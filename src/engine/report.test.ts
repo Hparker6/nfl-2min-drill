@@ -54,7 +54,9 @@ describe('realism batch', () => {
           if (res.yards < 0 && !res.turnover) row.neg++;
           row.secs += tl.end;
           // hard rules
-          if (tl.end <= 0 || tl.end > 20) flags.push(`${key}: play lasted ${tl.end.toFixed(1)}s (longer than any real play)`);
+          // a Hail Mary picked off and run back the length of the field is the longest real play there is
+          const cap = res.intercepted && res.defTd ? 22 : 20;
+          if (tl.end <= 0 || tl.end > cap) flags.push(`${key}: play lasted ${tl.end.toFixed(1)}s (longer than any real play)`);
           if (Math.abs(res.yards) > 100) flags.push(`${key}: ${res.yards} yards`);
           const ts = tl.events.map((e) => e.t);
           if (ts.some((t, j) => j && t < ts[j - 1] - 1e-9)) flags.push(`${key}: events out of order`);

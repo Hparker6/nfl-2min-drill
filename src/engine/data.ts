@@ -151,13 +151,29 @@ export const FAMS: Record<Fam, string> = { run: 'Run', pass: 'Pass', rpo: 'RPO',
 
 /** Defensive calls as the player sees them: what each is for, what it stops, and what it gives up. */
 export const LOOKS: Record<Look, { label: string; sub: string; stops: string; risk: string; tilt: 1 | 2 | 3 }> = {
-  balanced: { label: 'Balanced', sub: 'Base defense, ready for anything', stops: 'Nothing gets a free pass', risk: 'Nothing is taken away either', tilt: 1 },
-  blitz: { label: 'Blitz', sub: 'Send six or seven after the quarterback', stops: 'Sacks on deep drops and slow-developing throws', risk: 'Quick throws, screens and draws find open grass', tilt: 3 },
-  load: { label: 'Load the box', sub: 'Eight near the line to stop the run', stops: 'Runs, especially between the tackles', risk: 'Play-action and passes over the top', tilt: 2 },
-  zone: { label: 'Zone coverage', sub: 'Defend areas; rally and read the quarterback', stops: 'Yards after the catch; more interceptions', risk: 'Digs and seams sitting in the holes', tilt: 1 },
-  man: { label: 'Man coverage', sub: 'A defender on every receiver', stops: 'Easy throws underneath to hitches and digs', risk: 'Crossers, slants and wheels that get separation', tilt: 2 },
+  // zone
+  balanced: { label: 'Cover 3', sub: 'Base defense: three deep, four underneath', stops: 'Nothing gets a free pass', risk: 'Nothing is taken away either', tilt: 1 },
+  zone: { label: 'Cover 2', sub: 'Two deep safeties; rally and read the quarterback', stops: 'Yards after the catch; more interceptions', risk: 'Digs and seams sitting in the holes', tilt: 1 },
+  cover4: { label: 'Cover 4 Quarters', sub: 'Four deep, each with a quarter of the field', stops: 'Deep shots: posts, seams and go routes', risk: 'Flats, outs, hitches and slants underneath', tilt: 1 },
+  tampa2: { label: 'Tampa 2', sub: 'Cover 2 with the middle linebacker running deep', stops: 'Seams and digs over the middle', risk: 'Corners and outs on the sideline; runs', tilt: 2 },
   prevent: { label: 'Prevent', sub: 'Everyone deep; keep it in front', stops: 'Deep shots and long touchdowns', risk: 'Short completions, runs and the clock', tilt: 2 },
-  goal: { label: 'Goal line', sub: 'Heavy front for the last few yards', stops: 'Runs at the goal line and on short yardage', risk: 'Away from the goal line, anything that gets past it goes far', tilt: 3 },
+  // man
+  man: { label: 'Cover 1 Man', sub: 'A defender on every receiver, one safety deep', stops: 'Easy throws underneath to hitches and digs', risk: 'Crossers, slants and wheels that get separation', tilt: 2 },
+  twoman: { label: '2-Man Under', sub: 'Man underneath, two safeties over the top', stops: 'Deep throws and contested catches underneath', risk: 'Runs and draws: only six in the box', tilt: 2 },
+  press: { label: 'Press Man', sub: 'Jam the receivers at the line', stops: 'Quick throws: slants, hitches, timing routes', risk: 'The go route and anything over the top', tilt: 2 },
+  robber: { label: 'Cover 1 Robber', sub: 'Man coverage with a safety lurking in the middle', stops: 'Crossers, slants and digs over the middle', risk: 'Deep outside throws: corners and go routes', tilt: 2 },
+  // blitz
+  blitz: { label: 'Cover 0 Blitz', sub: 'Send six or seven; nobody deep', stops: 'Sacks on deep drops and slow-developing throws', risk: 'Quick throws, screens and draws find open grass', tilt: 3 },
+  firezone: { label: 'Fire Zone', sub: 'Five rush, a lineman drops into coverage', stops: 'Hot routes and screens into the blitz', risk: 'Fewer sacks than an all-out blitz; seams between zones', tilt: 2 },
+  mike: { label: 'Mike Blitz', sub: 'The middle linebacker shoots the A-gap', stops: 'Inside runs and long drops', risk: 'Crossers and digs where he left', tilt: 3 },
+  cblitz: { label: 'Corner Blitz', sub: 'A corner comes off the edge', stops: 'Screens and runs to his side', risk: 'Outs, hitches and fades to the receiver he left', tilt: 3 },
+  sblitz: { label: 'Safety Blitz', sub: 'A safety comes downhill at the snap', stops: 'Runs and play-action', risk: 'Seams and posts with no one in the middle', tilt: 3 },
+  // goal line and run stop
+  goal: { label: 'Goal Line 6-5', sub: 'Heavy front for the last few yards', stops: 'Runs at the goal line and on short yardage', risk: 'Away from the goal line, anything that gets past it goes far', tilt: 3 },
+  glblitz: { label: 'Goal Line Blitz', sub: 'Everyone shoots a gap at the snap', stops: 'Runs, sneaks and slow throws', risk: 'Quick throws, screens and play-action', tilt: 3 },
+  glman: { label: 'Goal Line Man', sub: 'Heavy front, every receiver covered', stops: 'Play-action and fades', risk: 'Rubs, crossers and slants; a gap in the run fit', tilt: 2 },
+  load: { label: 'Bear 46', sub: 'Eight in the box to stop the run', stops: 'Runs, especially between the tackles', risk: 'Play-action and passes over the top', tilt: 2 },
+  runblitz: { label: 'Run Blitz', sub: 'The box shoots its gaps at the snap', stops: 'Runs at the line, before they start', risk: 'Screens and play-action behind it; a missed gap goes far', tilt: 3 },
   soft: { label: 'Prevent', sub: 'Everyone deep; keep it in front', stops: 'Deep shots and long touchdowns', risk: 'Short completions, runs and the clock', tilt: 2 },
 };
 export const LOOK_READ: Record<Look, string> = {
@@ -169,6 +185,18 @@ export const LOOK_READ: Record<Look, string> = {
   prevent: 'Safeties deep, corners off: soft shell',
   goal: 'Heavy goal-line front',
   soft: 'Safeties deep, corners off: soft shell',
+  cover4: 'Four deep, corners off: quarters',
+  tampa2: 'Two deep, middle linebacker bailing: Tampa 2',
+  twoman: 'Corners pressed, two safeties deep',
+  press: 'Corners in the receivers\' faces: press man',
+  robber: 'Man looks, a safety sitting in the middle',
+  firezone: 'Linebackers creeping up: pressure showing',
+  mike: 'Middle linebacker in the A-gap: blitz showing',
+  cblitz: 'A corner cheating toward the line',
+  sblitz: 'A safety rolled down near the box',
+  glblitz: 'Heavy goal-line front, everyone on the line',
+  glman: 'Heavy goal-line front, corners pressed',
+  runblitz: 'Eight in the box, linebackers on the line',
 };
 
 export const TEMPO = {

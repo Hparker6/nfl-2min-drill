@@ -9,7 +9,7 @@
  */
 import { CALL, DROPS, ROUTES, TEMPO, type Call, type DropId } from './data';
 import { clip, gauss, pickWeighted, type Rng } from './rng';
-import { DEF_CALLS, defFx, goalLineSituation } from './defense';
+import { BASE_CALLS, defFx, famOf, goalLineSituation } from './defense';
 import { passMods, runMods } from './attributes';
 
 /**
@@ -60,7 +60,7 @@ function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0, side?: 1 |
   let stuff = c.stuff! + L.stuff + P.stuff;
   // the side: strong (the tight end's) has the extra blocker; weak is where the box is thinner when it is loaded
   if (side) {
-    if (look === 'load' || look === 'goal') m += side === -1 ? 0.6 : -0.2;
+    if (famOf(look) === 'load' || famOf(look) === 'goal') m += side === -1 ? 0.6 : -0.2;
     else m += side === 1 ? 0.3 : -0.1;
     if (c.lane === 'out' && side === -1) { big *= 1.25; stuff += 0.03; }
   }
@@ -176,7 +176,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
     if (catchY >= yt) { res.td = true; res.yards = yt; res.dur = drop.release + fl + 0.5; return res; }
     let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * PM.yacMul * Wx.yac * (mods.oob ? 0.55 : 1));
     if (r() < 0.018 * PM.bigYac) yac += 12 + Math.round(r() * 30);
-    if (route === 'screen' && look === 'blitz') yac += 2;
+    if (route === 'screen' && famOf(look) === 'blitz') yac += 2;
     let y = catchY + yac;
     if (s.yl + y <= 0) y = 1 - s.yl;
     y = Math.min(y, yt);
@@ -617,6 +617,6 @@ export const aiST = (play: string): StChoice => (play === 'fg' ? 'safe' : 'retur
 // --------------------------------------------------------- helpers for UI ---
 
 export function lookOther(look: Look, r: Rng): Look {
-  const rest = DEF_CALLS.filter((x) => x !== look && x !== 'goal');
+  const rest = BASE_CALLS.filter((x) => x !== famOf(look) && x !== 'goal');
   return rest[Math.floor(r() * rest.length)];
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CALL, POS_ROUTES } from '../engine/data';
 import { DESIGN } from '../engine/formation';
-import { WEATHER, clone } from '../engine/sim';
+import { WEATHER, clone, leadOf } from '../engine/sim';
 import { utcDate, type Scenario } from '../engine/scenario';
 import type { Ev, Rcv, State } from '../engine/types';
 import { ballOn, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
@@ -53,6 +53,17 @@ let uid = 0;
 
 /** The pre-snap picture of a snap that already happened (for the next auto play, or a replay). */
 const before = (s: State, ev: Extract<Ev, { type: 'snap' }>): State => ({ ...s, off: ev.off, yl: ev.yl0, down: ev.down0, dist: ev.dist0, t: ev.t0, stage: 'call' });
+
+/**
+ * The tempo starts on what a coach would usually do, so the play can be snapped in one tap: milk it with the lead,
+ * hurry when behind or inside two minutes, huddle otherwise. On defense, let it run. Any of them can be changed.
+ */
+function defaultTempo(d: Decision): Opt | null {
+  const key = d.step === 'defClock' ? 'let' : d.step === 'offClock'
+    ? (leadOf(d.state, 0) > 0 ? 'milk' : leadOf(d.state, 0) < 0 || d.state.t <= 120 ? 'nohuddle' : 'huddle')
+    : null;
+  return key ? d.options.find((o) => o.key === key) ?? null : null;
+}
 
 export function GameScreen(p: Props) {
   const { sc, saved, settings, hints, onPicks, onDone } = p;
@@ -136,6 +147,21 @@ export function GameScreen(p: Props) {
     if (r.top < 60 || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
   };
 
+  /**
+   * On phones the field stays pinned while the page scrolls, and after a play it can cover the top of the next call:
+   * the situation, the tempo, Timeout and Spike. A new call scrolls up just enough to start right below the field.
+   */
+  useEffect(() => {
+    if (!dec || window.innerWidth >= 1000) return;
+    const id = requestAnimationFrame(() => {
+      const st = stageRef.current, cp = document.querySelector<HTMLElement>('.side .cp');
+      if (!st || !cp) return;
+      const gap = cp.getBoundingClientRect().top - st.getBoundingClientRect().bottom - 6;
+      if (gap < -4) window.scrollBy({ top: gap, behavior: reduced ? 'auto' : 'smooth' });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [dec, reduced]);
+
   /** Play events on the field. The banner and the scoreboard update land when each play is decided. */
   const animate = useCallback(async (evs: Ev[]) => {
     for (const ev of evs) {
@@ -197,7 +223,7 @@ export function GameScreen(p: Props) {
     setDec(d);
     setSel(null);
     setEdits(NO_EDITS);
-    setClockSel(null);
+    setClockSel(defaultTempo(d));
     setClockHints(null);
     setHintMap(null);
     peekJobRef.current = null;

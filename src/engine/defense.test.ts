@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { CALLS } from './data';
-import { DEF_CALLS } from './defense';
+import { DEF_CALLS, DEF_PLAYS } from './defense';
 import { advance, clone, resolveSnap, simulate } from './sim';
 import { customScenario, type SpotParams } from './scenario';
 import { rng } from './rng';
@@ -91,6 +91,21 @@ describe('defensive calls change outcomes', () => {
       expect([look, worse, better]).toEqual([look, true, true]);
     }
   });
+  it('every play in a tab has its own reason: none is better than another against every offensive call', () => {
+    const plays = CALLS.filter((c) => c.id !== 'hail').map((c) => c.id);
+    // the goal-line fronts are compared where they are offered; the run-stop calls in the tab, anywhere
+    const groups = [['zone', {}], ['man', {}], ['blitz', {}], ['goal', { yl: 90, dist: 2 }], ['runstop', {}]] as const;
+    for (const [cat, spot] of groups) {
+      const looks = DEF_CALLS.filter((l) => cat === 'runstop' ? DEF_PLAYS[l].cat === 'goal' && !DEF_PLAYS[l].goalOnly : DEF_PLAYS[l].cat === cat && (cat !== 'goal' || DEF_PLAYS[l].goalOnly));
+      const ypp = new Map(looks.map((l) => [l, plays.map((p) => dist(p, l, spot, 2000).ypp)]));
+      for (const a of looks) for (const b of looks) {
+        if (a >= b) continue;
+        const A = ypp.get(a)!, B = ypp.get(b)!;
+        const aBetter = A.some((y, i) => y < B[i] - 0.15), bBetter = B.some((y, i) => y < A[i] - 0.15);
+        expect([cat, a, b, aBetter, bBetter]).toEqual([cat, a, b, true, true]);
+      }
+    }
+  });
 });
 
 describe('the player\'s defensive call reaches the simulator', () => {
@@ -121,7 +136,7 @@ describe('the player\'s defensive call reaches the simulator', () => {
       for (let g = 0; g < 20 && (!d || d.step !== 'look'); g++) { if (d) ses.choose(d.options[0]); else ses.auto(); d = ses.decision(); }
       expect(d?.step).toBe('look');
       const opt = d!.options.find((o) => o.key === look);
-      if (look === 'goal') continue;   // offered only near the goal line or on short yardage
+      if (DEF_PLAYS[look].goalOnly) continue;   // offered only near the goal line or on short yardage
       expect(opt).toBeTruthy();
       const ev = ses.choose(opt!);
       const snap = ev.find((e) => e.type === 'snap');

@@ -35,8 +35,8 @@ export function Help({ onClose }: { onClose: () => void }) {
       <p><b>You're the play-caller at the end of a close game.</b> Each spot drops you into the fourth quarter with the score, the clock, the timeouts and 22 players on the field. Win the game.</p>
       <ul>
         <li><b>On offense</b>, pick from 27 calls in four families: Run, Pass, RPO and Trick. Field goals, punts and kneel-downs show up when they matter. On a pass, tap a receiver on the field to throw to him, and tap him again to change his route.</li>
-        <li><b>The clock is yours too.</b> When it's running you choose the tempo (no-huddle, huddle, milk it), call a timeout, spike it or kneel.</li>
-        <li><b>On defense</b>, choose Blitz, Load the box or Play it soft, and decide when to burn your timeouts.</li>
+        <li><b>The clock is yours too.</b> When it's running, the tempo starts on the usual choice (no-huddle when you're behind, milk it with the lead). Change it, or tap Timeout, Spike or Kneel instead.</li>
+        <li><b>On defense</b>, pick from four tabs: Zone, Man, Blitz and Goal Line, with four or five plays each, from Cover 2 to a corner blitz. Each one stops something and gives something up. Then decide when to burn your timeouts.</li>
         <li><b>Read the defense.</b> Before each snap you get a pre-snap read. It's right about 7 times in 10.</li>
       </ul>
       <h3>How calls are graded</h3>

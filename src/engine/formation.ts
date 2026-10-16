@@ -9,6 +9,7 @@
  * movement; designSignature() is what the tests use to check that no two calls are the same play under two names.
  */
 import { CALL } from './data';
+import { famOf } from './defense';
 import type { Look, Rcv } from './types';
 
 export const W = 53.33;
@@ -36,7 +37,8 @@ export function formation(id: FormationId): Record<string, Pt> {
 }
 
 /** Defensive alignments for each call (what the offense sees before the snap). */
-export function defAlign(look: Look | null): Record<string, Pt> {
+export function defAlign(call: Look | null): Record<string, Pt> {
+  const look = call ? famOf(call) : null;
   const s: Record<string, Pt> = {
     EDGE1: [CX - 5.6, 1.4], DL1: [CX - 1.7, 1.4], DL2: [CX + 1.7, 1.4], EDGE2: [CX + 5.6, 1.4],
     LB1: [CX - 4.8, 5], LB2: [CX, 5.5], LB3: [CX + 4.8, 5], CB1: [5, 6], CB2: [W - 5, 6], S1: [CX - 9, 13], S2: [CX + 9, 13],
@@ -46,7 +48,20 @@ export function defAlign(look: Look | null): Record<string, Pt> {
   if (look === 'zone') { s.CB1 = [5, 7.5]; s.CB2 = [W - 5, 7.5]; s.LB1 = [CX - 6, 6]; s.LB3 = [CX + 6, 6]; s.S1 = [CX - 10, 14]; s.S2 = [CX + 10, 14]; }
   if (look === 'man') { s.CB1 = [5, 1.6]; s.CB2 = [W - 5, 1.6]; s.LB1 = [13, 3.2]; s.LB3 = [CX + 6.6, 3.4]; s.LB2 = [CX - 1.5, 5]; s.S1 = [CX, 14]; s.S2 = [CX + 3, 8]; }
   if (look === 'goal') { s.LB1 = [CX - 3.5, 2.3]; s.LB2 = [CX, 2.3]; s.LB3 = [CX + 3.5, 2.3]; s.CB1 = [6, 2.5]; s.CB2 = [W - 6, 2.5]; s.S1 = [CX - 7, 4]; s.S2 = [CX + 7, 4]; }
-  if (look === 'soft' || look === 'prevent') { s.LB1 = [CX - 5, 6.5]; s.LB2 = [CX, 7]; s.LB3 = [CX + 5, 6.5]; s.CB1 = [5, 9]; s.CB2 = [W - 5, 9]; s.S1 = [CX - 8, 17]; s.S2 = [CX + 8, 17]; }
+  if (look === 'prevent') { s.LB1 = [CX - 5, 6.5]; s.LB2 = [CX, 7]; s.LB3 = [CX + 5, 6.5]; s.CB1 = [5, 9]; s.CB2 = [W - 5, 9]; s.S1 = [CX - 8, 17]; s.S2 = [CX + 8, 17]; }
+  // the plays built on a family: where they differ before the snap
+  switch (call) {
+    case 'cover4': s.CB1 = [5, 9]; s.CB2 = [W - 5, 9]; s.S1 = [CX - 12, 13]; s.S2 = [CX + 12, 13]; break;
+    case 'tampa2': s.LB2 = [CX, 8.5]; s.S1 = [CX - 11, 15]; s.S2 = [CX + 11, 15]; break;
+    case 'twoman': s.S1 = [CX - 10, 15]; s.S2 = [CX + 10, 15]; break;
+    case 'press': s.CB1 = [5, 0.9]; s.CB2 = [W - 5, 0.9]; break;
+    case 'robber': s.S1 = [CX, 15]; s.S2 = [CX + 1, 9]; break;
+    case 'mike': s.LB2 = [CX, 3]; break;
+    case 'cblitz': s.CB1 = [7, 3]; break;
+    case 'sblitz': s.S1 = [CX - 5, 7]; break;
+    case 'glman': s.CB1 = [6, 1.2]; s.CB2 = [W - 6, 1.2]; break;
+    case 'runblitz': s.LB1 = [CX - 3.6, 3.2]; s.LB2 = [CX, 3.4]; s.LB3 = [CX + 3.6, 3.2]; break;
+  }
   return s;
 }
 

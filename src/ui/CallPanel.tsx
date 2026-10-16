@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CALL, LOOK_READ, LOOKS, POS_NAME, ROUTES, TEMPO } from '../engine/data';
+import { DEF_PLAYS, type DefCat } from '../engine/defense';
 import { WEATHER } from '../engine/sim';
 import { tendency } from '../game/describe';
 import type { Decision, Opt } from '../game/session';
@@ -48,12 +49,22 @@ const tabOf = (o: Opt): Tab | null => (o.group === 'pass' ? (SHORT.has(o.key) ? 
 // decisions that cost something you cannot get back: marked so they are not tapped by accident
 const MAJOR = new Set(['timeout', 'spike', 'kneel', 'drain', 'onside', 'two', 'block', 'rush', 'fg', 'punt']);
 const TEMPO_KEYS = new Set(['nohuddle', 'huddle', 'milk', 'let']);
+const TEMPO_NAME: Record<string, string> = { nohuddle: 'No-huddle', huddle: 'Huddle', milk: 'Milk it', let: 'Let it run' };
 const RISK = ['', 'Safe', 'Balanced', 'Risky'];
 const MODS: { k: keyof PassMods; label: string; tip: string }[] = [
   { k: 'pa', label: 'Play action', tip: 'Fake the handoff first. Freezes a loaded box; holds the ball a beat longer.' },
   { k: 'roll', label: 'Roll out', tip: 'Move the pocket. Fewer sacks; the deep throws get harder.' },
   { k: 'oob', label: 'Sideline', tip: 'Get out of bounds after the catch to stop the clock, for fewer yards.' },
 ];
+
+/** The defense in four tabs, like the offense. */
+const DEF_TABS: { id: DefCat; label: string; key: string; blurb: string }[] = [
+  { id: 'zone', label: 'Zone', key: 'z', blurb: 'Zone: defenders cover areas and keep everything in front.' },
+  { id: 'man', label: 'Man', key: 'm', blurb: 'Man: a defender on every receiver. Tight coverage, but rubs and crossers get open.' },
+  { id: 'blitz', label: 'Blitz', key: 'b', blurb: 'Blitz: send extra rushers. Sacks and hurried throws, but someone is left open.' },
+  { id: 'goal', label: 'Goal Line', key: 'g', blurb: 'Goal line and run stop: load the box. Stops runs; play-action and the deep ball are the risk.' },
+];
+const defTabOf = (o: Opt): DefCat => (o.choice.look && o.choice.look !== 'soft' ? DEF_PLAYS[o.choice.look].cat : 'zone');
 
 /** Runs that have a side to pick: everything but a sneak. */
 const sided = (play: string | undefined) => !!play && CALL[play]?.kind === 'run' && play !== 'sneak';
@@ -109,8 +120,8 @@ function ClockRow({ clock, clockSel, hints, s, onClock, onMajor }: { clock: Deci
           const secs = o.key in TEMPO ? TEMPO[o.key as keyof typeof TEMPO].secs : null;
           return (
             <button key={o.key} role="radio" aria-checked={sel} className={`tbtn${sel ? ' on' : ''} ${hintClass(wp, best)}`} onClick={() => onClock(o)} title={o.sub}>
-              <span className="tbtn-name">{o.label}</span>
-              <span className="tbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : secs != null ? `−${Math.min(secs, s.t)}s` : o.sub}</span>
+              <span className="tbtn-name">{TEMPO_NAME[o.key] ?? o.label}</span>
+              <span className="tbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : secs != null ? `about ${Math.min(secs, s.t)} s` : o.key === 'let' ? 'Save your timeouts' : o.sub}</span>
             </button>
           );
         })}
@@ -122,7 +133,7 @@ function ClockRow({ clock, clockSel, hints, s, onClock, onMajor }: { clock: Deci
             return (
               <button key={o.key} className={`mbtn ${o.key}${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} onClick={() => onMajor(o)} title={o.sub}>
                 <span className="mbtn-name">{o.label}</span>
-                <span className="mbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : o.key === 'timeout' ? `${s.to[0]} left` : o.key === 'spike' ? 'Costs a down' : o.key === 'kneel' ? 'Runs the clock' : o.key === 'drain' ? 'To 0:03, then timeout' : o.key === 'let' ? '' : o.sub}</span>
+                <span className="mbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : o.key === 'timeout' ? `${s.to[0]} left` : o.key === 'spike' ? 'Stops it, costs a down' : o.key === 'kneel' ? 'Runs the clock' : o.key === 'drain' ? 'To 0:03, then timeout' : o.key === 'let' ? '' : o.sub}</span>
               </button>
             );
           })}
@@ -137,19 +148,21 @@ export function CallPanel(p: Props) {
   const isPlay = dec.step === 'play';
   const isLook = dec.step === 'look';
   const [tab, setTab] = useState<Tab>('short');
+  const [dtab, setDtab] = useState<DefCat>('zone');
   const specials = dec.options.filter((o) => o.group === 'special');
   const best = bestOf(hints);
   const needClock = !!clock && !clockSel;
   const canSnap = !!selected && !needClock;
 
   useEffect(() => { if (isPlay) setTab('short'); }, [dec.step === 'play' ? dec.title : null, isPlay]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (isLook) setDtab('zone'); }, [dec.step === 'look' ? dec.title : null, isLook]);   // eslint-disable-line react-hooks/exhaustive-deps
   // a row picked from the keyboard (or under the pinned field on phones) scrolls clear, with its options
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('.cp [aria-selected="true"]');
     if (el) keepClear(el.closest<HTMLElement>('.prow-wrap') ?? el);
   }, [selected?.key]);
 
-  const list = isPlay ? dec.options.filter((o) => tabOf(o) === tab) : dec.options;
+  const list = isPlay ? dec.options.filter((o) => tabOf(o) === tab) : isLook ? dec.options.filter((o) => defTabOf(o) === dtab) : dec.options;
   // keys: 1-9 the list, then the special-teams buttons; R S D O T switch tabs; Enter snaps the selected call
   const keyed = isPlay ? [...list, ...specials] : list;
   useEffect(() => {
@@ -168,6 +181,9 @@ export function CallPanel(p: Props) {
       } else if (isPlay) {
         const t = TABS.find((x) => x.key === e.key.toLowerCase());
         if (t) setTab(t.id);
+      } else if (isLook) {
+        const t = DEF_TABS.find((x) => x.key === e.key.toLowerCase());
+        if (t) setDtab(t.id);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -181,11 +197,8 @@ export function CallPanel(p: Props) {
   if (isLook) {
     const look = selected?.choice.look;
     const info = look ? LOOKS[look] : null;
-    // the calls in two groups: who you send, and how you cover
-    const pressure = dec.options.filter((o) => ['blitz', 'load', 'goal'].includes(o.key));
-    const coverage = dec.options.filter((o) => !pressure.includes(o));
-    const row = (o: Opt) => {
-      const i = dec.options.indexOf(o);
+    const DT = DEF_TABS.find((x) => x.id === dtab)!;
+    const row = (o: Opt, i: number) => {
       const wp = hints?.get(o.key);
       const sel = selected?.key === o.key;
       const L = LOOKS[o.choice.look!];
@@ -212,22 +225,29 @@ export function CallPanel(p: Props) {
           <div className="read tend"><b>Their offense:</b> {tendency(s)}</div>
         </header>
         {clockRow}
-        <div className="cp-list def-list" role="listbox" aria-label="Defensive calls">
-          <div className="def-group-k">Coverage</div>
-          {coverage.map(row)}
-          {pressure.length > 0 && <div className="def-group-k">Pressure</div>}
-          {pressure.map(row)}
+        <div className="tabs5 deftabs" role="tablist" aria-label="Kinds of defense">
+          {DEF_TABS.map((t) => {
+            const n = dec.options.filter((o) => defTabOf(o) === t.id).length;
+            return (
+              <button key={t.id} role="tab" aria-selected={dtab === t.id} className={`tab5 dcat-${t.id}${dtab === t.id ? ' on' : ''}`} onClick={() => setDtab(t.id)} title={t.blurb}>
+                <span className="tab5-name"><i />{t.label}</span>
+                <span className="tab5-n">{n} play{n === 1 ? '' : 's'}</span>
+              </button>
+            );
+          })}
         </div>
+        <p className="tab5-blurb">{DT.blurb}</p>
+        <div className="cp-list def-list" role="listbox" aria-label={`${DT.label} defenses`}>{list.map(row)}</div>
         {info && <div className="def-trade strip"><span><b>Stops:</b> {info.stops}</span><span><b>Gives up:</b> {info.risk}</span></div>}
         <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
           <div className="cp-sel">
             {info ? (
               <>
-                <span className="cp-sel-k">Your defense{clockSel ? ` · ${clockSel.label.toLowerCase()}` : ''}</span>
+                <span className="cp-sel-k">Your defense</span>
                 <span className="cp-sel-name">{info.label}</span>
                 {clockNote && <span className="cp-sel-sub"><b>{clockNote}</b></span>}
               </>
-            ) : <span className="cp-sel-sub">{clockNote ?? 'Pick a defense to see it on the field.'}<span className="keys"> Keys: 1–{dec.options.length} pick · Enter calls it</span></span>}
+            ) : <span className="cp-sel-sub">{clockNote ?? 'Pick a defense to see it on the field.'}<span className="keys"> Keys: 1–9 pick · Z M B G tabs · Enter calls it</span></span>}
           </div>
           <button className="btn snap" disabled={!canSnap} onClick={() => selected && canSnap && onSnap(selected)}>{snapLabel('Call it')}<kbd>Enter</kbd></button>
         </footer>
@@ -376,7 +396,7 @@ export function CallPanel(p: Props) {
         <div className="cp-sel">
           {selected ? (
             <>
-              <span className="cp-sel-k">Selected{clockSel ? ` · ${clockSel.label.toLowerCase()}` : ''}</span>
+              <span className="cp-sel-k">Selected{clockSel ? ` · ${(TEMPO_NAME[clockSel.key] ?? clockSel.label).toLowerCase()}` : ''}</span>
               <span className="cp-sel-mini"><MiniPlay play={selected.choice.play} side={edits.side} routes={edits.routes} target={edits.target} mods={edits.mods} /></span>
               <span className="cp-sel-name">{selected.label}</span>
               <span className="cp-sel-sub">{clockNote ? <b>{clockNote}</b> : summary()}</span>

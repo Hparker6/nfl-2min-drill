@@ -809,3 +809,22 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .mbtn-sub:empty { display: none; }
 .cp-sel-sub b { color: var(--accent); }
 .cp.def .cp-sel-sub b { color: var(--def); }
+
+/* the defense in four tabs, each with its own color */
+.tabs5.deftabs { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tab5.dcat-zone { --fc: var(--pass); } .tab5.dcat-man { --fc: var(--rpo); } .tab5.dcat-blitz { --fc: var(--r); } .tab5.dcat-goal { --fc: var(--run); }
+/* clock decisions you can't take back: solid buttons, like the snap */
+.mbtn { background: var(--accent); border-color: var(--accent); }
+.mbtn:hover { background: color-mix(in srgb, var(--accent) 86%, #fff); }
+.mbtn-name { color: var(--accent-ink); }
+.mbtn-sub { color: color-mix(in srgb, var(--accent-ink) 72%, transparent); }
+.mbtn.h-g .mbtn-sub, .mbtn.h-y .mbtn-sub, .mbtn.h-o .mbtn-sub, .mbtn.h-r .mbtn-sub { color: var(--accent-ink); font-weight: 700; }
+.cp.def .mbtn { background: var(--def); border-color: var(--def); }
+.cp.def .mbtn:hover { background: color-mix(in srgb, var(--def) 86%, #fff); }
+.cp.def .mbtn-name { color: #04201c; }
+/* defense with their clock running: Let it run and Timeout side by side, one row */
+.clockrow.def { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: stretch; }
+.clockrow.def .majors { grid-auto-flow: row; }
+@media (min-width: 1000px) { .cp.def:has(.clockrow) .tab5-blurb { display: none; } }
+/* short desktop windows: when the panel can't fit, the column scrolls and the Snap bar stays pinned at its bottom */
+@media (min-width: 1000px) { .side > section.cp { min-height: min-content; } }

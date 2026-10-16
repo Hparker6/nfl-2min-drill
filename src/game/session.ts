@@ -9,7 +9,7 @@ import {
 } from '../engine/sim';
 import { hash, rng } from '../engine/rng';
 import { READ_ACCURACY } from '../engine/evaluate';
-import { DEF_CALLS, goalLineSituation } from '../engine/defense';
+import { DEF_CALLS, DEF_PLAYS, goalLineSituation } from '../engine/defense';
 import type { Scenario } from '../engine/scenario';
 import type { Choice, Ev, State } from '../engine/types';
 import type { Grade } from './grade';
@@ -127,7 +127,7 @@ export class Session {
       }
       if (pp === 'kneel' || pp === 'spike') return null;
       // goal-line defense is offered where it belongs: near the goal line or on short yardage
-      const calls = DEF_CALLS.filter((k) => k !== 'goal' || goalLineSituation(s) || ytg(s) <= 10);
+      const calls = DEF_CALLS.filter((k) => !DEF_PLAYS[k].goalOnly || goalLineSituation(s) || ytg(s) <= 10);
       const options: Opt[] = calls.map((k) => ({ key: k, label: LOOKS[k].label, sub: LOOKS[k].sub, group: 'def', choice: { look: k }, risk: LOOKS[k].tilt }));
       const ai = aiDefLook(s, aiR);
       const goal = s.dist >= ytg(s) ? 'Goal' : String(s.dist);

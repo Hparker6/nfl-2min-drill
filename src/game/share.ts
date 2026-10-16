@@ -1,5 +1,6 @@
 /** Share text for a finished day or survivor run, and the coach profile. */
 import { ARCHETYPES, CALL, type ArchetypeId } from '../engine/data';
+import { DEF_PLAYS } from '../engine/defense';
 import { dayNumber } from '../engine/scenario';
 import { GRADE_INFO } from './grade';
 import type { Record_ } from './session';
@@ -75,7 +76,12 @@ export function tagsOf(records: Record_[]): string[] {
       if (r.situation.includes('4th &') && !call && (c.play === 'fg' || c.play === 'punt')) tags.push('kick4');
     }
     if (r.step === 'offClock' && c.offClock) tags.push(`clock:${c.offClock}`);
-    if (r.step === 'look' && c.look) tags.push(`look:${c.look}`);
+    if (r.step === 'look' && c.look) {
+      tags.push(`look:${c.look}`);
+      // every pressure call counts as a blitz, and prevent (or its old name) as playing it soft
+      if (c.look !== 'soft' && (DEF_PLAYS[c.look].cat === 'blitz' || c.look === 'glblitz' || c.look === 'runblitz')) tags.push('dpress');
+      if (c.look === 'prevent' || c.look === 'soft') tags.push('dsoft');
+    }
     if (r.step === 'pat' && c.pat === 'two') tags.push('two');
     if (r.step === 'kick' && c.kick === 'onside') tags.push('onside');
   }
@@ -92,8 +98,8 @@ export function archetype(tags: string[]): ArchetypeId {
     grinder: (n('run') + n('rpo') * 0.5) / plays,
     gambler: (n('trick') * 2 + n('go4') * 2 + n('two') * 2 + n('onside') * 2) / plays,
     surgeon: (n('clock:nohuddle') + n('clock:timeout') + n('clock:spike') + n('sideline')) / (plays + n('clock')) * 1.2,
-    pressure: n('look') ? tags.filter((t) => t === 'look:blitz').length / looks * 0.9 : 0,
-    bend: n('look') ? tags.filter((t) => t === 'look:soft').length / looks * 0.9 : 0,
+    pressure: n('look') ? n('dpress') / looks * 0.9 : 0,
+    bend: n('look') ? n('dsoft') / looks * 0.9 : 0,
   };
   return (Object.keys(score) as ArchetypeId[]).reduce((a, b) => (score[b] > score[a] ? b : a));
 }
@@ -110,7 +116,7 @@ export function profileFacts(tags: string[]): string[] {
   if (plays >= 4 && runs / plays >= 0.5) out.push(`ran it on ${runs} of ${plays} snaps (most: ${Math.round(plays * 0.4)})`);
   const looks = tags.filter((x) => x.startsWith('look:')).length;
   if (looks >= 3) {
-    const b = n('look:blitz'), p = n('look:prevent') + n('look:soft');
+    const b = n('dpress'), p = n('dsoft');
     if (b >= p) out.push(`blitzed on ${b} of ${looks} defensive snaps (most: ${Math.round(looks * 0.25)})`);
     else out.push(`played it soft on ${p} of ${looks} defensive snaps (most: ${Math.round(looks * 0.2)})`);
   }

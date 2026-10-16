@@ -27,11 +27,13 @@
     <meta name="twitter:description" content="Run the 2-minute drill: call the plays at the end of a close game. Every call graded against every option you had." />
     <meta name="twitter:image" content="%OG_IMAGE%" />
     <!--JSONLD-->
+    <!-- colors before the stylesheet loads; the stylesheet (and the theme setting) take over once it does -->
+    <style>html,body{margin:0;background:#0a0e0c;color:#edf2ee}@media (prefers-color-scheme:light){html,body{background:#eef2ef;color:#101813}}</style>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body style="background:#0a0e0c;color:#edf2ee;margin:0">
+  <body>
     <!-- Shown until the app loads (React replaces it); also what crawlers that don't run JavaScript read. -->
     <div id="root"><main style="font:16px/1.5 system-ui,sans-serif;padding:48px 24px;max-width:640px;margin:auto">
       <h1 style="font-size:28px;line-height:1.2;margin:0 0 12px">NFL 2-Minute Drill: call the plays in The 4th Call</h1>

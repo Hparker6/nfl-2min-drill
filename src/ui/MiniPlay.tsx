@@ -4,6 +4,7 @@
  * the card matches what the play looks like once it is snapped.
  */
 import { CALL, ROUTES } from '../engine/data';
+import { DEF_PLAYS, famOf } from '../engine/defense';
 import { DESIGN, defAlign, formation } from '../engine/formation';
 import { routePoints } from '../engine/timeline';
 import type { Look, PassMods, Rcv, RouteId } from '../engine/types';
@@ -65,13 +66,16 @@ export function MiniPlay({ play, look, side, routes, target, mods, className }: 
   const cls = `mini mp${className ? ' ' + className : ''}`;
   if (look) {
     // the defense's eleven, with the ghost of a base offense so the shape of the call reads
-    const L = look === 'soft' ? 'prevent' : look;
-    const da = defAlign(L);
+    const call = look === 'soft' ? 'prevent' : look;
+    const L = famOf(call);
+    const da = defAlign(call);
     const fm = formation('gun');
     const qb: Pt = [CX, -5.4];
-    const rushers = L === 'blitz' ? ['LB1', 'LB3', 'CB1'] : L === 'goal' ? ['LB1', 'LB2', 'LB3'] : L === 'load' ? ['LB2'] : [];
-    const zones = L === 'zone' ? ['LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'] : L === 'prevent' ? ['CB1', 'CB2', 'S1', 'S2', 'LB2'] : L === 'balanced' ? ['S1', 'S2'] : [];
-    const manPairs: [string, Rcv][] = L === 'man' ? [['CB1', 'WR1'], ['CB2', 'WR2'], ['LB1', 'WR3'], ['LB3', 'TE'], ['LB2', 'RB']] : [];
+    const rushers = DEF_PLAYS[call].rush ?? [];
+    // deep help drawn as zones on the man calls that have it
+    const deepHelp: Partial<Record<Look, string[]>> = { twoman: ['S1', 'S2'], robber: ['S2'], cover4: ['CB1', 'CB2', 'S1', 'S2', 'LB1', 'LB3'], tampa2: ['LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'], firezone: ['DL1', 'LB2', 'S1', 'S2', 'CB1', 'CB2'] };
+    const zones = (deepHelp[call] ?? (L === 'zone' ? ['LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'] : L === 'prevent' ? ['CB1', 'CB2', 'S1', 'S2', 'LB2'] : L === 'balanced' ? ['S1', 'S2'] : [])).filter((k) => !rushers.includes(k));
+    const manPairs: [string, Rcv][] = (L === 'man' || call === 'glman' || call === 'blitz' ? [['CB1', 'WR1'], ['CB2', 'WR2'], ['LB1', 'WR3'], ['LB3', 'TE'], ['LB2', 'RB']] as [string, Rcv][] : []).filter(([d]) => !rushers.includes(d));
     return (
       <svg className={`${cls} mp-def look-${L}`} viewBox={VB} aria-hidden>
         <Turf />

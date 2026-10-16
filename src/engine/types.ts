@@ -1,7 +1,16 @@
 /** Core models shared by the engine, the evaluator worker and the UI. Team 0 is always the player ("you"). */
 export type Team = 0 | 1;
-/** Defensive calls. 'soft' is the old name of 'prevent', kept so saved games replay. */
-export type Look = 'balanced' | 'blitz' | 'load' | 'zone' | 'man' | 'prevent' | 'goal' | 'soft';
+/** The seven defensive families: each has its own alignment and its own way of moving on the field. */
+export type LookFam = 'balanced' | 'blitz' | 'load' | 'zone' | 'man' | 'prevent' | 'goal';
+/**
+ * Defensive calls: the seven families' base calls plus the plays built on them (see DEF_PLAYS in defense.ts).
+ * 'soft' is the old name of 'prevent', kept so saved games replay.
+ */
+export type Look = LookFam | 'soft'
+  | 'cover4' | 'tampa2'
+  | 'twoman' | 'press' | 'robber'
+  | 'firezone' | 'mike' | 'cblitz' | 'sblitz'
+  | 'glblitz' | 'glman' | 'runblitz';
 export type Stage = 'pre' | 'call' | 'pat' | 'kick' | 'over';
 export type Rcv = 'WR1' | 'WR2' | 'WR3' | 'TE' | 'RB';
 export type RouteId =

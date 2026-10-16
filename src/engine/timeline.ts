@@ -22,11 +22,12 @@
  * Deterministic: the same snap and seed always give the same timeline, so a replay shows exactly the same play.
  */
 import { CALL, ROUTES } from './data';
+import { famOf } from './defense';
 import { CX, DESIGN, W, defAlign, formation, type Design, type Pt } from './formation';
 import { clip, rng, type Rng } from './rng';
 import { flight } from './sim';
 import { fieldGoalTimeline } from './kicks';
-import type { Look, PlayResult, Ratings, Rcv, RouteId } from './types';
+import type { Look, LookFam, PlayResult, Ratings, Rcv, RouteId } from './types';
 
 export type Key = [number, number, number];          // t, x, dy
 export interface BallKey { t: number; x: number; dy: number; h: number }
@@ -61,6 +62,10 @@ const DEF = ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1', 'CB2', 
 const LINE = ['LT', 'LG', 'C', 'RG', 'RT'];
 const FRONT = ['EDGE1', 'DL1', 'DL2', 'EDGE2'];
 const RCV: Rcv[] = ['WR1', 'WR2', 'WR3', 'TE', 'RB'];
+/** Who rushes besides the front four, by call. */
+const BLITZERS: Partial<Record<Look, string[]>> = {
+  blitz: ['LB1', 'LB3'], firezone: ['LB1', 'LB3'], mike: ['LB2'], cblitz: ['CB1', 'LB3'], sblitz: ['S1', 'LB1'], glblitz: ['LB1', 'LB2', 'LB3'], runblitz: ['LB1', 'LB2'],
+};
 
 const sub = (a: Pt, b: Pt): Pt => [a[0] - b[0], a[1] - b[1]];
 const add = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]];
@@ -154,7 +159,8 @@ export function choreograph(inp: ChoreoInput): Timeline {
   const design: Design | undefined = design0 && (res.mods?.roll || res.mods?.pa)
     ? { ...design0, qb: res.mods.roll ? 'boot' : design0.qb === 'boot' ? 'boot' : 'pa', rb: design0.rb === 'route' || design0.rb === 'fake' ? 'fake' : design0.rb, scheme: res.mods.roll ? 'boot' : design0.scheme === 'quick' ? 'pa' : design0.scheme }
     : design0;
-  const look: Look = res.look ?? 'balanced';
+  const call0: Look = res.look ?? 'balanced';
+  const look: LookFam = famOf(call0);   // alignment and movement come from the family; the extra rushers from the play
   // runs go to the side the play-caller picked (strong is the tight end's side); passes bend toward the target
   const side: 1 | -1 = (res.kind === 'run' ? res.side ?? design?.side ?? 1 : design?.side ?? res.side ?? 1) as 1 | -1;
   const fm = formation(design?.formation ?? 'gun');
@@ -182,7 +188,7 @@ export function choreograph(inp: ChoreoInput): Timeline {
   const pro = units.o?.passPro ?? inp.off.ol, rush = units.d?.passRush ?? inp.def.dl;
   // pressure time: when the rush gets home with this protection (seconds); used for sacks and for how long the
   // quarterback can hold the ball
-  const pressureT = clip(2.7 + (pro - rush) * 0.05 + (look === 'blitz' ? -0.55 : look === 'prevent' || look === 'soft' ? 0.4 : 0) + (r() - 0.5) * 0.5, 1.4, 4.5);
+  const pressureT = clip(2.7 + (pro - rush) * 0.05 + (look === 'blitz' ? -0.55 : look === 'prevent' ? 0.4 : 0) + (r() - 0.5) * 0.5, 1.4, 4.5);
 
   // ======================================================================== passing plays
   if (isPassish) {
@@ -306,8 +312,9 @@ export function choreograph(inp: ChoreoInput): Timeline {
     }
 
     // ---- the pass rush: lanes to the quarterback, slowed by blockers; the winner (on a sack) gets home on time
-    const sacker = sack ? (look === 'blitz' && r() < 0.35 ? 'd:LB1' : r() < 0.5 ? 'd:EDGE1' : 'd:EDGE2') : '';
-    const rushers = [...FRONT.map((k) => 'd:' + k), ...(look === 'blitz' ? ['d:LB1', 'd:LB3'] : [])];
+    const extra = (BLITZERS[call0] ?? []).map((k) => 'd:' + k);
+    const sacker = sack ? (extra.length && look === 'blitz' && r() < 0.35 ? extra[0] : r() < 0.5 ? 'd:EDGE1' : 'd:EDGE2') : '';
+    const rushers = [...FRONT.map((k) => 'd:' + k), ...extra];
     const proUnit = pro, rushUnit = rush;
     const gain = clip(0.35 + (rushUnit - proUnit) * 0.02, 0.12, 0.8);   // yards per second a blocked rusher gains
     for (const key of rushers) {
@@ -338,7 +345,7 @@ export function choreograph(inp: ChoreoInput): Timeline {
     const man = look === 'man' || look === 'blitz' || look === 'balanced' || look === 'load' || look === 'goal';
     const coverOf: Record<string, Rcv | null> = { 'd:CB1': 'WR1', 'd:CB2': 'WR2', 'd:LB1': look === 'blitz' ? null : 'WR3', 'd:LB3': look === 'blitz' ? null : 'TE', 'd:LB2': 'RB', 'd:S2': look === 'man' ? 'WR3' : null };
     const sepTarget = res.complete ? clip(1.3 + ((units.o?.rcv[tgt]?.sep ?? 80) - (units.d?.cov[tgt]?.coverage ?? 80)) * 0.04 + r() * 0.9, 1.0, 3.2) : res.intercepted ? 0 : clip(0.5 + r() * 0.6, 0.4, 1.1);
-    const landmarks: Record<string, Pt> = look === 'prevent' || look === 'soft'
+    const landmarks: Record<string, Pt> = look === 'prevent'
       ? { 'd:CB1': [8, 15], 'd:CB2': [W - 8, 15], 'd:S1': [CX - 9, 22], 'd:S2': [CX + 9, 22], 'd:LB1': [CX - 7, 9], 'd:LB2': [CX, 10], 'd:LB3': [CX + 7, 9] }
       : { 'd:CB1': [7, 12], 'd:CB2': [W - 7, 12], 'd:S1': [CX - 10, 16], 'd:S2': [CX + 10, 16], 'd:LB1': [CX - 7, 7], 'd:LB2': [CX, 8], 'd:LB3': [CX + 7, 7] };
     const recvPos = (rk: Rcv, t: number): Pt => ag['o:' + rk].keys.length ? (() => { const ks = ag['o:' + rk].keys; const i = Math.max(0, Math.min(ks.length - 1, Math.round(t / DT))); return [ks[i][1], ks[i][2]] as Pt; })() : P('o:' + rk);
