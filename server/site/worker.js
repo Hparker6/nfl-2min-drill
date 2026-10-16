@@ -157,6 +157,9 @@ function page({ path, title, description, h1, body, jsonld, eyebrow }) {
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/pages.css" />
 ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>` : ''}
+<!-- Google AdSense site verification: loads the AdSense script only; no ad units are placed -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2581780385461126"
+     crossorigin="anonymous"></script>
 </head><body>
 <header class="top"><div class="top-in">
 <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="18" height="18"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="currentColor"/></g></svg></span><span>The <em>4th</em> Call</span></a>
