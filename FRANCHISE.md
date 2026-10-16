@@ -68,8 +68,8 @@ changes the Daily, Survivor or Practice, and existing saved games must replay id
 
 ### League
 - 32 teams, 2 conferences × 4 divisions (static table in `src/franchise/league.ts`).
-- Rosters from `src/data/nfl-rosters.json`, which has 24 starters per team with ratings.
-- Refresh the roster build (`npm run rosters`) to current 2026 rosters before launch (the file is labeled season 2025).
+- **Fictional players only (decided).** No real player names anywhere in Franchise. Rosters are generated, building on `makeTeam` in `scenario.ts`. Each team gets a stable, seeded roster with realistic rating spreads, so there are stars, depth and weak spots.
+- Team names and logos are still open: whether to use real NFL cities and team names, or a fictional league.
 
 ### Schedule
 - **The real 2026 NFL schedule** (week, home and away, byes), built into a data file from nflverse schedule data by a
@@ -214,4 +214,4 @@ Code lives in `src/franchise/` (league, schedule, game sim, stats, standings, pl
 | 4 | Difficulty levels | Rookie, Pro, All-Pro: they change how sharp the AI's play-calling is, not the players' ratings |
 | 5 | Saves | Browser only, 3 slots, with an export code |
 | 6 | Free or premium | **Agreed:** free while in beta. Later, sell **ad-free play** and/or **extra seasons** (the Dynasty phase). |
-| 7 | Player names | Get a legal review **before** monetizing anything. Misspelled "parody" names (e.g. "Bejawn Robinson") are **not** a safe option: same team, number, position and ratings still identify the player. Options to bring to the lawyer: an NFLPA group license; fictional players with editable names; real names only in the free modes. |
+| 7 | Player names | **Decided:** fictional players only, no real names. Still open: real NFL team names, or a fictional league (NFL names and logos are trademarks). |
