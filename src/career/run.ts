@@ -30,7 +30,7 @@ function collegeTeams(c: Career): [TeamInfo, TeamInfo] {
     SLOTS.forEach((slot, n) => {
       p[slot] = slot === 'QB' && you ? youPlayer(c) : genPlayer(`${id}-${slot}`, slot, base + (r() - 0.5) * 8, r, name(), 10 + n, null);
     });
-    return { id, city: col[0], name: col[1], color: col[2], color2: col[3], rat: teamRatings(p), players: p };
+    return { id: col[4], city: col[0], name: col[1], color: col[2], color2: col[3], rat: teamRatings(p), players: p };
   };
   return [mk('COLA', 0, 72, true), mk('COLB', 1, 73, false)];
 }
@@ -165,7 +165,7 @@ export function liveBox(c: Career, live: LiveGame): { box: Box; teams: [TeamInfo
   const g = gameOf(c, live.gameId);
   const teams = liveTeams(c, g);
   const pid = (side: Team, slot: string) => {
-    if (g.id === 'college') return side === 0 && slot === 'QB' ? c.you.pid : `${teams[side].id}:${slot}`;
+    if (g.id === 'college') return side === 0 && slot === 'QB' ? c.you.pid : `col${side}:${slot}`;
     return teamById(c.league, teams[side].id).roster[slot] ?? `${teams[side].id}:${slot}`;
   };
   return { box: boxScore(live.ev, teams, live.seed, pid), teams };

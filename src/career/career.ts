@@ -30,7 +30,7 @@ export const ABILITIES = {
   release: { name: 'Quick Release', blurb: 'The ball is out fast: sacked about a quarter less often.', cost: 6, level: 4 },
   escape: { name: 'Escape Artist', blurb: '+6 mobility when the pocket breaks down: scrambles go further.', cost: 5, level: 5 },
   deep: { name: 'Deep Ball', blurb: '+5 arm strength: more completions down the field.', cost: 7, level: 6 },
-  iron: { name: 'Ironman', blurb: 'Never misses a start, and ages slower: attributes decline later.', cost: 8, level: 8 },
+  iron: { name: 'Ironman', blurb: 'Ages slower: your attributes start to decline three years later than everyone else’s.', cost: 8, level: 8 },
 } as const;
 export type Ability = keyof typeof ABILITIES;
 
@@ -89,11 +89,12 @@ export interface Career {
   last?: { gameId: string; xp: { label: string; xp: number }[]; total: number; sp: number; levelUp?: number };
 }
 
-export const COLLEGES: [string, string, string, string][] = [
-  ['Lakeshore State', 'Lakers', '#1D4ED8', '#F8FAFC'], ['Bluff City', 'Bulldogs', '#7F1D1D', '#FDE68A'],
-  ['Prairie Tech', 'Engineers', '#B45309', '#111827'], ['Coastal Carolina A&M', 'Mariners', '#0E7490', '#FDE047'],
-  ['Mountain West U', 'Peaks', '#14532D', '#F1F5F9'], ['Southern Plains', 'Mustangs', '#9F1239', '#F5F5F4'],
-  ['Great Lakes Tech', 'Huskers', '#374151', '#F59E0B'], ['Desert State', 'Coyotes', '#EA580C', '#1C1917'],
+/** name, nickname, colors, abbreviation */
+export const COLLEGES: [string, string, string, string, string][] = [
+  ['Lakeshore State', 'Lakers', '#1D4ED8', '#F8FAFC', 'LKST'], ['Bluff City', 'Bulldogs', '#7F1D1D', '#FDE68A', 'BLUF'],
+  ['Prairie Tech', 'Engineers', '#B45309', '#111827', 'PRT'], ['Coastal Carolina A&M', 'Mariners', '#0E7490', '#FDE047', 'CCAM'],
+  ['Mountain West U', 'Peaks', '#14532D', '#F1F5F9', 'MWU'], ['Southern Plains', 'Mustangs', '#9F1239', '#F5F5F4', 'SPLN'],
+  ['Great Lakes Tech', 'Huskers', '#374151', '#F59E0B', 'GLT'], ['Desert State', 'Coyotes', '#EA580C', '#1C1917', 'DSST'],
 ];
 
 /** Level from lifetime XP: each level costs a little more than the last. */

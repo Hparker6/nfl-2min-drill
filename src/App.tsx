@@ -6,10 +6,13 @@ import { Practice } from './ui/Practice';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 import { UpdateBar } from './ui/UpdateBar';
+import { lazy, Suspense } from 'react';
+// career mode is its own chunk: the Daily loads as fast as it did
+const CareerMode = lazy(() => import('./ui/career/Career').then((m) => ({ default: m.CareerMode })));
 import { setContext, setPlayerProperties, track } from './game/analytics';
 
-type Mode = 'daily' | 'survivor' | 'practice' | 'everyone';
-const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : 'daily');
+type Mode = 'daily' | 'survivor' | 'practice' | 'everyone' | 'career';
+const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : location.hash.startsWith('#career') ? 'career' : 'daily');
 
 export default function App() {
   const [store, setStore] = useState<Store>(loadStore);
@@ -66,9 +69,9 @@ export default function App() {
             <span className="brand-name">The <em>4th</em> Call</span>
           </div>
           <nav className="modes" aria-label="Game modes">
-            {(['daily', 'survivor', 'practice'] as Mode[]).map((m) => (
-              <button key={m} className={mode === m ? 'on' : ''} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
-                {m === 'daily' ? 'Daily' : m === 'survivor' ? 'Survivor' : 'Practice'}
+            {(['daily', 'survivor', 'practice', 'career'] as Mode[]).map((m) => (
+              <button key={m} className={`${mode === m ? 'on' : ''}${m === 'career' ? ' new' : ''}`} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
+                {m === 'daily' ? 'Daily' : m === 'survivor' ? 'Survivor' : m === 'practice' ? 'Practice' : 'Career'}
               </button>
             ))}
           </nav>
@@ -91,6 +94,7 @@ export default function App() {
         {mode === 'survivor' && <Survivor store={store} update={update} toast={toast} />}
         {mode === 'practice' && <Practice store={store} update={update} />}
         {mode === 'everyone' && <Everyone store={store} go={go} />}
+        {mode === 'career' && <Suspense fallback={<div className="cr-busy" />}><CareerMode app={store.settings} /></Suspense>}
       </main>
       <footer className="foot">
         <nav className="foot-links" aria-label="About">
@@ -100,10 +104,10 @@ export default function App() {
           <a href="/stats/">Stats</a>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
         </nav>
-        <section className="foot-about" aria-labelledby="foot-about-h">
+        {mode !== 'career' && <section className="foot-about" aria-labelledby="foot-about-h">
           <h2 id="foot-about-h">Play the NFL 2-minute drill</h2>
           <p>The 4th Call is a free NFL 2 min drill game that puts you on the sideline for the end of a close game: run the two-minute drill, go for it on fourth down, protect a lead or make a goal-line stand. Call every play, manage the clock and your timeouts, and call the defense when they have the ball. Teams use real NFL rosters and season stats, and every call is graded against every option you had by playing the rest of the game out thousands of times. Free in your browser, no sign-up, a new game every day.</p>
-        </section>
+        </section>}
         <p>An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0); ratings and outcomes are this game's own estimates from a simplified simulation.</p>
       </footer>
       {modal === 'help' && <Help onClose={closeModal} />}

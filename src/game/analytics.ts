@@ -70,7 +70,7 @@ export function initAnalytics() {
 export type EventName =
   | 'screen_view' | 'modal_open' | 'brief_shown' | 'game_start' | 'phase' | 'decision_shown' | 'call_made' | 'result_shown'
   | 'replay' | 'next_play' | 'grade_failed' | 'spot_complete' | 'daily_complete' | 'survivor_new_run' | 'survivor_end'
-  | 'practice_setup' | 'leaderboard_submit' | 'share' | 'leave' | 'app_error' | 'welcome_link';
+  | 'practice_setup' | 'leaderboard_submit' | 'share' | 'leave' | 'app_error' | 'welcome_link' | 'career_start' | 'career_game';
 
 export function track(name: EventName, params: Record<string, string | number | boolean | undefined | null> = {}) {
   try {
