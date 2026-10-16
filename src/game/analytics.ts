@@ -14,7 +14,8 @@
  *   result_shown       the play's result card (grade, lost, secs the grade took)
  *   replay, next_play  result-card actions
  *   grade_failed       grading could not finish (the play stood)
- *   game_complete      a game ended (mode, win, calls); named spot_complete before 2026-10-16
+ *   spot_complete      a game ended (mode, win, calls): the game_complete event, kept under its first name so GA
+ *                      history stays continuous
  *   play_again         the player chose another game after finishing one (from, to)
  *   daily_complete, survivor_new_run, survivor_end, practice_setup, leaderboard_submit, share
  *   leave              the tab was hidden or closed, with where the player was (mode, phase, step, calls, secs)
@@ -70,7 +71,7 @@ export function initAnalytics() {
 
 export type EventName =
   | 'screen_view' | 'modal_open' | 'brief_shown' | 'game_start' | 'phase' | 'decision_shown' | 'call_made' | 'result_shown'
-  | 'replay' | 'next_play' | 'grade_failed' | 'game_complete' | 'play_again' | 'daily_complete' | 'survivor_new_run' | 'survivor_end'
+  | 'replay' | 'next_play' | 'grade_failed' | 'spot_complete' | 'play_again' | 'daily_complete' | 'survivor_new_run' | 'survivor_end'
   | 'practice_setup' | 'leaderboard_submit' | 'share' | 'leave' | 'app_error' | 'welcome_link' | 'career_start' | 'career_game';
 
 export function track(name: EventName, params: Record<string, string | number | boolean | undefined | null> = {}) {

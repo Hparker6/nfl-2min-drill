@@ -15,6 +15,7 @@ import { applyClutch, driveOver, endMoment, gameOf, isMoment, liveTeams, momentS
 import type { LiveGame } from '../../career/types';
 import { WEEK_NAME } from '../../career/season';
 import { GameScreen } from '../GameScreen';
+import { gameOnScreen } from '../AdSlot';
 import { Scoreboard, periodName } from '../Scoreboard';
 
 interface Props {
@@ -30,6 +31,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const shownEv = (e: Ev) => e.type === 'snap' || e.type === 'kick' || e.type === 'pat' || e.type === 'period' || e.type === 'final' || e.type === 'timeout' || e.type === 'warning';
 
 export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
+  useEffect(() => { gameOnScreen(true); return () => gameOnScreen(false); }, []);   // a live game: no ads, as in GameScreen
   const liveRef = useRef<LiveGame>(structuredClone(c.live!));
   const L = liveRef.current;
   const g = gameOf(c, L.gameId);

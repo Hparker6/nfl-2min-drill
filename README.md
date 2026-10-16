@@ -36,7 +36,7 @@ Copy `.env.example` to `.env.production` (or set the same variables in your host
 | `VITE_FEEDBACK_URL`, `VITE_SUPPORT_URL` | Optional | The footer's Feedback and Support the developer links (`https://` or `mailto:`). Not shown when empty. |
 | `VITE_ADS`, `VITE_ADSENSE_CLIENT`, `VITE_ADSENSE_SLOT` | Optional | Display ads, off by default. See [MONETIZATION.md](MONETIZATION.md) before setting them. |
 
-Analytics events (when enabled): `game_start`, `call_made`, `game_complete`, `play_again`, `daily_complete`, `survivor_end`, `share` (the full list is in `src/game/analytics.ts`).
+Analytics events (when enabled): `game_start`, `call_made`, `spot_complete` (game complete), `play_again`, `daily_complete`, `survivor_end`, `share` (the full list is in `src/game/analytics.ts`).
 No personal data is sent. If you enable analytics for visitors in the EU/UK, you may need a consent banner.
 
 ## Deploy

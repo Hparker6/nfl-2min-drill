@@ -216,7 +216,7 @@ export function GameScreen(p: Props) {
     if (!doneRef.current) {
       doneRef.current = true;
       onDone(res);
-      track('game_complete', { mode: sc.mode, win: r.win, calls: recs.length });
+      track('spot_complete', { mode: sc.mode, win: r.win, calls: recs.length });
     }
   }, [sc, session, onDone]);
 
