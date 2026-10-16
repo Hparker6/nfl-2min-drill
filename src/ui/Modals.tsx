@@ -1,0 +1,148 @@
+import { useEffect, useRef, type ReactNode } from 'react';
+import { ARCHETYPES } from '../engine/data';
+import { SPOTS_PER_DAY, utcDate } from '../engine/scenario';
+import { GRADE_INFO, type GradeKey } from '../game/grade';
+import { archetype, rating } from '../game/share';
+import { bestStreak, defaultStore, streak, type Settings, type Store } from '../game/storage';
+
+export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null;
+    ref.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); prev?.focus?.(); };
+  }, [onClose]);
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title} tabIndex={-1} ref={ref} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button className="icon" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export function Help({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="How to play" onClose={onClose}>
+      <p><b>You're the play-caller at the end of a close game.</b> Each spot drops you into the fourth quarter with the score, the clock, the timeouts and 22 players on the field. Win the game.</p>
+      <ul>
+        <li><b>On offense</b>, pick from 27 calls in four families: Run, Pass, RPO and Trick. Field goals, punts and kneel-downs show up when they matter. On a pass, tap a receiver on the field to throw to him, and tap him again to change his route.</li>
+        <li><b>The clock is yours too.</b> When it's running you choose the tempo (no-huddle, huddle, milk it), call a timeout, spike it or kneel.</li>
+        <li><b>On defense</b>, choose Blitz, Load the box or Play it soft, and decide when to burn your timeouts.</li>
+        <li><b>Read the defense.</b> Before each snap you get a pre-snap read. It's right about 7 times in 10.</li>
+      </ul>
+      <h3>How calls are graded</h3>
+      <p>Before the result is shown, the game plays out the rest of the game thousands of times for <i>every</i> option you had, and compares your call's win chance with the best one:</p>
+      <ul className="grades">
+        {(['g', 'y', 'o', 'r'] as GradeKey[]).map((g) => (
+          <li key={g}><span className={`grade-dot g-${g}`}>{GRADE_INFO[g].glyph}</span> <b>{GRADE_INFO[g].word}</b> {{ g: 'best call, or within 0.75 points', y: 'within 2.5 points', o: 'within 6 points', r: 'more than 6 points off' }[g]}</li>
+        ))}
+      </ul>
+      <p>A good call that fails still counts as good, and a bad call that works still counts as bad. You also see what an AI coach would have called, and how much win chance that would have cost.</p>
+      <h3>Modes</h3>
+      <ul>
+        <li><b>Daily:</b> three spots, the same for everyone, new every day at midnight UTC.</li>
+        <li><b>Survivor:</b> random spots back to back. Win to keep going; one loss ends the run.</li>
+        <li><b>Practice:</b> build any spot and play it out with Coach mode, which shows the win chance of every option before you call it.</li>
+      </ul>
+      <p className="muted small">Teams, players and situations are fictional. Outcomes come from a simplified football simulation built for this game. Win chances and grades are that simulation's estimates, not official evaluations or real-world probabilities.</p>
+    </Modal>
+  );
+}
+
+export function About({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="About & privacy" onClose={onClose}>
+      <p><b>The 4th Call</b> is an independent fan game about late-game play-calling. Teams, players and situations are made up.</p>
+      <h3>About the grades</h3>
+      <p>Plays are resolved by a simplified football simulation written for this game. Win chances and grades are that simulation's estimates: useful for comparing your options, but not official evaluations, real coaching grades or real-world probabilities.</p>
+      <h3>Your data</h3>
+      <ul>
+        <li>Your progress, streaks, stats and settings are stored only in this browser (localStorage). There are no accounts, and nothing about you is sent to a server we run.</li>
+        <li>Clearing your browser data, or <i>Settings → Erase my data</i>, removes everything.</li>
+        <li>Fonts are loaded from Google Fonts. If the site owner turns on Google Analytics, anonymous gameplay events are sent to it (for example, that a game started or a result was shared), never names or contact details.</li>
+      </ul>
+      <h3>No affiliation</h3>
+      <p>Not affiliated with, endorsed by or connected to any professional or college league, team or players' association.</p>
+    </Modal>
+  );
+}
+
+export function Stats({ store, onClose }: { store: Store; onClose: () => void }) {
+  const h = store.history.filter((r) => r.mode !== 'practice');
+  const wins = h.filter((r) => r.win).length;
+  const grades = h.flatMap((r) => r.grades);
+  const count = (g: GradeKey) => grades.filter((x) => x === g).length;
+  const max = Math.max(1, ...(['g', 'y', 'o', 'r'] as GradeKey[]).map(count));
+  const arch = h.length ? ARCHETYPES[archetype(h.flatMap((r) => r.tags))] : null;
+  const days = Object.values(store.days).filter((d) => d.spots.length >= SPOTS_PER_DAY).length;
+  const beat = h.reduce((a, r) => a + r.aiLost - r.lost, 0);
+  return (
+    <Modal title="Your stats" onClose={onClose}>
+      {!h.length ? <p>No games yet. Play today's daily to get started.</p> : (
+        <>
+          <div className="stat-grid">
+            <div><b>{h.length}</b><span>games</span></div>
+            <div><b>{Math.round((wins / h.length) * 100)}%</b><span>won</span></div>
+            <div><b>{rating(h)}</b><span>coach rating</span></div>
+            <div><b>{grades.length}</b><span>calls</span></div>
+            <div><b>{streak(store, utcDate(), SPOTS_PER_DAY)}</b><span>daily streak</span></div>
+            <div><b>{bestStreak(store, SPOTS_PER_DAY)}</b><span>best streak</span></div>
+            <div><b>{days}</b><span>dailies done</span></div>
+            <div><b>{store.surv.best}</b><span>survivor best</span></div>
+          </div>
+          <h3>Call grades</h3>
+          <div className="bars">
+            {(['g', 'y', 'o', 'r'] as GradeKey[]).map((g) => (
+              <div key={g} className="bar-row">
+                <span className="bar-k">{GRADE_INFO[g].word}</span>
+                <span className={`bar g-${g}`} style={{ width: `${(count(g) / max) * 100}%` }} />
+                <span className="bar-n">{count(g)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="small">{beat >= 0 ? `Across all games you've beaten the AI coach by ${beat.toFixed(1)} points of win chance.` : `The AI coach leads you by ${(-beat).toFixed(1)} points of win chance overall.`}</p>
+          {arch && <div className="arch"><div className="k">You call it like</div><div className="arch-name">{arch.name}</div><div className="muted small">{arch.blurb}</div></div>}
+        </>
+      )}
+    </Modal>
+  );
+}
+
+export function SettingsModal({ store, update, onClose }: { store: Store; update: (fn: (s: Store) => void) => void; onClose: () => void }) {
+  const st = store.settings;
+  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update((s) => { s.settings[k] = v; });
+  const reset = () => {
+    if (!confirm('Erase all your games, streaks and settings on this device?')) return;
+    update((s) => { Object.assign(s, defaultStore()); });
+    onClose();
+  };
+  return (
+    <Modal title="Settings" onClose={onClose}>
+      <div className="form">
+        <label>Theme
+          <select value={st.theme} onChange={(e) => set('theme', e.target.value as Settings['theme'])}>
+            <option value="auto">Match my device</option>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+          </select>
+        </label>
+        <label>Play speed
+          <select value={st.speed} onChange={(e) => set('speed', e.target.value as Settings['speed'])}>
+            <option value="normal">Real time</option>
+            <option value="fast">Fast</option>
+            <option value="instant">Skip animations</option>
+          </select>
+        </label>
+        <label className="check"><input type="checkbox" checked={st.hints} onChange={(e) => set('hints', e.target.checked)} /> Coach mode in Practice (show win chances before you call)</label>
+      </div>
+      <button className="btn danger" onClick={reset}>Erase my data</button>
+    </Modal>
+  );
+}

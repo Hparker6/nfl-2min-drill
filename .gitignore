@@ -1,0 +1,27 @@
+# dependencies and build output
+node_modules
+dist
+dist-ssr
+*.tsbuildinfo
+coverage
+
+# environment files and secrets (.env.example is the template and is committed)
+.env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.p12
+*.pfx
+secrets*
+credentials*
+
+# logs and OS/editor clutter
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea
