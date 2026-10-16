@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ARCHETYPES } from '../engine/data';
 import { DAILY_KINDS, dailyScenarios, dayNumber, utcDate } from '../engine/scenario';
 import { archetype, dailyShare, profileFacts, shareText } from '../game/share';
+import { download, drawCard, shareCard, toBlob } from '../game/shareImage';
 import { rateSpot } from '../game/rating';
 import { BAND_LABELS, bandOf, fetchBoard, leaderboardOn, submitScore, type Board } from '../game/leaderboard';
 import { streak, type Store, type SpotResult } from '../game/storage';
@@ -60,7 +61,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
   );
 
   if (result && !reviewing) {
-    return <div className="page">{meta}<DayScore date={today} result={result} store={store} update={update} toast={toast} go={go} /></div>;
+    return <div className="page">{meta}<DayScore date={today} result={result} store={store} update={update} toast={toast} go={go} kind={kind?.name} /></div>;
   }
   return (
     <GameScreen
@@ -93,7 +94,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
   );
 }
 
-function DayScore({ date, result, store, update, toast, go }: { date: string; result: SpotResult; store: Store; update: Props['update']; toast: (m: string) => void; go: Props['go'] }) {
+function DayScore({ date, result, store, update, toast, go, kind }: { date: string; result: SpotResult; store: Store; update: Props['update']; toast: (m: string) => void; go: Props['go']; kind?: string }) {
   const rt = rateSpot(result);
   const streakN = streak(store, date, 1);
   const arch = ARCHETYPES[archetype(result.tags)];
@@ -121,11 +122,34 @@ function DayScore({ date, result, store, update, toast, go }: { date: string; re
     update((s) => { s.settings.nickname = n; });
     setEditing(false);
   };
+  const shareTxt = dailyShare(date, [result], streakN, { percentile: pct, coach: arch.name, rank: board?.rank ? { rank: board.rank, count: board.count } : null });
+  // the result card as an image, redrawn when the rank comes in
+  const [card, setCard] = useState<{ blob: Blob; url: string } | null>(null);
+  const rankLine = board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()} today` : pct != null ? `Better than ${pct}% of play-callers` : `${result.win ? 'Won' : 'Lost'} the game`;
+  useEffect(() => {
+    let live = true, url = '';
+    drawCard({
+      day: dayNumber(date), dateLabel: new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }),
+      title: kind, performance: rt.performance, rankLine, teams: result.teams, score: result.score, win: result.win, ot: result.ot,
+      grades: result.grades, coach: arch.name, streak: streakN, site: location.host || 'nfl-2min-drill.com',
+    }).then(toBlob).then((blob) => {
+      if (!live || !blob) return;
+      url = URL.createObjectURL(blob);
+      setCard({ blob, url });
+    }).catch(() => { /* the text share still works */ });
+    return () => { live = false; if (url) URL.revokeObjectURL(url); };
+  }, [rankLine, date]); // eslint-disable-line react-hooks/exhaustive-deps
   const share = async () => {
-    const r = await shareText(dailyShare(date, [result], streakN, { percentile: pct, coach: arch.name, rank: board?.rank ? { rank: board.rank, count: board.count } : null }), 'daily');
+    if (card) {
+      const r = await shareCard(card.blob, shareTxt);
+      if (r === 'shared') { track('share', { what: 'daily', method: 'image' }); return; }
+      if (r === 'cancelled') return;
+    }
+    const r = await shareText(shareTxt, 'daily');
     if (r === 'copied') toast('Result copied. Paste it anywhere.');
     else if (r === 'failed') toast('Could not share. Try again.');
   };
+  const save = () => { if (card) { download(card.blob, `the-4th-call-${dayNumber(date)}.png`); track('share', { what: 'daily', method: 'download' }); } };
   const maxBand = board ? Math.max(1, ...board.bands) : 1;
 
   return (
@@ -151,8 +175,11 @@ function DayScore({ date, result, store, update, toast, go }: { date: string; re
       </div>
 
       <div className="share-card">
-        <pre>{dailyShare(date, [result], streakN, { percentile: pct, coach: arch.name, rank: board?.rank ? { rank: board.rank, count: board.count } : null })}</pre>
-        <button className="btn primary big" onClick={share}>Share your score</button>
+        {card ? <img className="share-img" src={card.url} alt={`Daily #${dayNumber(date)}: performance ${rt.performance} out of 100, ${rankLine}`} /> : <pre>{shareTxt}</pre>}
+        <div className="share-btns">
+          <button className="btn primary big" onClick={share}>Share your score</button>
+          {card && <button className="btn big" onClick={save}>Save image</button>}
+        </div>
       </div>
 
       <div className="board">

@@ -43,6 +43,11 @@ export interface Preview {
 /** What the play came to, fired when it happens on the field (not after the hold). */
 export type Outcome = 'tackle' | 'catch' | 'drop' | 'pick' | 'td' | 'oob' | 'sack' | 'kick' | 'none';
 
+/** Overall rating to a color: about 62 and below red, through orange and yellow, to green at 90 and up. */
+export function ratingColor(r: number): string {
+  const f = Math.max(0, Math.min(1, (r - 62) / 28));
+  return `hsl(${Math.round(f * 125)} 68% ${Math.round(46 - Math.abs(f - 0.5) * 8)}%)`;
+}
 const COARSE = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const LINE_KEYS = new Set(['LT', 'LG', 'C', 'RG', 'RT', 'EDGE1', 'DL1', 'DL2', 'EDGE2']);
 interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement; mk: SVGElement }
@@ -73,6 +78,8 @@ export class FieldRenderer {
   onTap: ((pos: Rcv) => void) | null = null;
   /** Hover/focus on a player: which side ('o' offense, 'd' defense) and position; nulls when the pointer leaves. */
   onInspect: ((side: 'o' | 'd' | null, pos: string | null) => void) | null = null;
+  /** markers filled by overall rating, red to green (shape still tells offense from defense) */
+  byRating = true;
 
   constructor(svg: SVGSVGElement) {
     this.svg = svg;
@@ -340,9 +347,11 @@ export class FieldRenderer {
   }
 
   /** Offense and defense look the same for every team: blue circles and light diamonds, for an instant read. */
-  private paint(d: Dot, side: 'o' | 'd', pl: { name: string; number?: number } | undefined, pos: string) {
-    d.body.setAttribute('class', `f-body ${side === 'o' ? 'f-body-o' : 'f-body-d'}`);
-    d.lab.setAttribute('class', `f-lab ${side === 'o' ? 'f-lab-o' : 'f-lab-d'}`);
+  private paint(d: Dot, side: 'o' | 'd', pl: { name: string; number?: number; rating?: number } | undefined, pos: string) {
+    const rated = this.byRating && pl?.rating != null;
+    d.body.setAttribute('class', `f-body ${side === 'o' ? 'f-body-o' : 'f-body-d'}${rated ? ' rated' : ''}`);
+    d.lab.setAttribute('class', `f-lab ${side === 'o' ? 'f-lab-o' : 'f-lab-d'}${rated ? ' rated' : ''}`);
+    if (rated) d.body.setAttribute('style', `fill:${ratingColor(pl!.rating!)}`); else d.body.removeAttribute('style');
     d.lab.textContent = pl?.number != null ? String(pl.number) : POS_LABEL[pos];
     d.name.textContent = pl ? shortName(pl.name) : '';
   }

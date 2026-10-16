@@ -1,6 +1,7 @@
 /**
- * The daily leaderboard: "everyone today". It needs a server (server/leaderboard/), configured with
- * VITE_LEADERBOARD_URL. Without one, the game shows your score and the simulated percentile only.
+ * The daily leaderboard: "everyone today". The site's own Worker serves it at /v1/ (server/site/worker.js), so a
+ * production build uses the same address. VITE_LEADERBOARD_URL points it somewhere else, or "off" turns it off; the
+ * dev server has no Worker, so it is off there unless the variable is set.
  *
  * What is sent: the day, a nickname, the performance score, the grade string and the result. Nothing that
  * identifies the player. A random per-browser token lets a player re-submit the same day without duplicates.
@@ -15,8 +16,10 @@ export interface Board {
   average: number;
 }
 
-const URL = (import.meta.env.VITE_LEADERBOARD_URL as string | undefined)?.replace(/\/+$/, '') || '';
-export const leaderboardOn = () => !!URL;
+const RAW = ((import.meta.env.VITE_LEADERBOARD_URL as string | undefined) ?? '').trim().replace(/\/+$/, '');
+const ON = RAW === 'off' ? false : !!RAW || import.meta.env.PROD;
+const URL = RAW === 'off' ? '' : RAW;   // '' is this site: requests go to /v1/…
+export const leaderboardOn = () => ON;
 
 const TOKEN_KEY = 'the4thcall:token';
 function token(): string {
@@ -28,7 +31,7 @@ function token(): string {
 }
 
 export async function submitScore(day: string, name: string, score: number, grades: string, win: boolean): Promise<Board | null> {
-  if (!URL) return null;
+  if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/day/${day}/score`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -40,7 +43,7 @@ export async function submitScore(day: string, name: string, score: number, grad
 }
 
 export async function fetchBoard(day: string): Promise<Board | null> {
-  if (!URL) return null;
+  if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/day/${day}?token=${encodeURIComponent(token())}`);
     if (!r.ok) return null;
@@ -56,7 +59,7 @@ export interface DaySummary { count: number; average: number; best: { name: stri
 export interface Stats { days: Record<string, DaySummary> }
 
 export async function fetchStats(): Promise<Stats | null> {
-  if (!URL) return null;
+  if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/stats`);
     if (!r.ok) return null;

@@ -9,7 +9,7 @@
  */
 import { CALL, DROPS, ROUTES, TEMPO, type Call, type DropId } from './data';
 import { clip, gauss, pickWeighted, type Rng } from './rng';
-import { BASE_CALLS, defFx, famOf, goalLineSituation } from './defense';
+import { BASE_CALLS, DEF_CALLS, DEF_PLAYS, defFx, famOf, goalLineSituation } from './defense';
 import { passMods, runMods } from './attributes';
 
 /**
@@ -590,8 +590,26 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
   return pickWeighted(r, w);
 }
 
+/** Within the family the AI picked, which play: base calls most often, the rest for variety. */
+const AI_VARIANTS: Partial<Record<Look, Partial<Record<Look, number>>>> = {
+  balanced: { balanced: 0.6, cover4: 0.4 },
+  zone: { zone: 0.5, tampa2: 0.3, cover4: 0.2 },
+  man: { man: 0.4, twoman: 0.25, press: 0.2, robber: 0.15 },
+  blitz: { blitz: 0.3, firezone: 0.3, mike: 0.2, cblitz: 0.1, sblitz: 0.1 },
+  load: { load: 0.6, runblitz: 0.4 },
+  goal: { goal: 0.5, glblitz: 0.25, glman: 0.25 },
+};
+
 /** The AI defensive coordinator: calls what the situation suggests, with enough mix not to be predictable. */
 export function aiDefLook(s: State, r: Rng): Look {
+  const base = aiBaseLook(s, r);
+  if (!s.mix) return base;
+  const v = AI_VARIANTS[base];
+  if (!v || (base === 'goal' && !goalLineSituation(s))) return base;
+  return pickWeighted<Look>(r, v as Record<Look, number>);
+}
+
+function aiBaseLook(s: State, r: Rng): Look {
   const od = leadOf(s, s.off);
   if (100 - s.yl <= 5) return pickWeighted<Look>(r, { goal: 0.4, man: 0.25, blitz: 0.15, zone: 0.1, load: 0.1 });
   const runish = od > 0 || (s.dist <= 2 && s.t > 60);
@@ -616,7 +634,9 @@ export const aiST = (play: string): StChoice => (play === 'fg' ? 'safe' : 'retur
 
 // --------------------------------------------------------- helpers for UI ---
 
-export function lookOther(look: Look, r: Rng): Look {
-  const rest = BASE_CALLS.filter((x) => x !== famOf(look) && x !== 'goal');
+export function lookOther(look: Look, r: Rng, mix = false): Look {
+  // a wrong read shows another family; with the full playbook in use it can name any of its plays
+  const pool: Look[] = mix ? DEF_CALLS.filter((x) => !DEF_PLAYS[x].goalOnly) : BASE_CALLS.filter((x) => x !== 'goal');
+  const rest = pool.filter((x) => famOf(x) !== famOf(look));
   return rest[Math.floor(r() * rest.length)];
 }

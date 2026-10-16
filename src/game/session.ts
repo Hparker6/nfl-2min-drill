@@ -105,7 +105,7 @@ export class Session {
       if (s.off === 0) {
         if (!s.pendLook) {
           s.pendLook = aiDefLook(s, pre);
-          s.shownLook = pre() < READ_ACCURACY ? s.pendLook : lookOther(s.pendLook, pre);
+          s.shownLook = pre() < READ_ACCURACY ? s.pendLook : lookOther(s.pendLook, pre, s.mix);
         }
         return this.playCall(aiR);
       }

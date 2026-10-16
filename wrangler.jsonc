@@ -1,9 +1,22 @@
 {
-  // Static site: Cloudflare serves the Vite build output from dist/.
+  // Cloudflare serves the Vite build output from dist/; the Worker handles only /v1/* (the daily leaderboard).
   "name": "nfl-2min-drill",
+  "main": "server/site/worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/v1/*"]
+  },
+  // leaderboard storage: created by the migration on the next deploy, nothing to set up by hand
+  "durable_objects": {
+    "bindings": [
+      { "name": "DAY_BOARD", "class_name": "DayBoard" },
+      { "name": "ALL_DAYS", "class_name": "AllDays" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["DayBoard", "AllDays"] }
+  ]
 }

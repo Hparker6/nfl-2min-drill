@@ -72,6 +72,7 @@ export interface State {
   pendPlay: string | null;// the offense's call, drawn before the defense calls
   k: number;              // snap counter: seeds the real game's draws
   weather?: Weather;
+  mix?: boolean;          // the AI defense calls the full playbook (Tampa 2, fire zone…), not only the seven base calls
   rat: [Ratings, Ratings];
 }
 

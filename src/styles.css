@@ -901,3 +901,22 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .pcard-cname { font: 700 15px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pcard-cpos { font: 600 11px var(--body); color: #9fb0a6; letter-spacing: .06em; }
 .pcard.compact .pcard-ovr { font-size: 20px; line-height: 1; }
+
+/* the result card image */
+.share-img { width: 100%; max-width: 420px; justify-self: center; aspect-ratio: 1080 / 1350; border-radius: var(--r-md); border: 1px solid var(--line); background: #0a0e0c; }
+.share-btns { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+
+/* markers colored by rating: offense keeps a white rim, defense a dark one, so the two sides still read apart */
+.f-dot .f-body-o.rated { stroke: #ffffff; stroke-width: .16; }
+.f-dot .f-body-d.rated { stroke: #0b0f0d; stroke-width: .16; }
+.f-dot .f-lab.rated { fill: #0b0f0d; }
+.rkey { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 6px; padding: 4px 9px; border-radius: 6px; background: rgba(8, 12, 10, .72); color: #dfe7e2; font: 600 11px var(--body); pointer-events: none; }
+.rkey i { width: 46px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, hsl(0 68% 42%), hsl(35 68% 46%), hsl(62 68% 46%), hsl(125 68% 42%)); }
+@media (max-width: 999px) { .rkey { top: 8px; right: 8px; padding: 3px 7px; font-size: 10px; } .rkey i { width: 34px; } }
+
+/* a newer build is live */
+.updbar { position: fixed; z-index: 70; left: 50%; top: calc(var(--top-h) + 8px); transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; border-radius: 12px; background: var(--ink); color: var(--bg); font: 600 14px var(--body); box-shadow: 0 8px 24px rgba(0, 0, 0, .35); width: max-content; max-width: calc(100vw - 24px); }
+.updbar .btn { padding: 8px 14px; }
+/* the wordmark never wraps; phones show the mark alone */
+.brand-name { white-space: nowrap; }
+@media (max-width: 640px) { .brand-name { display: none; } .meta-title { font-size: 20px; } }

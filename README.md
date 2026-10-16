@@ -113,8 +113,13 @@ The end-of-day screen shows the score, a percentile against **simulated play-cal
 regenerate with `npm run percentiles` after balance changes), the coach profile, a share card and, when connected,
 **Everyone today**: your rank, a histogram and today's best.
 
-"Everyone today" needs a server. One is included: `server/leaderboard/` is a Cloudflare Worker with one KV
-namespace (free tier is enough to launch). Deploy it with `wrangler` as described at the top of `worker.js`, then set
-`VITE_LEADERBOARD_URL` to the worker's address in the game's build settings and redeploy. Without it, the game shows
-the simulated percentile and hides the board. The worker stores a nickname, the score and the grade string per
-browser token per day; nothing identifying.
+"Everyone today" is served by the site's own Worker (`server/site/worker.js`, configured in `wrangler.jsonc`): the
+static game from `dist/`, and the leaderboard API under `/v1/`. Scores are kept in Durable Objects (one per day, plus
+one for the all-days summary), which the migration in `wrangler.jsonc` creates on deploy, so there is nothing to set
+up by hand. The worker stores a nickname, the score and the grade string per browser token per day; nothing
+identifying. Names are cleaned and obvious abuse is replaced with "Coach". Scores are self-reported by the browser, so
+treat the board as friendly competition, not a contest with prizes.
+
+Run the site and the leaderboard locally with `npm run build && npx wrangler dev`. `VITE_LEADERBOARD_URL` points the
+game at a different server, or `off` turns the board off; the Vite dev server has no Worker, so the board is off
+there.

@@ -5,6 +5,7 @@ import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
+import { UpdateBar } from './ui/UpdateBar';
 import { setContext, setPlayerProperties, track } from './game/analytics';
 
 type Mode = 'daily' | 'survivor' | 'practice' | 'everyone';
@@ -108,6 +109,7 @@ export default function App() {
       {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} />}
       {modal === 'about' && <About onClose={closeModal} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+      <UpdateBar />
     </>
   );
 }

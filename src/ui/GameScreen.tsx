@@ -509,7 +509,7 @@ export function GameScreen(p: Props) {
       <Scoreboard s={view} teams={T} wp={wp} trail={trail} />
       <div className="arena">
         <div className="stage" ref={stageRef}>
-          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather}>
+          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
             <div className="legend" aria-hidden>
               <span><i className="lg-o" />Offense: {T[view.off].name}</span>

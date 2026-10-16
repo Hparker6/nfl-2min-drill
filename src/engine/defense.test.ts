@@ -4,9 +4,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import { CALLS } from './data';
-import { DEF_CALLS, DEF_PLAYS } from './defense';
-import { advance, clone, resolveSnap, simulate } from './sim';
-import { customScenario, type SpotParams } from './scenario';
+import { BASE_CALLS, DEF_CALLS, DEF_PLAYS } from './defense';
+import { advance, aiDefLook, clone, resolveSnap, simulate } from './sim';
+import { customScenario, genScenario, type SpotParams } from './scenario';
 import { rng } from './rng';
 import { Session } from '../game/session';
 import type { Ev, Look, State } from './types';
@@ -105,6 +105,21 @@ describe('defensive calls change outcomes', () => {
         expect([cat, a, b, aBetter, bBetter]).toEqual([cat, a, b, true, true]);
       }
     }
+  });
+});
+
+describe('the AI defense calls the full playbook', () => {
+  it('from the first daily after the change; earlier dailies keep the seven base calls so saved games replay', () => {
+    expect(genScenario('daily:2026-10-16:0', 'daily').start.mix).toBeFalsy();
+    expect(genScenario('daily:2026-10-17:0', 'daily').start.mix).toBe(true);
+    expect(genScenario('surv:1:0', 'survivor').start.mix).toBe(true);
+  });
+  it('calls plays beyond the base seven, and only base calls without the flag', () => {
+    const s = even();
+    const seen = (mix: boolean) => { const set = new Set<string>(); for (let i = 0; i < 3000; i++) set.add(aiDefLook({ ...s, mix }, rng(i))); return set; };
+    const withMix = seen(true), without = seen(false);
+    expect([...withMix].some((l) => !BASE_CALLS.includes(l as never))).toBe(true);
+    expect([...without].every((l) => BASE_CALLS.includes(l as never))).toBe(true);
   });
 });
 

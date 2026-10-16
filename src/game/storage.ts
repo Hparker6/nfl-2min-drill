@@ -7,6 +7,7 @@ export interface Settings {
   speed: 'normal' | 'fast' | 'instant';
   hints: boolean;        // practice: show win chance on every option before you call it
   nickname?: string;     // the name shown on the daily leaderboard
+  plainDots?: boolean;   // field markers in team colors instead of colored by rating
 }
 
 export interface SpotResult {

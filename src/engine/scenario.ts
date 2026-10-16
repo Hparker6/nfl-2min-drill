@@ -188,6 +188,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
       running: r() < 0.5, home: r() < 0.5 ? 0 : 1, weather,
     };
     const s = stateFrom(p, teams);
+    if (aiMix(seedStr)) s.mix = true;
     const wp = quickWp(s, hash(seedStr, tries));
     if (wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
     if (!best || Math.abs(wp - 0.4) < Math.abs(best.wp - 0.4)) best = { s, wp, p };
@@ -208,6 +209,16 @@ export function dailyKind(date: string): DailyKind {
 const prevDate = (date: string) => new Date(Date.parse(date + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10);
 
 /** Today's daily: one game, the same for everyone, its teams not seen yesterday. */
+/**
+ * The AI defense calls the full playbook from the 2026-10-17 daily on. Earlier dailies keep the seven base calls, so
+ * a game saved before the change still replays exactly (a replay that came out differently would be restarted).
+ */
+export const MIX_FROM = '2026-10-17';
+function aiMix(seedStr: string): boolean {
+  const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return !m || m[1] >= MIX_FROM;
+}
+
 export function dailyScenarios(date: string): Scenario[] {
   const y = genScenario(`daily:${prevDate(date)}:0`, 'daily', { kind: dailyKind(prevDate(date)) });
   return [genScenario(`daily:${date}:0`, 'daily', { kind: dailyKind(date), avoid: [y.teams[0].id, y.teams[1].id] })];
@@ -220,5 +231,6 @@ export function survivorScenario(run: number, game: number): Scenario {
 export function customScenario(p: SpotParams, seedStr: string): Scenario {
   const teams: [TeamInfo, TeamInfo] = [makeTeam(p.you, seedStr), makeTeam(p.them, seedStr)];
   const s = stateFrom(p, teams);
+  s.mix = true;
   return { id: seedStr, seed: hash(seedStr), mode: 'practice', teams, home: p.home, start: s, baseWp: quickWp(s, hash(seedStr)) };
 }

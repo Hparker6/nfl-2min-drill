@@ -28,3 +28,6 @@ Thumbs.db
 
 # downloaded source data (rebuild with scripts/build-rosters.mjs)
 data-cache
+
+# wrangler dev state (local leaderboard data)
+.wrangler

@@ -21,9 +21,10 @@ interface Props {
   children?: ReactNode;      // overlays (legend)
   offense?: 0 | 1;           // which team has the ball, so hovering a marker shows the right player
   weather?: Weather;         // tints the field
+  byRating?: boolean;        // markers colored by overall rating
 }
 
-export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather }, ref) {
+export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather, byRating = true }, ref) {
   const [inspect, setInspect] = useState<{ side: 'o' | 'd'; pos: string } | null>(null);
   // touch screens and narrow windows get the one-line card: the full table would cover the field
   const compact = typeof matchMedia === 'function' && matchMedia('(pointer: coarse), (max-width: 999px)').matches;
@@ -47,6 +48,10 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
   }, [onTap]);
 
   useEffect(() => {
+    if (rRef.current) rRef.current.byRating = byRating;
+  }, [byRating, teams]);
+
+  useEffect(() => {
     if (rRef.current) rRef.current.onInspect = (side, pos) => setInspect(side && pos ? { side, pos } : null);
   }, [teams]);
 
@@ -68,6 +73,7 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
         </div>
       )}
       {children}
+      {byRating && <div className="rkey" aria-hidden><span>worse</span><i /><span>better</span></div>}
       {inspect && <PlayerCard team={teams[inspect.side === 'o' ? offense : offense === 0 ? 1 : 0]} pos={inspect.pos} compact={compact} />}
     </div>
   );
