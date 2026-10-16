@@ -9,6 +9,7 @@ interface Props {
   teams: [TeamInfo, TeamInfo];
   wp: number | null;
   trail: number[];
+  noWp?: boolean;        // career's drive tracker: no win chance on the bar
 }
 
 /** Flash a value when it changes, so a score or a new set of downs is noticed. */
@@ -64,7 +65,7 @@ function Team({ team, score, tos, ball, you, right }: { team: TeamInfo; score: n
   );
 }
 
-export function Scoreboard({ s, teams, wp, trail }: Props) {
+export function Scoreboard({ s, teams, wp, trail, noWp }: Props) {
   const live = s.stage === 'pre' || s.stage === 'call';
   const yt = 100 - s.yl;
   const dd = live ? downDist(s) : s.stage === 'pat' ? 'Try' : s.stage === 'kick' ? 'Kickoff' : 'Final';
@@ -84,14 +85,14 @@ export function Scoreboard({ s, teams, wp, trail }: Props) {
       <div className="sb-bar">
         <span key={ddBump} className={`sb-dd${ddBump ? ' bump' : ''}`}>{dd}</span>
         {live && <span className="sb-spot">Ball on <b>{ballOn(s.yl, s.off, teams)}</b>{yt <= 20 ? <em className="rz">Red zone</em> : null}</span>}
-        <span className="sb-wp" title="Your chance to win from here, by simulation">
+        {!noWp && <span className="sb-wp" title="Your chance to win from here, by simulation">
           <span className="sb-wp-k">Win</span>
           <span className="sb-wp-bar" aria-hidden>
             <i style={{ width: `${pct ?? 50}%` }} />
           </span>
           <b>{pct == null ? '…' : `${pct.toFixed(0)}%`}</b>
           {trail.length > 1 && <Spark values={trail} h={18} />}
-        </span>
+        </span>}
       </div>
     </section>
   );

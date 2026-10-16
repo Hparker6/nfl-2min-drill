@@ -9,6 +9,7 @@ import { clip, hash, pickWeighted, rng, type Rng } from './rng';
 import type { Player, Ratings, State, Team, TeamInfo, Weather } from './types';
 import { GROUP_ATTRS, SLOT_GROUP, units, type Attr, type PosGroup, type RosterMeta, type RosterPlayer } from './roster';
 import { NFL_IDS, hasRealTeam, realTeam } from './nfl';
+import { DEF_AMP } from './defense';
 
 /** The current rosters are fictional: every name, number and rating below is generated. */
 export const FICTIONAL_ROSTER: RosterMeta = { sourceName: 'Generated for fictional teams (The 4th Call)' };
@@ -195,6 +196,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     };
     const s = stateFrom(p, teams);
     if (aiMix(seedStr)) s.mix = true;
+    if (defAmp(seedStr)) s.dx = DEF_AMP;
     const wp = quickWp(s, hash(seedStr, tries));
     if (wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
     if (!best || Math.abs(wp - 0.4) < Math.abs(best.wp - 0.4)) best = { s, wp, p };
@@ -225,6 +227,16 @@ function aiMix(seedStr: string): boolean {
   return !m || m[1] >= MIX_FROM;
 }
 
+/**
+ * Your defensive calls count for more (defense.ts DEF_AMP) from the 2026-10-17 daily on, and in Survivor and
+ * Practice. Earlier dailies play as they did, so their saved games replay.
+ */
+export const DEF_AMP_FROM = '2026-10-17';
+function defAmp(seedStr: string): boolean {
+  const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return !m || m[1] >= DEF_AMP_FROM;
+}
+
 export function dailyScenarios(date: string): Scenario[] {
   const y = genScenario(`daily:${prevDate(date)}:0`, 'daily', { kind: dailyKind(prevDate(date)) });
   return [genScenario(`daily:${date}:0`, 'daily', { kind: dailyKind(date), avoid: [y.teams[0].id, y.teams[1].id] })];
@@ -238,5 +250,6 @@ export function customScenario(p: SpotParams, seedStr: string): Scenario {
   const teams: [TeamInfo, TeamInfo] = [makeTeam(p.you, seedStr), makeTeam(p.them, seedStr)];
   const s = stateFrom(p, teams);
   s.mix = true;
+  s.dx = DEF_AMP;
   return { id: seedStr, seed: hash(seedStr), mode: 'practice', teams, home: p.home, start: s, baseWp: quickWp(s, hash(seedStr)) };
 }

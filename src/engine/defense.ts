@@ -204,8 +204,43 @@ const FAR: Partial<Record<Look, DefFx>> = Object.fromEntries(DEF_CALLS.filter((k
 
 /** The effects of a call in this situation. */
 export function defFx(look: Look, s: State): DefFx {
+  const fx = baseFx(look, s);
+  // your defense (team 0, against team 1's offense): the call counts for more. See DEF_AMP.
+  return s.dx && s.off === 1 ? amplified(fx, s.dx) : fx;
+}
+
+function baseFx(look: Look, s: State): DefFx {
   if (look === 'soft') return DEF_FX.prevent;
   if (look === 'goal') return goalLineSituation(s) ? DEF_FX.goal : DEF_FX.goalFar;
   const p = DEF_PLAYS[look];
   return p.goalOnly && !goalLineSituation(s) ? FAR[look]! : p.fx;
+}
+
+/**
+ * When you call the defense, the matchup between your call and their play is stretched by this factor: the right
+ * call stops more, the wrong one gives up more. Without it a defense that knew the play in advance got only a few
+ * more stops than one calling at random, so calling defense felt like watching. Offense is untouched.
+ */
+export const DEF_AMP = 2.2;
+/** The edge: yards off every run's mean, and catch rate off every throw. */
+export const DEF_EDGE = { run: 0.3, pass: 0.02 };
+const ampCache = new Map<string, DefFx>();
+const multi = (v: number, k: number, lo = 0.15) => Math.max(lo, 1 + (v - 1) * k);
+function amplified(fx: DefFx, k: number): DefFx {
+  const key = `${k}|${JSON.stringify(fx)}`;
+  const hit = ampCache.get(key);
+  if (hit) return hit;
+  const routes: DefFx['routes'] = {};
+  for (const r in fx.routes) routes[r as RouteId] = fx.routes[r as RouteId]! * k;
+  const out: DefFx = {
+    // plus a small edge for the defense whatever the call: stops were too rare
+    run: { m: fx.run.m * k - DEF_EDGE.run, big: multi(fx.run.big, k), stuff: fx.run.stuff * k },
+    pass: {
+      sack: multi(fx.pass.sack, k), short: fx.pass.short * k - DEF_EDGE.pass, deep: fx.pass.deep * k - DEF_EDGE.pass, screen: fx.pass.screen * k - DEF_EDGE.pass, quick: fx.pass.quick * k,
+      yac: multi(fx.pass.yac, k, 0.4), int: multi(fx.pass.int, k),
+    },
+    routes, pa: fx.pa * k, flea: fx.flea * k, draw: fx.draw * k, trick: fx.trick * k, option: fx.option * k, rpoThrow: fx.rpoThrow,
+  };
+  ampCache.set(key, out);
+  return out;
 }

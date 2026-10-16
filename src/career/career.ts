@@ -12,11 +12,15 @@ import type { CPlayer, Game, LiveGame, Season } from './types';
 export type Arch = 'pocket' | 'gunslinger' | 'dual' | 'general';
 export const QB_ATTRS: Attr[] = ['accuracy', 'arm', 'decision', 'mobility'];
 
-export const ARCH: Record<Arch, { name: string; blurb: string; attrs: Record<'accuracy' | 'arm' | 'decision' | 'mobility', number> }> = {
-  pocket: { name: 'Pocket Passer', blurb: 'Accurate from the pocket. Wins with timing, not his legs.', attrs: { accuracy: 76, arm: 70, decision: 72, mobility: 52 } },
-  gunslinger: { name: 'Gunslinger', blurb: 'A cannon arm. Fits it into windows nobody else would try.', attrs: { accuracy: 67, arm: 82, decision: 62, mobility: 60 } },
-  dual: { name: 'Dual-Threat', blurb: 'Beats you with his arm, then with his legs.', attrs: { accuracy: 65, arm: 70, decision: 63, mobility: 84 } },
-  general: { name: 'Field General', blurb: 'Reads every defense. Rarely throws one to the other team.', attrs: { accuracy: 71, arm: 65, decision: 80, mobility: 56 } },
+/**
+ * The four kinds of quarterback. Each starts with different attributes (they decide how his throws and runs come
+ * out in the engine) and one signature ability; everything else is earned.
+ */
+export const ARCH: Record<Arch, { name: string; tag: string; blurb: string; sig: Ability; attrs: Record<'accuracy' | 'arm' | 'decision' | 'mobility', number> }> = {
+  pocket: { name: 'Pocket Passer', tag: 'Accuracy and timing', blurb: 'Stands in and delivers on time. The most accurate thrower, but he can’t outrun anyone.', sig: 'release', attrs: { accuracy: 77, arm: 71, decision: 71, mobility: 50 } },
+  dual: { name: 'Scrambler', tag: 'Legs and improvisation', blurb: 'Extends plays and picks up yards with his feet when nothing is open. The throws come along later.', sig: 'escape', attrs: { accuracy: 65, arm: 70, decision: 63, mobility: 84 } },
+  general: { name: 'Game Manager', tag: 'Smart and safe', blurb: 'Reads the defense, takes what it gives, and almost never gives the ball away.', sig: 'film', attrs: { accuracy: 71, arm: 64, decision: 80, mobility: 57 } },
+  gunslinger: { name: 'Gunslinger', tag: 'Big arm, big risks', blurb: 'The risk taker: a cannon that fits throws into windows nobody else would try. Some of them get picked.', sig: 'deep', attrs: { accuracy: 67, arm: 83, decision: 60, mobility: 61 } },
 };
 
 /** Abilities: bought with skill points once the level is high enough. Applied in career/run.ts. */
@@ -121,7 +125,7 @@ export function newCareer(o: { name: string; number: number; arch: Arch; college
   const rival = COLLEGES[(o.college + 3) % COLLEGES.length];
   return {
     v: 1, id: `c${seed.toString(36)}`, seed, created: Date.now(), phase: 'college',
-    you: { pid, name: o.name, number: o.number, arch: o.arch, college: col[0], xp: 0, sp: 0, abilities: [] },
+    you: { pid, name: o.name, number: o.number, arch: o.arch, college: col[0], xp: 0, sp: 0, abilities: [A.sig] },
     league, season: prev, history: [],
     college: { you: col[0], them: rival[0], youName: col[1], themName: rival[1] },
     goals: [], news: [], boxes: {},

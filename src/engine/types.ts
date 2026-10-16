@@ -73,6 +73,7 @@ export interface State {
   k: number;              // snap counter: seeds the real game's draws
   weather?: Weather;
   mix?: boolean;          // the AI defense calls the full playbook (Tampa 2, fire zone…), not only the seven base calls
+  dx?: number;            // your defensive calls count this much more (defense.ts DEF_AMP); absent on older dailies
   rat: [Ratings, Ratings];
   // ---- full games (career mode). All absent on a late-game spot, which plays as the fourth quarter as it always has.
   q?: number;             // the period: 1-4, 5 and up overtime. When set, t is the seconds left in this period

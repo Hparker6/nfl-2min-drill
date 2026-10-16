@@ -131,7 +131,7 @@ export function simUntilMoment(c: Career, live: LiveGame, max = 4000): Ev[] {
 export function momentScenario(c: Career, live: LiveGame): Scenario {
   const g = gameOf(c, live.gameId);
   const teams = liveTeams(c, g);
-  const s = clone(live.s);
+  const s = clone(live.seg?.start ?? live.s);
   applyClutch(c, live, s);
   const [st] = evaluate(s, [{}], 120, hash(live.seed, s.k, 'wp'));
   const mine = g.id === 'college' ? 'COLA' : youPlayer(c).team;
