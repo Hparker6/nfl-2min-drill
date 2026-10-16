@@ -56,7 +56,7 @@ export function Help({ onClose }: { onClose: () => void }) {
       </ul>
       <h3>Modes</h3>
       <ul>
-        <li><b>Daily:</b> three spots, the same for everyone, new every day at midnight UTC.</li>
+        <li><b>Daily:</b> one game a day, the same for everyone, new at midnight UTC. The situation changes every day: a two-minute drill, a goal-line stand, a fourth-down call…</li>
         <li><b>Survivor:</b> random spots back to back. Win to keep going; one loss ends the run.</li>
         <li><b>Practice:</b> build any spot and play it out with Coach mode, which shows the win chance of every option before you call it.</li>
       </ul>

@@ -85,3 +85,19 @@ node scripts/build-rosters.mjs 2025     # downloads nflverse data into data-cach
   every commercial use. Using many current players' identities in a commercial product normally involves the NFL
   Players Association's group licensing. Have this reviewed by a lawyer before a commercial launch; the fictional
   roster generator (engine/scenario.ts `makeTeam`) is still there as a fallback if you need to switch back.
+
+## The daily and the leaderboard
+
+The Daily is one game a day, the same for everyone (by UTC date). Its situation type rotates through a weekly
+shuffle of seven kinds (two-minute drill, dig out of the hole, win it on this drive, close it out, goal-line stand,
+four downs to win, fourth-down call), and the two teams are never the same as the day before.
+
+The end-of-day screen shows the score, a percentile against **simulated play-callers** (`src/data/percentiles.json`,
+regenerate with `npm run percentiles` after balance changes), the coach profile, a share card and, when connected,
+**Everyone today**: your rank, a histogram and today's best.
+
+"Everyone today" needs a server. One is included: `server/leaderboard/` is a Cloudflare Worker with one KV
+namespace (free tier is enough to launch). Deploy it with `wrangler` as described at the top of `worker.js`, then set
+`VITE_LEADERBOARD_URL` to the worker's address in the game's build settings and redeploy. Without it, the game shows
+the simulated percentile and hides the board. The worker stores a nickname, the score and the grade string per
+browser token per day; nothing identifying.

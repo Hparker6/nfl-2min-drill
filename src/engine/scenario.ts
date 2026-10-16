@@ -42,9 +42,22 @@ export interface Scenario {
   home: Team;
   start: State;
   baseWp: number;              // how often the AI coach wins it from here
+  kind?: DailyKind;            // the daily's situation type (rotates by day)
 }
 
-export const SPOTS_PER_DAY = 3;
+/** The situation types a daily rotates through, so no two days in a row feel alike. */
+export type DailyKind = 'drill' | 'hole' | 'tied' | 'closeout' | 'stand' | 'goalline' | 'fourthdown';
+export const DAILY_KINDS: Record<DailyKind, { name: string; tagline: string }> = {
+  drill: { name: 'Two-minute drill', tagline: 'Down a score, short on clock. Get into range.' },
+  hole: { name: 'Dig out of the hole', tagline: 'Down more than a field goal. You need a touchdown, and maybe more.' },
+  tied: { name: 'Win it on this drive', tagline: 'Tied. Whoever handles the clock better goes home happy.' },
+  closeout: { name: 'Close it out', tagline: 'You lead with the ball. Burn the clock without giving it back.' },
+  stand: { name: 'Goal-line stand', tagline: 'They have the ball and the clock. Make the stop.' },
+  goalline: { name: 'Four downs to win', tagline: 'Inside their 10 with time running out. Punch it in.' },
+  fourthdown: { name: 'Fourth-down call', tagline: 'It starts on fourth down. Kick, punt or go?' },
+};
+
+export const SPOTS_PER_DAY = 1;
 
 export function utcDate(d = new Date()): string {
   return d.toISOString().slice(0, 10);
@@ -131,20 +144,22 @@ function quickWp(s: State, seed: number): number {
   return st.wp / st.n;
 }
 
-export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 'def'; hard?: number } = {}): Scenario {
+export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 'def'; hard?: number; kind?: DailyKind; avoid?: string[] } = {}): Scenario {
   const r = rng(hash('spot', seedStr));
-  const ids = NFL_IDS.length ? NFL_IDS : FRANCHISES.map((f) => f[0]);
+  const all = NFL_IDS.length ? NFL_IDS : FRANCHISES.map((f) => f[0]);
+  const ids = all.filter((id) => !opts.avoid?.includes(id));
   const a = ids[Math.floor(r() * ids.length)];
   let b = ids[Math.floor(r() * ids.length)];
   while (b === a) b = ids[Math.floor(r() * ids.length)];
+  const K = opts.kind;
   const teams: [TeamInfo, TeamInfo] = [makeTeam(a, seedStr), makeTeam(b, seedStr)];
   const hard = opts.hard ?? 0;   // survivor ramps this up: deeper holes, less time
 
   let best: { s: State; wp: number; p: SpotParams } | null = null;
   for (let tries = 0; tries < 14; tries++) {
-    const side = opts.side ?? (r() < 0.72 ? 'off' : 'def');
+    const side = K ? (K === 'stand' ? 'def' : 'off') : opts.side ?? (r() < 0.72 ? 'off' : 'def');
     const band = pickWeighted(r, { short: 0.3 + hard * 0.1, mid: 0.4, long: 0.3 - hard * 0.1 });
-    const t = band === 'short' ? rnd(r, 28, 75) : band === 'mid' ? rnd(r, 76, 140) : rnd(r, 141, 270);
+    let t = band === 'short' ? rnd(r, 28, 75) : band === 'mid' ? rnd(r, 76, 140) : rnd(r, 141, 270);
     let lead: number;
     if (side === 'off') {
       const k = pickWeighted(r, { close: 0.34, deep: 0.3 + hard * 0.08, tied: 0.2, ahead: 0.16 - hard * 0.05 });
@@ -152,10 +167,18 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     } else {
       lead = r() < 0.8 ? rnd(r, 1, 8) : 0;
     }
-    const yl = rnd(r, 15, 45);
+    let yl = rnd(r, 15, 45), down = 1, dist = 10;
+    // a daily's kind fixes the shape of the spot; the details still vary with the date
+    if (K === 'drill') { lead = -rnd(r, 1, 3); t = rnd(r, 95, 150); }
+    if (K === 'hole') { lead = -rnd(r, 4, 8); t = rnd(r, 150, 270); }
+    if (K === 'tied') { lead = 0; t = rnd(r, 60, 130); }
+    if (K === 'closeout') { lead = rnd(r, 1, 6); t = rnd(r, 100, 200); }
+    if (K === 'stand') { lead = rnd(r, 1, 7); t = rnd(r, 60, 150); yl = rnd(r, 40, 70); }
+    if (K === 'goalline') { lead = -rnd(r, 1, 6); t = rnd(r, 22, 50); yl = rnd(r, 88, 95); dist = Math.min(10, 100 - yl); }
+    if (K === 'fourthdown') { lead = -rnd(r, 1, 3); t = rnd(r, 70, 140); yl = rnd(r, 50, 68); down = 4; dist = rnd(r, 1, 6); }
     const toPick = () => Number(pickWeighted(r, { 0: 0.18, 1: 0.3, 2: 0.3, 3: 0.22 }));
     const p: SpotParams = {
-      you: a, them: b, side, t, lead, yl, down: 1, dist: 10, to: [toPick(), toPick()],
+      you: a, them: b, side, t, lead, yl, down, dist, to: [toPick(), toPick()],
       running: r() < 0.5, home: r() < 0.5 ? 0 : 1,
     };
     const s = stateFrom(p, teams);
@@ -163,13 +186,25 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     if (wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
     if (!best || Math.abs(wp - 0.4) < Math.abs(best.wp - 0.4)) best = { s, wp, p };
   }
-  return { id: seedStr, seed: hash(seedStr), mode, teams, home: best!.p.home, start: best!.s, baseWp: best!.wp };
+  return { id: seedStr, seed: hash(seedStr), mode, teams, home: best!.p.home, start: best!.s, baseWp: best!.wp, kind: K };
 }
 
+/** The day's kind: a seven-day rotation shuffled per week, so consecutive days never repeat a type. */
+export function dailyKind(date: string): DailyKind {
+  const n = dayNumber(date);
+  const week = Math.floor((n - 1) / 7), i = (n - 1) % 7;
+  const kinds = Object.keys(DAILY_KINDS) as DailyKind[];
+  const r = rng(hash('daily-week', week));
+  for (let k = kinds.length - 1; k > 0; k--) { const j = Math.floor(r() * (k + 1)); [kinds[k], kinds[j]] = [kinds[j], kinds[k]]; }
+  return kinds[i];
+}
+
+const prevDate = (date: string) => new Date(Date.parse(date + 'T00:00:00Z') - 864e5).toISOString().slice(0, 10);
+
+/** Today's daily: one game, the same for everyone, its teams not seen yesterday. */
 export function dailyScenarios(date: string): Scenario[] {
-  // spot 3 of the day is on defense half the time, so every day is not all offense
-  const sides: ('off' | 'def' | undefined)[] = ['off', 'off', undefined];
-  return Array.from({ length: SPOTS_PER_DAY }, (_, i) => genScenario(`daily:${date}:${i}`, 'daily', { side: sides[i] }));
+  const y = genScenario(`daily:${prevDate(date)}:0`, 'daily', { kind: dailyKind(prevDate(date)) });
+  return [genScenario(`daily:${date}:0`, 'daily', { kind: dailyKind(date), avoid: [y.teams[0].id, y.teams[1].id] })];
 }
 
 export function survivorScenario(run: number, game: number): Scenario {

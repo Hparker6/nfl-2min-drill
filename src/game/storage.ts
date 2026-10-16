@@ -6,6 +6,7 @@ export interface Settings {
   theme: 'auto' | 'light' | 'dark';
   speed: 'normal' | 'fast' | 'instant';
   hints: boolean;        // practice: show win chance on every option before you call it
+  nickname?: string;     // the name shown on the daily leaderboard
 }
 
 export interface SpotResult {

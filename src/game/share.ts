@@ -10,15 +10,23 @@ import { rateSpots } from './rating';
 const site = () => (typeof location !== 'undefined' && location.origin && !location.origin.startsWith('file') ? location.origin + location.pathname : 'The 4th Call');
 
 
-export function dailyShare(date: string, spots: SpotResult[], streakN: number): string {
-  const wins = spots.filter((s) => s.win).length;
-  const lines = spots.map((s, i) => `${i + 1} ${s.win ? '✅' : '❌'} ${s.grades.map((g) => GRADE_INFO[g].emoji).join('')}`);
-  return [
+export function dailyShare(date: string, spots: SpotResult[], streakN: number, extra: { percentile?: number | null; coach?: string; rank?: { rank: number; count: number } | null } = {}): string {
+  const s = spots[0];
+  const r = rateSpots(spots);
+  const lines = [
     `The 4th Call #${dayNumber(date)}`,
-    `${wins}-${spots.length - wins} · Performance ${rateSpots(spots).performance} · Decisions ${rateSpots(spots).decisions}${streakN > 1 ? ` · 🔥${streakN}` : ''}`,
-    ...lines,
-    site(),
-  ].join('\n');
+    `Performance ${r.performance}/100${extra.rank ? ` · #${extra.rank.rank.toLocaleString()} of ${extra.rank.count.toLocaleString()} today` : extra.percentile != null ? ` · better than ${extra.percentile}% of play-callers` : ''}`,
+  ];
+  if (extra.coach) lines.push(`Coached like ${extra.coach}`);
+  if (s) {
+    // one square per graded call; a long game is summarized so the card stays short
+    const sq = s.grades.map((g) => GRADE_INFO[g].emoji);
+    const counts = (['g', 'y', 'o', 'r'] as const).map((g) => [GRADE_INFO[g].emoji, s.grades.filter((x) => x === g).length] as const).filter(([, n]) => n);
+    lines.push(`${s.teams[0]} ${s.win ? 'W' : 'L'} ${s.score[0]}–${s.score[1]} ${sq.length <= 14 ? sq.join('') : counts.map(([e, n]) => `${e}${n}`).join(' ')}`);
+  }
+  if (streakN > 1) lines.push(`🔥 ${streakN}-day streak`);
+  lines.push(`Can you beat me? ${site()}`);
+  return lines.join('\n');
 }
 
 export function survivorShare(results: SpotResult[]): string {
@@ -63,6 +71,7 @@ export function tagsOf(records: Record_[]): string[] {
         if (call.id === 'quick_out' || call.id === 'comeback') tags.push('sideline');
       } else tags.push(c.play);
       if (r.situation.includes('4th &') && call) tags.push('go4');
+      if (r.situation.includes('4th &') && !call && (c.play === 'fg' || c.play === 'punt')) tags.push('kick4');
     }
     if (r.step === 'offClock' && c.offClock) tags.push(`clock:${c.offClock}`);
     if (r.step === 'look' && c.look) tags.push(`look:${c.look}`);
@@ -86,6 +95,29 @@ export function archetype(tags: string[]): ArchetypeId {
     bend: n('look') ? tags.filter((t) => t === 'look:soft').length / looks * 0.9 : 0,
   };
   return (Object.keys(score) as ArchetypeId[]).reduce((a, b) => (score[b] > score[a] ? b : a));
+}
+
+/** The numbers behind the profile, in words: what you did, and what the typical play-caller does. */
+export function profileFacts(tags: string[]): string[] {
+  const n = (t: string) => tags.filter((x) => x === t).length;
+  const out: string[] = [];
+  const fourth = n('go4') + n('kick4');
+  if (fourth) out.push(`went for it on ${n('go4')} of ${fourth} fourth down${fourth === 1 ? '' : 's'} (most coaches: ${Math.round(fourth * 0.3)})`);
+  const throws = n('short') + n('deep');
+  if (throws >= 3) out.push(n('short') >= n('deep') ? `kept it short on ${n('short')} of ${throws} throws (most: ${Math.round(throws * 0.6)})` : `went deep on ${n('deep')} of ${throws} throws (most: ${Math.round(throws * 0.4)})`);
+  const runs = n('run') + n('rpo'), plays = runs + throws;
+  if (plays >= 4 && runs / plays >= 0.5) out.push(`ran it on ${runs} of ${plays} snaps (most: ${Math.round(plays * 0.4)})`);
+  const looks = tags.filter((x) => x.startsWith('look:')).length;
+  if (looks >= 3) {
+    const b = n('look:blitz'), p = n('look:prevent') + n('look:soft');
+    if (b >= p) out.push(`blitzed on ${b} of ${looks} defensive snaps (most: ${Math.round(looks * 0.25)})`);
+    else out.push(`played it soft on ${p} of ${looks} defensive snaps (most: ${Math.round(looks * 0.2)})`);
+  }
+  const to = n('clock:timeout') + n('clock:drain');
+  if (to) out.push(`used ${to} timeout${to === 1 ? '' : 's'} on offense`);
+  if (n('two')) out.push('went for two');
+  if (n('onside')) out.push('tried an onside kick');
+  return out.slice(0, 3);
 }
 
 export { ARCHETYPES };

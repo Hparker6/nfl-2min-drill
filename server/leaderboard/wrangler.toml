@@ -1,0 +1,12 @@
+name = "the4thcall-leaderboard"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Create the namespace with:  wrangler kv namespace create LEADERBOARD   and paste its id here.
+[[kv_namespaces]]
+binding = "LEADERBOARD"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# Set to your game's address (e.g. "https://your-domain.com") to refuse requests from other sites.
+ALLOWED_ORIGIN = "*"

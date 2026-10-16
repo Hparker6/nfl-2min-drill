@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "test": "vitest run"
+    "test": "vitest run",
+    "percentiles": "vitest run --dir scripts percentiles",
+    "rosters": "node scripts/build-rosters.mjs"
   },
   "dependencies": {
     "react": "18.3.1",
