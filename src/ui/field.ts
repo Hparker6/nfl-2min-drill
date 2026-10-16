@@ -14,6 +14,7 @@ import { CALL, DEF_POS, OFF_POS, POS_LABEL, RECEIVERS, ROUTES } from '../engine/
 import { CX, DESIGN, W, defAlign, formation, type Pt } from '../engine/formation';
 import { hash } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
+import { kickoffTimeline, patTimeline } from '../engine/kicks';
 import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo } from '../engine/types';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -419,9 +420,51 @@ export class FieldRenderer {
     const tl: Timeline = choreograph({ res, yl0: ev.yl0, off: T[ev.off].rat, def: T[ev.off === 0 ? 1 : 0].rat, seed });
     const outcome: Outcome = res.kind === 'kneel' || res.kind === 'spike' ? 'none' : res.kind === 'fg' || res.kind === 'punt' ? 'kick'
       : res.kind === 'sack' ? 'sack' : res.intercepted || res.fumble ? 'pick' : res.td ? 'td' : res.oob ? 'oob' : res.kind === 'pass' && !res.complete ? 'drop' : 'tackle';
+    return this.runTimeline(tl, ev, map, outcome, speed, onOutcome);
+  }
+
+  /** A kickoff, free kick or onside kick, drawn in the kicking team's frame. */
+  playKick(ev: Extract<Ev, { type: 'kick' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
+    if (!this.teams) { onOutcome?.('none'); return Promise.resolve(); }
+    this.ensureDots();
+    this.interrupt();
+    cancelAnimationFrame(this.tweenRaf);
+    const T = this.teams;
+    const seed = hash(ev.t, ev.kind, ev.kicker, ev.yl, ev.touchback ? 1 : 0, ev.td ? 1 : 0);
+    const { tl, res, yl0 } = kickoffTimeline(ev, T[ev.kicker].rat, T[ev.kicker === 0 ? 1 : 0].rat, seed);
+    this.lastOff = ev.kicker;
+    for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.kicker].players[k], k);
+    for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.kicker === 0 ? 1 : 0].players[k], k);
+    const fake = { type: 'snap', off: ev.kicker, yl0, down0: 1, dist0: 10, t0: ev.t, t: ev.t, res, first: false } as Extract<Ev, { type: 'snap' }>;
+    return this.runTimeline(tl, fake, this.frame(ev.kicker, yl0), 'kick', speed, onOutcome);
+  }
+
+  /** The try after a touchdown: an extra point from the 15, or a two-point snap from the 2. */
+  playPat(ev: Extract<Ev, { type: 'pat' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
+    if (!this.teams) { onOutcome?.('none'); return Promise.resolve(); }
+    this.ensureDots();
+    this.interrupt();
+    cancelAnimationFrame(this.tweenRaf);
+    const T = this.teams;
+    const seed = hash(ev.t, ev.off, ev.two ? 'two' : 'xp', ev.good ? 1 : 0);
+    const { tl, res, yl0 } = patTimeline(ev, T[ev.off].rat, T[ev.off === 0 ? 1 : 0].rat, seed);
+    this.lastOff = ev.off;
+    for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.off].players[k], k);
+    for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.off === 0 ? 1 : 0].players[k], k);
+    const fake = { type: 'snap', off: ev.off, yl0, down0: 1, dist0: 100 - yl0, t0: ev.t, t: ev.t, res, first: false } as Extract<Ev, { type: 'snap' }>;
+    return this.runTimeline(tl, fake, this.frame(ev.off, yl0), 'kick', speed, onOutcome);
+  }
+
+  private runTimeline(tl: Timeline, ev: Extract<Ev, { type: 'snap' }>, map: (p: Pt) => Pt, outcome: Outcome, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
+    const res = ev.res;
+    this.gMarks.innerHTML = '';
+    const los = map([CX, 0]);
+    if (res.kind !== 'kickoff') this.el('line', { x1: 0, x2: W, y1: los[1], y2: los[1], class: 'f-los' }, this.gMarks);
 
     const PRE = 0.35, HOLD = 0.5;
     const total = PRE + tl.end + HOLD;
+    const T = this.teams!;
+    void T;
     // a long return or breakaway plays faster, like a broadcast cut: no play takes more than ~9 s of real time
     const squeeze = total > 9 ? 9 / total : 1;
     const dur = speed > 0 ? (total * squeeze) / speed : 0;
@@ -494,9 +537,12 @@ export class FieldRenderer {
         this.callout('TOUCHDOWN', at, good !== !!res.defTd ? 'good' : 'bad', 2.2);
         break;
       }
-      case 'kick':
-        if (res.kind === 'fg') setTimeout(() => this.callout(res.blocked ? 'BLOCKED' : res.good ? "IT'S GOOD!" : 'NO GOOD', at, res.good === good ? 'good' : 'bad', 2), 0);
-        break;
+      case 'good': this.fx('td', [0, good ? 0 : 110]); this.callout(res.call === 'xp' || res.call === 'fg' ? "IT'S GOOD!" : 'GOOD · 2 POINTS', at, good ? 'good' : 'bad', 2.2); break;
+      case 'nogood': this.fx('x', at); this.callout('NO GOOD', at, good ? 'bad' : 'good', 2.2); break;
+      case 'blocked': this.fx('hit', at); this.callout('BLOCKED!', at, good ? 'bad' : 'good', 2.2); break;
+      case 'touchback': this.callout('TOUCHBACK', at, 'neutral', 1.6); break;
+      case 'return': this.fx('hit', at); this.fx('spot', at); this.callout(`RETURN · ${res.retYds ?? 0} YDS`, at, 'neutral'); break;
+      case 'recover': this.fx('hit', at); this.callout(res.call === 'onside' ? (ev.off === 0 ? 'ONSIDE RECOVERED!' : 'THEY RECOVER') : 'RECOVERED', at, ev.off === 0 ? 'good' : 'bad', 2); break;
       default: break;
     }
   }

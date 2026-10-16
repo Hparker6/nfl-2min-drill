@@ -25,12 +25,13 @@ import { CALL, ROUTES } from './data';
 import { CX, DESIGN, W, defAlign, formation, type Design, type Pt } from './formation';
 import { clip, rng, type Rng } from './rng';
 import { flight } from './sim';
+import { fieldGoalTimeline } from './kicks';
 import type { Look, PlayResult, Ratings, Rcv, RouteId } from './types';
 
 export type Key = [number, number, number];          // t, x, dy
 export interface BallKey { t: number; x: number; dy: number; h: number }
 export type EventKind = 'snap' | 'handoff' | 'pitch' | 'throw' | 'catch' | 'incomplete' | 'int' | 'sack' | 'pressure' | 'scramble'
-  | 'tackle' | 'td' | 'oob' | 'fumble' | 'kick' | 'kneel' | 'spike' | 'lateral' | 'return';
+  | 'tackle' | 'td' | 'oob' | 'fumble' | 'kick' | 'kneel' | 'spike' | 'lateral' | 'return' | 'good' | 'nogood' | 'blocked' | 'touchback' | 'recover';
 export interface TEvent { t: number; kind: EventKind; who?: string; at?: Pt }
 export interface Timeline {
   tracks: Record<string, Key[]>;
@@ -165,8 +166,9 @@ export function choreograph(inp: ChoreoInput): Timeline {
   for (const k of DEF) ag['d:' + k] = { key: 'd:' + k, p: start['d:' + k], v: 0, prof: profile(inp.def, k), goal: () => null, keys: [] };
   const P = (k: string) => ag[k].p;
 
-  // ---- kicks, kneels, spikes: simple, but still in formation
-  if (res.kind === 'fg' || res.kind === 'punt' || res.kind === 'kneel' || res.kind === 'spike') {
+  // ---- kicks, kneels, spikes
+  if (res.kind === 'fg') return fieldGoalTimeline({ good: !!res.good, blocked: !!res.blocked, yt, off: inp.off, def: inp.def, seed: inp.seed });
+  if (res.kind === 'punt' || res.kind === 'kneel' || res.kind === 'spike') {
     return special(inp, start, ag, events, carrier);
   }
 

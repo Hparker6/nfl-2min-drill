@@ -10,7 +10,7 @@ export interface Board {
   count: number;            // scores submitted today
   rank: number | null;      // your rank (1 = best), null when not submitted
   tied: number;             // others with your score
-  bands: number[];          // counts in 0-19, 20-39, 40-59, 60-79, 80-100
+  bands: number[];          // counts in 0-9, 10-19, …, 90-100
   best: { name: string; score: number }[];
   average: number;
 }
@@ -48,6 +48,18 @@ export async function fetchBoard(day: string): Promise<Board | null> {
   } catch { return null; }
 }
 
-/** The histogram band a score falls in. */
-export const bandOf = (score: number) => Math.min(4, Math.floor(score / 20));
-export const BAND_LABELS = ['0–19', '20–39', '40–59', '60–79', '80–100'];
+/** The histogram band a score falls in (ten bins of ten). */
+export const bandOf = (score: number) => Math.min(9, Math.floor(score / 10));
+export const BAND_LABELS = ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90'];
+
+export interface DaySummary { count: number; average: number; best: { name: string; score: number }[]; bands: number[] }
+export interface Stats { days: Record<string, DaySummary> }
+
+export async function fetchStats(): Promise<Stats | null> {
+  if (!URL) return null;
+  try {
+    const r = await fetch(`${URL}/v1/stats`);
+    if (!r.ok) return null;
+    return (await r.json()) as Stats;
+  } catch { return null; }
+}

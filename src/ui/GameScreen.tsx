@@ -121,13 +121,23 @@ export function GameScreen(p: Props) {
           if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         });
         staleRef.current = true;
+      } else if (ev.type === 'kick' || ev.type === 'pat') {
+        // kickoffs and tries are scenes too
+        setBanner(null);
+        const land = () => {
+          if (told.banner) setBanner({ id: ++uid, text: told.banner, tone: told.tone });
+          setView(clone(session.s));
+          if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
+        };
+        if (ev.type === 'kick') await field.current?.playKick(ev, speed, land); else await field.current?.playPat(ev, speed, land);
+        staleRef.current = true;
       } else {
         if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         setView(clone(session.s));
         if (told.banner) {
           setBanner({ id: ++uid, text: told.banner, tone: told.tone });
           if (speed) await sleep(1300 / speed);
-        } else if (speed && (ev.type === 'kick' || ev.type === 'pat')) await sleep(700 / speed);
+        }
       }
     }
     setView(clone(session.s));

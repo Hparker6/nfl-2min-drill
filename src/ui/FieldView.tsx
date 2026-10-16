@@ -7,6 +7,8 @@ import { PlayerCard } from './PlayerCard';
 export interface FieldHandle {
   setup(s: State, pv?: Preview, instant?: boolean): void;
   play(ev: Ev, speed: number, onOutcome?: (o: Outcome) => void): Promise<void>;
+  playKick(ev: Extract<Ev, { type: 'kick' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void>;
+  playPat(ev: Extract<Ev, { type: 'pat' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void>;
 }
 
 export interface Banner { id: number; text: string; sub?: string; tone: string }
@@ -54,6 +56,8 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
   useImperativeHandle(ref, () => ({
     setup: (s, pv, instant) => rRef.current?.setup(s, pv, instant),
     play: (ev, speed, onOutcome) => rRef.current?.play(ev, speed, onOutcome) ?? Promise.resolve(),
+    playKick: (ev, speed, onOutcome) => rRef.current?.playKick(ev, speed, onOutcome) ?? Promise.resolve(),
+    playPat: (ev, speed, onOutcome) => rRef.current?.playPat(ev, speed, onOutcome) ?? Promise.resolve(),
   }), []);
 
   return (

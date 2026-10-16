@@ -109,7 +109,8 @@ export function Stats({ store, onClose }: { store: Store; onClose: () => void })
             <div><b>{days}</b><span>dailies done</span></div>
             <div><b>{store.surv.best}</b><span>survivor best</span></div>
           </div>
-          <h3>Call grades</h3>
+          <p><button className="link" onClick={() => { onClose(); location.hash = 'everyone'; }}>Everyone's daily stats ›</button></p>
+      <h3>Call grades</h3>
           <div className="bars">
             {(['g', 'y', 'o', 'r'] as GradeKey[]).map((g) => (
               <div key={g} className="bar-row">

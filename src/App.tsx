@@ -3,10 +3,11 @@ import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
 import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
+import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 
-type Mode = 'daily' | 'survivor' | 'practice';
-const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : 'daily');
+type Mode = 'daily' | 'survivor' | 'practice' | 'everyone';
+const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : 'daily');
 
 export default function App() {
   const [store, setStore] = useState<Store>(loadStore);
@@ -82,10 +83,12 @@ export default function App() {
         {mode === 'daily' && <Daily store={store} update={update} toast={toast} go={go} onboarded={onboarded} openHelp={() => setModal('help')} />}
         {mode === 'survivor' && <Survivor store={store} update={update} toast={toast} />}
         {mode === 'practice' && <Practice store={store} update={update} />}
+        {mode === 'everyone' && <Everyone store={store} go={go} />}
       </main>
       <footer className="foot">
         <nav className="foot-links" aria-label="About">
           <button onClick={() => setModal('help')}>How to play</button>
+          <button onClick={() => go('everyone')}>Everyone's stats</button>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
         </nav>
         <p>An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0); ratings and outcomes are this game's own estimates from a simplified simulation.</p>

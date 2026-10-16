@@ -155,7 +155,7 @@ function DayScore({ date, result, store, update, toast, go }: { date: string; re
       </div>
 
       <div className="board">
-        <span className="k">Everyone today</span>
+        <div className="board-head"><span className="k">Everyone today</span><button className="link" onClick={() => location.hash = 'everyone'}>All days ›</button></div>
         {!on ? (
           <p className="muted small">The live leaderboard isn't connected on this site yet. Your score is compared with simulated play-callers above.</p>
         ) : (

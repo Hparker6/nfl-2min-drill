@@ -24,9 +24,9 @@ function summarize(day, scores, token) {
   const list = Object.entries(scores).map(([tok, e]) => ({ tok, ...e }));
   const sorted = [...list].sort((a, b) => b.score - a.score || a.t - b.t);
   const mine = token ? sorted.find((e) => e.tok === token) : null;
-  const bands = [0, 0, 0, 0, 0];
+  const bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   let sum = 0;
-  for (const e of list) { bands[Math.min(4, Math.floor(e.score / 20))]++; sum += e.score; }
+  for (const e of list) { bands[Math.min(9, Math.floor(e.score / 10))]++; sum += e.score; }
   const rank = mine ? sorted.filter((e) => e.score > mine.score).length + 1 : null;
   const tied = mine ? sorted.filter((e) => e.score === mine.score).length - 1 : 0;
   return {
@@ -40,6 +40,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return json({}, env);
+    if (request.method === 'GET' && url.pathname === '/v1/stats') {
+      // every day's summary (kept up to date on each score): counts, averages, histograms and the best ten
+      return json({ days: (await env.LEADERBOARD.get('days', 'json')) || {} }, env);
+    }
     const m = url.pathname.match(/^\/v1\/day\/(\d{4}-\d{2}-\d{2})(\/score)?$/);
     if (!m || !DAY.test(m[1])) return json({ error: 'not found' }, env, 404);
     const day = m[1];
@@ -61,7 +65,11 @@ export default {
       data.scores[token] = { name: clean(body.name), score: Math.round(score), grades: String(body.grades || '').slice(0, 64), win: !!body.win, t: data.scores[token]?.t ?? now };
       // KV writes are last-writer-wins; at launch scale the odd lost write is acceptable
       await env.LEADERBOARD.put(key, JSON.stringify(data), { expirationTtl: 60 * 60 * 24 * 60 });
-      return json(summarize(day, data.scores, token), env);
+      const sum = summarize(day, data.scores, token);
+      const days = (await env.LEADERBOARD.get('days', 'json')) || {};
+      days[day] = { count: sum.count, average: sum.average, best: sum.best, bands: sum.bands };
+      await env.LEADERBOARD.put('days', JSON.stringify(days));
+      return json(sum, env);
     }
     return json({ error: 'method' }, env, 405);
   },
