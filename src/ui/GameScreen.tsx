@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CALL, POS_ROUTES } from '../engine/data';
 import { DESIGN } from '../engine/formation';
-import { WEATHER, clone, leadOf } from '../engine/sim';
+import { WEATHER, clone } from '../engine/sim';
 import { utcDate, type Scenario } from '../engine/scenario';
 import type { Ev, Rcv, State } from '../engine/types';
 import { ballOn, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
@@ -57,13 +57,11 @@ let uid = 0;
 const before = (s: State, ev: Extract<Ev, { type: 'snap' }>): State => ({ ...s, off: ev.off, yl: ev.yl0, down: ev.down0, dist: ev.dist0, t: ev.t0, stage: 'call' });
 
 /**
- * The tempo starts on what a coach would usually do, so the play can be snapped in one tap: milk it with the lead,
- * hurry when behind or inside two minutes, huddle otherwise. On defense, let it run. Any of them can be changed.
+ * The tempo starts on Huddle, so picking a play and tapping Go always snaps it: the clock is only managed when the
+ * player asks to (No-huddle, Milk it, Timeout, Spike). On defense, let it run.
  */
 function defaultTempo(d: Decision): Opt | null {
-  const key = d.step === 'defClock' ? 'let' : d.step === 'offClock'
-    ? (leadOf(d.state, 0) > 0 ? 'milk' : leadOf(d.state, 0) < 0 || d.state.t <= 120 ? 'nohuddle' : 'huddle')
-    : null;
+  const key = d.step === 'defClock' ? 'let' : d.step === 'offClock' ? 'huddle' : null;
   return key ? d.options.find((o) => o.key === key) ?? null : null;
 }
 
