@@ -29,7 +29,7 @@ Copy `.env.example` to `.env.production` (or set the same variables in your host
 
 | Variable | Required | What it does |
 | --- | --- | --- |
-| `VITE_SITE_URL` | Recommended | Your public address, e.g. `https://the4thcall.com` (no trailing slash). Makes the social-preview image and canonical link absolute, which link previews need. |
+| `VITE_SITE_URL` | Recommended | Your public address, e.g. `https://your-domain.com` (no trailing slash). Makes the social-preview image and canonical link absolute, which link previews need. |
 | `VITE_GA_ID` | Optional | A Google Analytics 4 measurement ID (`G-…`). Without it, no analytics code is loaded at all. |
 
 Analytics events (when enabled): `game_start`, `call_made`, `spot_complete`, `daily_complete`, `survivor_end`, `share`.
