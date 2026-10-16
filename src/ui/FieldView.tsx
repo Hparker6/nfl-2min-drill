@@ -48,13 +48,6 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
     if (rRef.current) rRef.current.onInspect = (side, pos) => setInspect(side && pos ? { side, pos } : null);
   }, [teams]);
 
-  // touch screens have no 'pointer left': a tapped player's card clears itself
-  useEffect(() => {
-    if (!inspect || typeof matchMedia !== 'function' || !matchMedia('(pointer: coarse)').matches) return;
-    const id = setTimeout(() => setInspect(null), 2500);
-    return () => clearTimeout(id);
-  }, [inspect]);
-
   useImperativeHandle(ref, () => ({
     setup: (s, pv, instant) => rRef.current?.setup(s, pv, instant),
     play: (ev, speed, onOutcome) => rRef.current?.play(ev, speed, onOutcome) ?? Promise.resolve(),

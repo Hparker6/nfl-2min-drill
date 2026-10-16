@@ -43,7 +43,7 @@ export interface Preview {
 /** What the play came to, fired when it happens on the field (not after the hold). */
 export type Outcome = 'tackle' | 'catch' | 'drop' | 'pick' | 'td' | 'oob' | 'sack' | 'kick' | 'none';
 
-interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement }
+interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement; mk: SVGElement }
 
 export class FieldRenderer {
   private svg: SVGSVGElement;
@@ -56,6 +56,7 @@ export class FieldRenderer {
   private ballLace: SVGLineElement;
   private shadow: SVGEllipseElement;
   private dots = new Map<string, Dot>();
+  private mkScale = 1;   // markers drawn larger when the field is narrow, so numbers stay readable
   private pos = new Map<string, Pt>();      // where each marker is drawn now (field coordinates)
   private teams: [TeamInfo, TeamInfo] | null = null;
   private s: State | null = null;
@@ -100,6 +101,12 @@ export class FieldRenderer {
   resize(w: number, h: number) {
     if (w <= 0 || h <= 0) return;
     this.viewH = Math.max(26, Math.min(80, (W * h) / w));
+    // about 10 pixels a yard is where a marker's number reads; narrower fields draw markers up to half again larger
+    const k = Math.round(Math.min(1.5, Math.max(1, 10 / (w / W))) * 100) / 100;
+    if (k !== this.mkScale) {
+      this.mkScale = k;
+      this.dots.forEach((d) => (k === 1 ? d.mk.removeAttribute('transform') : d.mk.setAttribute('transform', `scale(${k})`)));
+    }
     if (this.s) {
       const dir = this.s.off === 0 ? 1 : -1;
       const ballU = this.s.off === 0 ? this.s.yl : 100 - this.s.yl;
@@ -161,32 +168,48 @@ export class FieldRenderer {
       for (const pos of side === 'o' ? OFF_POS : DEF_POS) {
         const g = this.el('g', { class: `f-dot f-${side}` }, this.gPlayers) as SVGGElement;
         // offense: circles; defense: diamonds. The outline is the player's rating, red to green.
+        // the marker itself sits in its own group so small screens can draw it larger (.f-mk in the stylesheet)
+        const mk = this.el('g', { class: 'f-mk' }, g);
         const ring = side === 'o'
-          ? this.el('circle', { r: 1.12, class: 'f-ring' }, g)
-          : this.el('rect', { x: -1.02, y: -1.02, width: 2.04, height: 2.04, rx: 0.3, transform: 'rotate(45)', class: 'f-ring' }, g);
+          ? this.el('circle', { r: 1.12, class: 'f-ring' }, mk)
+          : this.el('rect', { x: -1.02, y: -1.02, width: 2.04, height: 2.04, rx: 0.3, transform: 'rotate(45)', class: 'f-ring' }, mk);
         const body = side === 'o'
-          ? this.el('circle', { r: 0.86, class: 'f-body' }, g)
-          : this.el('rect', { x: -0.74, y: -0.74, width: 1.48, height: 1.48, rx: 0.2, transform: 'rotate(45)', class: 'f-body' }, g);
-        const lab = this.el('text', { y: 0.3, class: 'f-lab' }, g) as SVGTextElement;
+          ? this.el('circle', { r: 0.86, class: 'f-body' }, mk)
+          : this.el('rect', { x: -0.74, y: -0.74, width: 1.48, height: 1.48, rx: 0.2, transform: 'rotate(45)', class: 'f-body' }, mk);
+        const lab = this.el('text', { y: 0.3, class: 'f-lab' }, mk) as SVGTextElement;
         lab.textContent = POS_LABEL[pos];
         // linemen stand a yard apart: their names would overlap, so they go by number only
         const crowded = ['LT', 'LG', 'C', 'RG', 'RT', 'EDGE1', 'DL1', 'DL2', 'EDGE2'].includes(pos);
         const name = this.el('text', { y: 2.05, class: crowded ? 'f-name f-name-line' : 'f-name' }, g) as SVGTextElement;
+        // details: hover with a mouse, keyboard focus, or press and hold on a touch screen. A tap only retargets, so
+        // cycling a receiver's routes never puts a card over the field.
+        const show = () => this.onInspect?.(side, pos);
+        const hide = () => this.onInspect?.(null, null);
+        let hold: ReturnType<typeof setTimeout> | null = null;
+        let held = false;
+        const endHold = () => { if (hold) clearTimeout(hold); hold = null; if (held) hide(); };
+        g.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') show(); });
+        g.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') hide(); });
+        g.addEventListener('pointerdown', (e) => {
+          if (e.pointerType === 'mouse') return;
+          held = false;
+          hold = setTimeout(() => { held = true; show(); }, 450);
+        });
+        g.addEventListener('pointerup', endHold);
+        g.addEventListener('pointercancel', endHold);
+        g.addEventListener('contextmenu', (e) => e.preventDefault());   // the long press is ours, not the browser's menu
+        g.addEventListener('focus', () => { if (g.matches(':focus-visible')) show(); });
+        g.addEventListener('blur', hide);
         if (side === 'o' && (RECEIVERS as string[]).includes(pos)) {
-          g.addEventListener('click', () => this.onTap?.(pos as Rcv));
+          // a press-and-hold to read his ratings is not also a tap
+          g.addEventListener('click', () => { if (held) { held = false; return; } this.onTap?.(pos as Rcv); });
           // Enter on a focused receiver retargets the throw; it must not also reach the panel's Enter-to-snap
           g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.onTap?.(pos as Rcv); } });
           g.setAttribute('data-rcv', pos);
         }
-        // details on hover or keyboard focus, never on the field all the time
-        const show = () => this.onInspect?.(side, pos);
-        const hide = () => this.onInspect?.(null, null);
-        g.addEventListener('mouseenter', show);
-        g.addEventListener('mouseleave', hide);
-        g.addEventListener('focus', show);
-        g.addEventListener('blur', hide);
         this.el('title', {}, g).textContent = pos;
-        this.dots.set(`${side}:${pos}`, { g, body, ring, lab, name });
+        this.dots.set(`${side}:${pos}`, { g, body, ring, lab, name, mk });
+        if (this.mkScale !== 1) mk.setAttribute('transform', `scale(${this.mkScale})`);
       }
     }
   }

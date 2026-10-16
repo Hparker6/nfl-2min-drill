@@ -828,3 +828,14 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 @media (min-width: 1000px) { .cp.def:has(.clockrow) .tab5-blurb { display: none; } }
 /* short desktop windows: when the panel can't fit, the column scrolls and the Snap bar stays pinned at its bottom */
 @media (min-width: 1000px) { .side > section.cp { min-height: min-content; } }
+/* touch: press and hold a player for his card, without the browser's own long-press menu or text selection */
+svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+/* phones: less to read around the call. The scoreboard already shows down and distance, the tabs say what they hold */
+@media (max-width: 999px) {
+  .cp .cp-flags .off-flag, .cp .cp-flags .def-flag { display: none; }
+  .cp-head h2 { font-size: 19px; }
+  .cp-flags:not(:has(.wx-chip)) { display: none; }
+  .tab5-blurb { display: none; }
+  .cp .read { font-size: 13px; padding: 5px 9px; }
+  .cp { gap: 10px; }
+}
