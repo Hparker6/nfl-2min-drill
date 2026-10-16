@@ -33,8 +33,10 @@ Copy `.env.example` to `.env.production` (or set the same variables in your host
 | --- | --- | --- |
 | `VITE_SITE_URL` | Required for search | Your public address, e.g. `https://your-domain.com` (no trailing slash). Makes the social-preview image, canonical link and structured data absolute, and adds `sitemap.xml` plus its line in `robots.txt`. Without it, search engines get no sitemap and no canonical URL. |
 | `VITE_GA_ID` | Optional | Google Analytics 4 measurement ID. The site tag (`G-WVFFZZWS61`) is built in; set this to use another, or `off` to load no analytics (for local builds). |
+| `VITE_FEEDBACK_URL`, `VITE_SUPPORT_URL` | Optional | The footer's Feedback and Support the developer links (`https://` or `mailto:`). Not shown when empty. |
+| `VITE_ADS`, `VITE_ADSENSE_CLIENT`, `VITE_ADSENSE_SLOT` | Optional | Display ads, off by default. See [MONETIZATION.md](MONETIZATION.md) before setting them. |
 
-Analytics events (when enabled): `game_start`, `call_made`, `spot_complete`, `daily_complete`, `survivor_end`, `share`.
+Analytics events (when enabled): `game_start`, `call_made`, `game_complete`, `play_again`, `daily_complete`, `survivor_end`, `share` (the full list is in `src/game/analytics.ts`).
 No personal data is sent. If you enable analytics for visitors in the EU/UK, you may need a consent banner.
 
 ## Deploy

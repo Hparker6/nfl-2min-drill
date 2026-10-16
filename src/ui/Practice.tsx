@@ -22,8 +22,11 @@ export function Practice({ store, update }: Props) {
   const hints = store.settings.hints;
   const set = <K extends keyof SpotParams>(k: K, v: SpotParams[K]) => setP((x) => ({ ...x, [k]: v }));
 
-  const build = () => { track('practice_setup', { how: 'custom', side: p.side, weather: p.weather ?? 'clear', coach: hints }); setSc(customScenario(p, `practice:${Date.now()}`)); setN((x) => x + 1); };
-  const random = () => { track('practice_setup', { how: 'random', coach: hints }); setSc(genScenario(`practice:rand:${Date.now()}`, 'practice')); setN((x) => x + 1); };
+  // a spot started after one was played out is a play-again (counted once per new spot)
+  const [finished, setFinished] = useState(false);
+  const again = () => { if (finished) { track('play_again', { from: 'practice', to: 'practice' }); setFinished(false); } };
+  const build = () => { again(); track('practice_setup', { how: 'custom', side: p.side, weather: p.weather ?? 'clear', coach: hints }); setSc(customScenario(p, `practice:${Date.now()}`)); setN((x) => x + 1); };
+  const random = () => { again(); track('practice_setup', { how: 'random', coach: hints }); setSc(genScenario(`practice:rand:${Date.now()}`, 'practice')); setN((x) => x + 1); };
 
   if (sc) {
     const meta = (
@@ -37,7 +40,7 @@ export function Practice({ store, update }: Props) {
     return (
       <GameScreen key={`${sc.id}:${n}`} sc={sc} saved={[]} settings={store.settings} hints={hints} meta={meta} label="Practice" autoStart={false}
         startLabel="Play it" briefExtra={<button className="btn ghost" onClick={() => setSc(null)}>Change the spot</button>}
-        onPicks={() => {}} onDone={() => {}} onContinue={() => setSc(null)} continueLabel="Back to the builder" />
+        onPicks={() => {}} onDone={() => setFinished(true)} onContinue={() => setSc(null)} continueLabel="Back to the builder" />
     );
   }
   const yourSide = p.side === 'off';

@@ -6,6 +6,8 @@ import { Practice } from './ui/Practice';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 import { UpdateBar } from './ui/UpdateBar';
+import { AdSlot } from './ui/AdSlot';
+import { FEEDBACK_URL, SUPPORT_URL } from './game/site';
 import { lazy, Suspense } from 'react';
 // career mode is its own chunk: the Daily loads as fast as it did
 const CareerMode = lazy(() => import('./ui/career/Career').then((m) => ({ default: m.CareerMode })));
@@ -97,12 +99,16 @@ export default function App() {
         {mode === 'career' && <Suspense fallback={<div className="cr-busy" />}><CareerMode app={store.settings} /></Suspense>}
       </main>
       <footer className="foot">
+        {/* ads only below the page, never during a game (AdSlot renders nothing then, or when ads are off) */}
+        <AdSlot />
         <nav className="foot-links" aria-label="About">
           {/* real links, so search engines find the guide, the leaderboard and the stats pages */}
           <a href="/how-to-play/">How to play</a>
           <a href="/leaderboard/">Leaderboard</a>
           <a href="/stats/">Stats</a>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
+          {FEEDBACK_URL && <a href={FEEDBACK_URL} target="_blank" rel="noopener">Feedback</a>}
+          {SUPPORT_URL && <a href={SUPPORT_URL} target="_blank" rel="noopener">Support the developer</a>}
         </nav>
         {mode !== 'career' && <section className="foot-about" aria-labelledby="foot-about-h">
           <h2 id="foot-about-h">Play the NFL 2-minute drill</h2>

@@ -228,8 +228,8 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
 
       <div className="sum-actions">
         <div className="row">
-          <button className="btn" onClick={() => go('survivor')}>Play Survivor</button>
-          <button className="btn" onClick={() => go('practice')}>Practice</button>
+          <button className="btn" onClick={() => { track('play_again', { from: 'daily', to: 'survivor' }); go('survivor'); }}>Play Survivor</button>
+          <button className="btn" onClick={() => { track('play_again', { from: 'daily', to: 'practice' }); go('practice'); }}>Practice</button>
         </div>
         <span className="muted small">Next daily in <Countdown /></span>
       </div>

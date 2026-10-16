@@ -17,6 +17,7 @@ import { MiniPlay } from './MiniPlay';
 import { Scoreboard } from './Scoreboard';
 import { SpotReview } from './Review';
 import type { Preview } from './field';
+import { gameOnScreen } from './AdSlot';
 
 interface Props {
   sc: Scenario;
@@ -215,7 +216,7 @@ export function GameScreen(p: Props) {
     if (!doneRef.current) {
       doneRef.current = true;
       onDone(res);
-      track('spot_complete', { mode: sc.mode, win: r.win, calls: recs.length });
+      track('game_complete', { mode: sc.mode, win: r.win, calls: recs.length });
     }
   }, [sc, session, onDone]);
 
@@ -264,6 +265,7 @@ export function GameScreen(p: Props) {
     }
   }, [session, finish, present, animate]);
 
+  useEffect(() => { gameOnScreen(true); return () => gameOnScreen(false); }, []);   // no ads while a game is up
   useEffect(() => {
     if (boot.lost) onPicks([]);
     field.current?.setup(session.s, {}, true);

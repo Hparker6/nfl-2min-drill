@@ -103,7 +103,7 @@ export function Survivor({ store, update, toast }: Props) {
           </div>
           <div className="sum-actions">
             <button className="btn primary big" onClick={share}>Share run</button>
-            <button className="btn big" onClick={newRun}>Start a new run</button>
+            <button className="btn big" onClick={() => { track('play_again', { from: 'survivor', to: 'survivor' }); newRun(); }}>Start a new run</button>
           </div>
         </section>
       </div>
