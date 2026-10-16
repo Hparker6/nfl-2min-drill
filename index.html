@@ -3,9 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>The 4th Call: Daily Football Play-Calling Game</title>
-    <meta name="description" content="Call the plays at the end of a close football game. Three new spots every day, every call graded against every option you had. Free, no sign-up." />
+    <title>NFL 2-Minute Drill Game: Call the Plays | The 4th Call</title>
+    <meta name="description" content="Play the NFL 2 min drill free in your browser. Real NFL rosters: call every play, manage the clock, and see every call graded. New game every day." />
     <meta name="theme-color" content="#0a0e0c" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
     <!--CANONICAL-->
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192" />
@@ -13,8 +14,8 @@
     <link rel="manifest" href="site.webmanifest" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="The 4th Call" />
-    <meta property="og:title" content="The 4th Call: Daily Football Play-Calling" />
-    <meta property="og:description" content="Call the plays at the end of a close game. Every call graded against every option you had. Three new spots every day." />
+    <meta property="og:title" content="NFL 2-Minute Drill Game: Call the Plays | The 4th Call" />
+    <meta property="og:description" content="Run the 2-minute drill: call the plays at the end of a close game with real rosters. Every call graded against every option you had. New game every day." />
     <meta property="og:image" content="%OG_IMAGE%" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -22,15 +23,22 @@
     <meta name="twitter:image:alt" content="The 4th Call: a play drawn on a football field, a yellow corner route against the defense, with the score 17 to 20, 0:48 left, 4th and 2." />
     <!--OG_URL-->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="The 4th Call: Daily Football Play-Calling" />
-    <meta name="twitter:description" content="Call the plays at the end of a close game. Every call graded against every option you had." />
+    <meta name="twitter:title" content="NFL 2-Minute Drill Game: Call the Plays | The 4th Call" />
+    <meta name="twitter:description" content="Run the 2-minute drill: call the plays at the end of a close game. Every call graded against every option you had." />
     <meta name="twitter:image" content="%OG_IMAGE%" />
+    <!--JSONLD-->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body style="background:#0a0e0c;color:#edf2ee;margin:0">
-    <div id="root"></div>
+    <!-- Shown until the app loads (React replaces it); also what crawlers that don't run JavaScript read. -->
+    <div id="root"><main style="font:16px/1.5 system-ui,sans-serif;padding:48px 24px;max-width:640px;margin:auto">
+      <h1 style="font-size:28px;line-height:1.2;margin:0 0 12px">NFL 2-Minute Drill: call the plays in The 4th Call</h1>
+      <p>Run the NFL 2 min drill at the end of a close game. Call every play, manage the clock and your timeouts, and call the defense when they have the ball. Teams use real NFL rosters and season stats.</p>
+      <p>Every call is graded against every option you had, by playing the rest of the game out thousands of times. Free in your browser, no sign-up, and a new daily game for everyone, plus Survivor and Practice modes.</p>
+      <p style="font-size:13px;opacity:.7">An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA.</p>
+    </main></div>
     <noscript><p style="font:16px/1.5 system-ui,sans-serif;padding:24px;max-width:560px;margin:auto">The 4th Call is a football play-calling game that runs in your browser. Please turn on JavaScript to play.</p></noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,7 +1,7 @@
 {
   "name": "The 4th Call",
   "short_name": "4th Call",
-  "description": "Daily football play-calling game.",
+  "description": "2-minute drill football play-calling game. Call the plays, manage the clock, new game every day.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

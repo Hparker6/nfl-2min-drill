@@ -31,7 +31,7 @@ Copy `.env.example` to `.env.production` (or set the same variables in your host
 
 | Variable | Required | What it does |
 | --- | --- | --- |
-| `VITE_SITE_URL` | Recommended | Your public address, e.g. `https://your-domain.com` (no trailing slash). Makes the social-preview image and canonical link absolute, which link previews need. |
+| `VITE_SITE_URL` | Required for search | Your public address, e.g. `https://your-domain.com` (no trailing slash). Makes the social-preview image, canonical link and structured data absolute, and adds `sitemap.xml` plus its line in `robots.txt`. Without it, search engines get no sitemap and no canonical URL. |
 | `VITE_GA_ID` | Optional | Google Analytics 4 measurement ID. The site tag (`G-WVFFZZWS61`) is built in; set this to use another, or `off` to load no analytics (for local builds). |
 
 Analytics events (when enabled): `game_start`, `call_made`, `spot_complete`, `daily_complete`, `survivor_end`, `share`.
@@ -49,6 +49,23 @@ The build is a static site in `dist/` with relative asset paths and hash-based n
   upload the contents of `dist/`.
 
 `public/404.html` is the not-found page (Netlify, Cloudflare Pages and GitHub Pages use it automatically).
+
+## Search (SEO)
+
+The title, description and the text that crawlers read (the pre-render fallback in `index.html` and the "A free
+2-minute drill football game" blurb in the footer) target searches like "nfl 2 min drill", "2 minute drill game" and
+"football play-calling game". The domain (nfl-2min-drill.com) matches the same phrase. `vite.config.ts` adds JSON-LD (`WebSite` + `VideoGame`), `robots.txt` and `sitemap.xml` at build
+time from `VITE_SITE_URL`. After deploying:
+
+1. Add the site in [Google Search Console](https://search.google.com/search-console) (a Domain property, verified by
+   DNS), submit `https://your-domain.com/sitemap.xml`, and use URL Inspection → Request indexing on the home page.
+2. Do the same in [Bing Webmaster Tools](https://www.bing.com/webmasters) (it can import from Search Console).
+3. Get linked: the GitHub repo's website field, and posts where football fans are (subreddits, Discords, X). A new
+   site with no inbound links ranks for very little, whatever its tags say.
+
+The page uses "NFL" in its title and copy; keep the no-affiliation disclaimer (footer, About, fallback text) in place.
+"NFL" is the league's trademark and "NFL 2 Minute Drill" is also the name of Sega's arcade game. Open search tasks
+are in [TODO.md](TODO.md).
 
 ## Project layout
 

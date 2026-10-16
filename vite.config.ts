@@ -2,19 +2,56 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
+const NAME = 'The 4th Call';
+const ABOUT = 'A free NFL 2-minute drill play-calling game. Run the 2-minute drill at the end of a close game: call every play, manage the clock, and see each call graded against every option you had. New game every day.';
+
 /**
- * Social previews need absolute URLs. Set VITE_SITE_URL (e.g. https://your-domain.com) in .env.production or the
- * host's build settings; without it the tags fall back to relative paths and the canonical link is left out.
+ * Social previews, the canonical link, structured data and the sitemap need absolute URLs. Set VITE_SITE_URL
+ * (e.g. https://your-domain.com) in .env.production or the host's build settings; without it the tags fall back to
+ * relative paths, the canonical link and sitemap are left out, and robots.txt has no Sitemap line.
  */
 function siteMeta(site: string): Plugin {
   const abs = (p: string) => (site ? `${site}/${p}` : p);
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      { '@type': 'WebSite', name: NAME, alternateName: ['NFL 2-Min Drill', 'NFL 2-Minute Drill Game', '4th Call'], ...(site && { url: `${site}/` }) },
+      {
+        '@type': ['VideoGame', 'WebApplication'],
+        name: NAME,
+        alternateName: ['NFL 2-Minute Drill Game', 'NFL 2 Min Drill', '2-Minute Drill Football Play-Calling Game'],
+        description: ABOUT,
+        genre: ['Sports', 'Strategy'],
+        gamePlatform: 'Web browser',
+        applicationCategory: 'GameApplication',
+        operatingSystem: 'Any',
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        image: abs('og.png'),
+        ...(site && { url: `${site}/` }),
+      },
+    ],
+  };
   return {
     name: 'site-meta',
     transformIndexHtml(html) {
       return html
         .replace(/%OG_IMAGE%/g, abs('og.png'))
         .replace('<!--CANONICAL-->', site ? `<link rel="canonical" href="${site}/" />` : '')
-        .replace('<!--OG_URL-->', site ? `<meta property="og:url" content="${site}/" />` : '');
+        .replace('<!--OG_URL-->', site ? `<meta property="og:url" content="${site}/" />` : '')
+        .replace('<!--JSONLD-->', `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`);
+    },
+    generateBundle() {
+      // one indexable page: the modes are hash routes (#survivor, #practice), which search engines don't index separately
+      const today = new Date().toISOString().slice(0, 10);
+      this.emitFile({ type: 'asset', fileName: 'robots.txt', source: `User-agent: *\nAllow: /\n${site ? `\nSitemap: ${site}/sitemap.xml\n` : ''}` });
+      if (site) {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'sitemap.xml',
+          source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${site}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n`,
+        });
+      }
     },
   };
 }
