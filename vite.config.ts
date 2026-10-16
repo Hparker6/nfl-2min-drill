@@ -3,6 +3,8 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const NAME = 'The 4th Call';
+// the site's pages for the sitemap: the game, the guide (static, public/how-to-play/) and the pages the Worker draws
+const PAGES: [string, string][] = [['/', 'daily'], ['/how-to-play/', 'weekly'], ['/leaderboard/', 'daily'], ['/stats/', 'daily']];
 const ABOUT = 'A free NFL 2-minute drill play-calling game. Run the 2-minute drill at the end of a close game: call every play, manage the clock, and see each call graded against every option you had. New game every day.';
 
 /**
@@ -49,7 +51,7 @@ function siteMeta(site: string): Plugin {
         this.emitFile({
           type: 'asset',
           fileName: 'sitemap.xml',
-          source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${site}/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq></url>\n</urlset>\n`,
+          source: `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${PAGES.map(([p, f]) => `  <url><loc>${site}${p}</loc><lastmod>${today}</lastmod><changefreq>${f}</changefreq></url>`).join('\n')}\n</urlset>\n`,
         });
       }
     },

@@ -952,3 +952,8 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
   .cp-adjust .mchip, .cp-adjust .sidebtn { padding: 6px 11px; font-size: 13px; }
   .cp-adjust { gap: 6px; }
 }
+
+/* footer links to the site's pages, styled like its buttons */
+.foot-links a { padding: 4px 0; color: var(--ink-2); font: 600 13px var(--body); text-decoration: none; }
+.foot-links a:hover { color: var(--ink); text-decoration: underline; }
+.foot-links { flex-wrap: wrap; justify-content: center; }

@@ -1,5 +1,6 @@
 {
-  // Cloudflare serves the Vite build output from dist/; the Worker handles only /v1/* (the daily leaderboard).
+  // Cloudflare serves the Vite build output from dist/; the Worker handles /v1/* (the leaderboard API) and draws the
+  // /leaderboard/ and /stats/ pages from the live scores.
   "name": "nfl-2min-drill",
   "main": "server/site/worker.js",
   "compatibility_date": "2026-10-01",
@@ -7,7 +8,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/v1/*"]
+    "run_worker_first": ["/v1/*", "/leaderboard", "/leaderboard/", "/stats", "/stats/"]
   },
   // leaderboard storage: created by the migration on the next deploy, nothing to set up by hand
   "durable_objects": {

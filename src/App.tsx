@@ -94,8 +94,10 @@ export default function App() {
       </main>
       <footer className="foot">
         <nav className="foot-links" aria-label="About">
-          <button onClick={() => setModal('help')}>How to play</button>
-          <button onClick={() => go('everyone')}>Everyone's stats</button>
+          {/* real links, so search engines find the guide, the leaderboard and the stats pages */}
+          <a href="/how-to-play/">How to play</a>
+          <a href="/leaderboard/">Leaderboard</a>
+          <a href="/stats/">Stats</a>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
         </nav>
         <section className="foot-about" aria-labelledby="foot-about-h">
