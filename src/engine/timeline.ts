@@ -545,9 +545,11 @@ export function choreograph(inp: ChoreoInput): Timeline {
       a.cap = 0.45;
       a.goal = (t) => (t < 0.3 ? [s0[0], s0[1] - 0.4] : [clip(lerpP(s0, P(ck), 0.25)[0], s0[0] - 1.5, s0[0] + 1.5), runWin ? 1.2 : -0.6]);
     } else if (k.startsWith('LB')) {
-      a.goal = (t) => (t < a.prof.react + 0.25 ? [s0[0], s0[1] - 0.3] : [lerpP([s0[0], 0], [holeX, 0], 0.7)[0], clip(P(ck)[1] + 2.2, 1.2, s0[1])]);
+      // each linebacker fits his own gap, shaded toward the play side; nobody abandons his lane until the runner is through
+      a.goal = (t) => (t < a.prof.react + 0.25 ? [s0[0], s0[1] - 0.3] : [clip(lerpP([s0[0], 0], [holeX, 0], 0.4)[0], s0[0] - 5, s0[0] + 5), clip(P(ck)[1] + 2.2, 1.2, s0[1])]);
     } else if (k.startsWith('S')) {
-      a.goal = (t) => (t < a.prof.react + 0.45 ? [s0[0], s0[1] + 0.4] : [lerpP(s0, P(ck), 0.5)[0], Math.max(P(ck)[1] + 5, 5)]);
+      // safeties keep their depth and come down only as the runner reaches them
+      a.goal = (t) => (t < a.prof.react + 0.45 ? [s0[0], s0[1] + 0.4] : [lerpP(s0, P(ck), 0.3)[0], Math.max(P(ck)[1] + 6, 6)]);
     } else {
       const sameSide = (s0[0] < CX) === (side < 0);
       a.goal = (t) => (t < a.prof.react + 0.35 ? [s0[0], s0[1] + 0.6] : sameSide ? [clip(holeX + side * 4, 2, W - 2), Math.max(P(ck)[1] + 2.5, 2.5)] : [lerpP(s0, P(ck), 0.25)[0], Math.max(s0[1], P(ck)[1] + 5)]);
