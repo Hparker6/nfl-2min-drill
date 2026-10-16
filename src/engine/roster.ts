@@ -118,6 +118,10 @@ export interface Units {
   rcv: Record<Rcv, { sep: number; hands: number; yac: number; contested: number; speed: number }>;
   /** the defender covering each eligible receiver */
   cov: Record<Rcv, { coverage: number; ballSkills: number; speed: number; reaction: number }>;
+  /** the two safeties: deep help on long throws */
+  safety: { coverage: number; speed: number };
+  /** movement for every slot: top speed, acceleration and reaction (0-100), for the play timeline */
+  move: Record<string, { speed: number; accel: number; react: number }>;
 }
 
 const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
@@ -150,7 +154,8 @@ export function units(p: Record<string, RosterPlayer>): Units {
   return {
     passPro: 0.85 * avg(line.map((s) => a(s, 'passPro'))) + 0.15 * a('TE', 'passPro'),
     runBlock: 0.85 * avg(line.map((s) => a(s, 'runBlock'))) + 0.15 * a('TE', 'runBlock'),
-    passRush: avg(front.map((s) => a(s, 'passRush'))),
+    // the best rusher matters, but he is one of four against five blockers
+    passRush: 0.7 * avg(front.map((s) => a(s, 'passRush'))) + 0.3 * Math.max(...front.map((s) => a(s, 'passRush'))),
     runDef: 0.65 * avg(front.map((s) => a(s, 'runDefense'))) + 0.35 * avg(second.map((s) => a(s, 'runDefense'))),
     tackling: avg([...front, ...second, ...back].map((s) => a(s, 'tackling'))),
     pursuit: avg([...front.map((s) => a(s, 'pursuit')), ...second.map((s) => a(s, 'pursuit')), ...back.map((s) => a(s, 'speed'))]),
@@ -158,5 +163,14 @@ export function units(p: Record<string, RosterPlayer>): Units {
     rb: { speed: a('RB', 'speed'), acceleration: a('RB', 'acceleration'), agility: a('RB', 'agility'), power: a('RB', 'power'), hands: a('RB', 'hands') },
     rcv,
     cov,
+    safety: { coverage: avg(['S1', 'S2'].map((s) => a(s, 'coverage'))), speed: avg(['S1', 'S2'].map((s) => a(s, 'speed'))) },
+    move: Object.fromEntries(SLOTS.map((s) => {
+      const g = SLOT_GROUP[s];
+      // linemen and front-seven players have no speed rating: pursuit (or a lineman's baseline) stands in
+      const speed = g === 'QB' ? a(s, 'mobility') : g === 'OL' ? 50 : g === 'DL' || g === 'LB' ? a(s, 'pursuit') : g === 'K' || g === 'P' ? 50 : a(s, 'speed');
+      const accel = p[s]?.attrs.acceleration ?? speed;
+      const react = g === 'CB' || g === 'S' ? a(s, 'reaction') : g === 'DL' || g === 'LB' ? a(s, 'pursuit') : 75;
+      return [s, { speed, accel, react }];
+    })),
   };
 }

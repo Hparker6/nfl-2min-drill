@@ -6,7 +6,8 @@
  * Passing (receiver = the targeted man, defender = whoever covers him; see roster.ts COVERS):
  *   catch rate   +0.005 per point of separation over the defender's coverage
  *                +0.002 per point of receiver hands over 80, +0.004 per point of quarterback accuracy over 80
- *                deep throws also: +0.003 per point of arm over 80, +0.002 per point of contested catch over coverage
+ *                deep throws also: +0.003 per point of arm over 80, +0.002 per point of contested catch over coverage,
+ *                -0.002 per point of safety coverage over 80 (help over the top)
  *   sacks        x (1 + 0.025 per point of pass rush over pass protection), clamped to 0.5-2
  *   picks        x (1 + 0.03 per point of the defender's ball skills over the quarterback's decision-making), 0.5-2
  *   after catch  x (1 + 0.02 per point of receiver run-after-catch over the defense's tackling), 0.6-1.5
@@ -35,13 +36,15 @@ export function passMods(R: Ratings, D: Ratings, tgt: Rcv, deep: boolean): PassM
   }
   const rc = O.rcv[tgt], cv = X.cov[tgt], q = O.qb;
   let comp = (rc.sep - cv.coverage) * 0.005 + (rc.hands - 80) * 0.002 + (q.accuracy - 80) * 0.004;
-  if (deep) comp += (q.arm - 80) * 0.003 + (rc.contested - cv.coverage) * 0.002;
+  // deep throws: arm and contested catches help; good safeties take some away (help over the top)
+  if (deep) comp += (q.arm - 80) * 0.003 + (rc.contested - cv.coverage) * 0.002 - ((X.safety?.coverage ?? 80) - 80) * 0.002;
   return {
     sackMul: clip(1 + (X.passRush - O.passPro) * 0.025, 0.5, 2),
     comp: clip(comp, -0.15, 0.15),
     intMul: clip(1 + (cv.ballSkills - q.decision) * 0.03, 0.5, 2),
     yacMul: clip(1 + (rc.yac - X.tackling) * 0.02, 0.6, 1.5),
-    bigYac: clip(1 + (rc.speed - X.pursuit) * 0.04, 0.5, 2),
+    // a long run after the catch needs the receiver to outrun pursuit, and fast safeties close the gap
+    bigYac: clip(1 + (rc.speed - X.pursuit) * 0.04, 0.5, 2) * clip(1 - ((X.safety?.speed ?? 80) - 80) * 0.02, 0.6, 1.4),
     scramble: (q.mobility - 75) * 0.05,
   };
 }
