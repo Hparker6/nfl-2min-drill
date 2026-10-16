@@ -15,14 +15,24 @@ export function MiniPlay({ play, look }: { play?: string; look?: Look }) {
   const vb = '-12 -16 24 21';
   if (look) {
     // defensive looks: where the second level stands
-    const dots: [number, number][] = look === 'blitz' ? [[-6, -2], [-2, -2], [2, -2], [6, -2], [-3.5, -4], [3.5, -4], [0, -6], [-8, -10], [8, -10]]
-      : look === 'load' ? [[-6, -2], [-2, -2], [2, -2], [6, -2], [-4, -5], [0, -5], [4, -5], [6.5, -6], [0, -11]]
-      : [[-6, -2], [-2, -2], [2, -2], [6, -2], [-5, -7], [0, -7.5], [5, -7], [-6, -12.5], [6, -12.5]];
+    const front: [number, number][] = [[-6, -2], [-2, -2], [2, -2], [6, -2]];
+    const back: Record<string, [number, number][]> = {
+      balanced: [[-5, -6], [0, -6.5], [5, -6], [-10, -6], [10, -6], [-6, -12], [6, -12]],
+      blitz: [[-3.5, -4], [3.5, -4], [0, -6], [-10, -4], [10, -4], [-8, -10], [8, -10]],
+      load: [[-4, -5], [0, -5], [4, -5], [6.5, -6], [-10, -5], [10, -5], [0, -11]],
+      zone: [[-6.5, -7], [0, -7], [6.5, -7], [-10, -8], [10, -8], [-6, -13], [6, -13]],
+      man: [[-10, -1.5], [10, -1.5], [-6, -3.5], [6, -3.5], [0, -6], [0, -13], [3, -9]],
+      prevent: [[-5, -7], [0, -7.5], [5, -7], [-10, -10], [10, -10], [-6, -13.5], [6, -13.5]],
+      goal: [[-4, -3.5], [0, -3.5], [4, -3.5], [-8, -3.5], [8, -3.5], [-5, -6], [5, -6]],
+    };
+    const dots: [number, number][] = [...front, ...(back[look === 'soft' ? 'prevent' : look] ?? back.balanced)];
     return (
       <svg className="mini" viewBox={vb} aria-hidden>
         <line x1="-12" x2="12" y1="0.5" y2="0.5" className="mini-los" />
         {dots.map(([x, y], i) => <rect key={i} x={x - 1} y={y - 1} width="2" height="2" transform={`rotate(45 ${x} ${y})`} className="mini-d" />)}
         {look === 'blitz' && <path d="M-3.5,-4 L-2,-0.5 M3.5,-4 L2,-0.5" className="mini-arrow" />}
+        {look === 'zone' && <><circle cx="-6.5" cy="-7" r="3.2" className="mini-zone" /><circle cx="6.5" cy="-7" r="3.2" className="mini-zone" /><circle cx="0" cy="-12" r="3.2" className="mini-zone" /></>}
+        {look === 'man' && <path d="M-10,-1.5 L-10,0 M10,-1.5 L10,0 M-6,-3.5 L-5,-1 M6,-3.5 L5,-1" className="mini-arrow" />}
       </svg>
     );
   }

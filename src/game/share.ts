@@ -5,20 +5,17 @@ import { GRADE_INFO } from './grade';
 import type { Record_ } from './session';
 import type { SpotResult } from './storage';
 import { track } from './analytics';
+import { rateSpots } from './rating';
 
 const site = () => (typeof location !== 'undefined' && location.origin && !location.origin.startsWith('file') ? location.origin + location.pathname : 'The 4th Call');
 
-export const rating = (spots: SpotResult[]) => {
-  const all = spots.flatMap((s) => s.scores);
-  return all.length ? Math.round(all.reduce((a, b) => a + b, 0) / all.length) : 0;
-};
 
 export function dailyShare(date: string, spots: SpotResult[], streakN: number): string {
   const wins = spots.filter((s) => s.win).length;
   const lines = spots.map((s, i) => `${i + 1} ${s.win ? '✅' : '❌'} ${s.grades.map((g) => GRADE_INFO[g].emoji).join('')}`);
   return [
     `The 4th Call #${dayNumber(date)}`,
-    `${wins}-${spots.length - wins} · Coach rating ${rating(spots)}${streakN > 1 ? ` · 🔥${streakN}` : ''}`,
+    `${wins}-${spots.length - wins} · Performance ${rateSpots(spots).performance} · Decisions ${rateSpots(spots).decisions}${streakN > 1 ? ` · 🔥${streakN}` : ''}`,
     ...lines,
     site(),
   ].join('\n');
@@ -28,7 +25,7 @@ export function survivorShare(results: SpotResult[]): string {
   const wins = results.filter((r) => r.win).length;
   return [
     `The 4th Call · Survivor`,
-    `Survived ${wins} game${wins === 1 ? '' : 's'} · Coach rating ${rating(results)}`,
+    `Survived ${wins} game${wins === 1 ? '' : 's'} · Performance ${rateSpots(results).performance}`,
     results.map((r) => (r.win ? '🏈' : '💀')).join(''),
     site(),
   ].join('\n');

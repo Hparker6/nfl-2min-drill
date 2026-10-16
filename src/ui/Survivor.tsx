@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { survivorScenario } from '../engine/scenario';
 import { hash } from '../engine/rng';
-import { rating, shareText, survivorShare } from '../game/share';
+import { shareText, survivorShare } from '../game/share';
+import { rateSpots } from '../game/rating';
 import type { Store, SpotResult } from '../game/storage';
 import { track } from '../game/analytics';
 import { GameScreen } from './GameScreen';
@@ -41,7 +42,7 @@ export function Survivor({ store, update, toast }: Props) {
         R.over = true;
         const wins = R.results.length - 1;
         s.surv.best = Math.max(s.surv.best, wins);
-        track('survivor_end', { wins, rating: rating(R.results) });
+        track('survivor_end', { wins, performance: rateSpots(R.results).performance });
       }
     });
   };
@@ -89,7 +90,7 @@ export function Survivor({ store, update, toast }: Props) {
           <div className="sum-stats">
             <div className="stat big"><span className="k">Survived</span><b>{survived}</b></div>
             <div className="stat"><span className="k">Best run</span><b>{store.surv.best}</b></div>
-            <div className="stat"><span className="k">Coach rating</span><b>{rating(run.results)}</b></div>
+            <div className="stat" title="Average performance across the run's games"><span className="k">Performance</span><b>{rateSpots(run.results).performance}</b></div>
           </div>
           <div className="sum-spots">
             {run.results.map((r, i) => (

@@ -149,14 +149,25 @@ export const CALLS: Call[] = [
 export const CALL: Record<string, Call> = Object.fromEntries(CALLS.map((c) => [c.id, c]));
 export const FAMS: Record<Fam, string> = { run: 'Run', pass: 'Pass', rpo: 'RPO', trick: 'Trick' };
 
-export const LOOKS: Record<Look, { label: string; sub: string }> = {
-  blitz: { label: 'Blitz', sub: 'Send extra rushers' },
-  load: { label: 'Load the box', sub: 'Stop the run' },
-  soft: { label: 'Play it soft', sub: 'Keep everything in front' },
+/** Defensive calls as the player sees them: what each is for, what it stops, and what it gives up. */
+export const LOOKS: Record<Look, { label: string; sub: string; stops: string; risk: string; tilt: 1 | 2 | 3 }> = {
+  balanced: { label: 'Balanced', sub: 'Base defense, ready for anything', stops: 'Nothing gets a free pass', risk: 'Nothing is taken away either', tilt: 1 },
+  blitz: { label: 'Blitz', sub: 'Send six or seven after the quarterback', stops: 'Sacks on deep drops and slow-developing throws', risk: 'Quick throws, screens and draws find open grass', tilt: 3 },
+  load: { label: 'Load the box', sub: 'Eight near the line to stop the run', stops: 'Runs, especially between the tackles', risk: 'Play-action and passes over the top', tilt: 2 },
+  zone: { label: 'Zone coverage', sub: 'Defend areas; rally and read the quarterback', stops: 'Yards after the catch; more interceptions', risk: 'Digs and seams sitting in the holes', tilt: 1 },
+  man: { label: 'Man coverage', sub: 'A defender on every receiver', stops: 'Easy throws underneath to hitches and digs', risk: 'Crossers, slants and wheels that get separation', tilt: 2 },
+  prevent: { label: 'Prevent', sub: 'Everyone deep; keep it in front', stops: 'Deep shots and long touchdowns', risk: 'Short completions, runs and the clock', tilt: 2 },
+  goal: { label: 'Goal line', sub: 'Heavy front for the last few yards', stops: 'Runs at the goal line and on short yardage', risk: 'Away from the goal line, anything that gets past it goes far', tilt: 3 },
+  soft: { label: 'Prevent', sub: 'Everyone deep; keep it in front', stops: 'Deep shots and long touchdowns', risk: 'Short completions, runs and the clock', tilt: 2 },
 };
 export const LOOK_READ: Record<Look, string> = {
+  balanced: 'Base front, two deep safeties: nothing given away',
   blitz: 'Linebackers creeping up: blitz showing',
   load: 'Eight in the box: they expect a run',
+  zone: 'Corners bailing at the snap count: zone',
+  man: 'Corners pressed on the receivers: man coverage',
+  prevent: 'Safeties deep, corners off: soft shell',
+  goal: 'Heavy goal-line front',
   soft: 'Safeties deep, corners off: soft shell',
 };
 

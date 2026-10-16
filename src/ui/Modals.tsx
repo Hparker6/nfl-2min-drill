@@ -2,7 +2,8 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { ARCHETYPES } from '../engine/data';
 import { SPOTS_PER_DAY, utcDate } from '../engine/scenario';
 import { GRADE_INFO, type GradeKey } from '../game/grade';
-import { archetype, rating } from '../game/share';
+import { archetype } from '../game/share';
+import { rateSpots } from '../game/rating';
 import { bestStreak, defaultStore, streak, type Settings, type Store } from '../game/storage';
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
@@ -45,6 +46,13 @@ export function Help({ onClose }: { onClose: () => void }) {
         ))}
       </ul>
       <p>A good call that fails still counts as good, and a bad call that works still counts as bad. You also see what an AI coach would have called, and how much win chance that would have cost.</p>
+      <h3>Your rating</h3>
+      <ul>
+        <li><b>Call grade</b> (each play): 100, minus 7 for every point of win chance your call gave up against the best one.</li>
+        <li><b>Decisions</b> (each game): falls with the total win chance you gave up over the whole game, so one costly call counts in full.</li>
+        <li><b>Result</b> (each game): a win scores 75–100, a loss 0–25; the harder the spot, the higher inside its band.</li>
+        <li><b>Performance</b> = 55% Decisions + 45% Result. A loss can't score above 66; good calls in a loss still show in Decisions.</li>
+      </ul>
       <h3>Modes</h3>
       <ul>
         <li><b>Daily:</b> three spots, the same for everyone, new every day at midnight UTC.</li>
@@ -90,7 +98,8 @@ export function Stats({ store, onClose }: { store: Store; onClose: () => void })
           <div className="stat-grid">
             <div><b>{h.length}</b><span>games</span></div>
             <div><b>{Math.round((wins / h.length) * 100)}%</b><span>won</span></div>
-            <div><b>{rating(h)}</b><span>coach rating</span></div>
+            <div><b>{rateSpots(h).performance}</b><span>performance</span></div>
+            <div><b>{rateSpots(h).decisions}</b><span>decisions</span></div>
             <div><b>{grades.length}</b><span>calls</span></div>
             <div><b>{streak(store, utcDate(), SPOTS_PER_DAY)}</b><span>daily streak</span></div>
             <div><b>{bestStreak(store, SPOTS_PER_DAY)}</b><span>best streak</span></div>

@@ -31,7 +31,10 @@ function defSet(look: Look | null): Record<string, Pt> {
   };
   if (look === 'load') { s.LB1 = [CX - 4, 4]; s.LB2 = [CX, 4.2]; s.LB3 = [CX + 4, 4]; s.S2 = [CX + 7, 6]; s.CB1 = [5, 5]; s.CB2 = [W - 5, 5]; }
   if (look === 'blitz') { s.LB1 = [CX - 3.2, 2.6]; s.LB3 = [CX + 3.6, 2.6]; s.LB2 = [CX, 4.2]; s.S1 = [CX - 8, 11]; s.CB1 = [5, 2.8]; s.CB2 = [W - 5, 2.8]; }
-  if (look === 'soft') { s.LB1 = [CX - 5, 6.5]; s.LB2 = [CX, 7]; s.LB3 = [CX + 5, 6.5]; s.CB1 = [5, 9]; s.CB2 = [W - 5, 9]; s.S1 = [CX - 8, 17]; s.S2 = [CX + 8, 17]; }
+  if (look === 'zone') { s.CB1 = [5, 7.5]; s.CB2 = [W - 5, 7.5]; s.LB1 = [CX - 6, 6]; s.LB3 = [CX + 6, 6]; s.S1 = [CX - 10, 14]; s.S2 = [CX + 10, 14]; }
+  if (look === 'man') { s.CB1 = [5, 1.6]; s.CB2 = [W - 5, 1.6]; s.LB1 = [13, 3.2]; s.LB3 = [CX + 6.6, 3.4]; s.LB2 = [CX - 1.5, 5]; s.S1 = [CX, 14]; s.S2 = [CX + 3, 8]; }
+  if (look === 'goal') { s.LB1 = [CX - 3.5, 2.3]; s.LB2 = [CX, 2.3]; s.LB3 = [CX + 3.5, 2.3]; s.CB1 = [6, 2.5]; s.CB2 = [W - 6, 2.5]; s.S1 = [CX - 7, 4]; s.S2 = [CX + 7, 4]; }
+  if (look === 'soft' || look === 'prevent') { s.LB1 = [CX - 5, 6.5]; s.LB2 = [CX, 7]; s.LB3 = [CX + 5, 6.5]; s.CB1 = [5, 9]; s.CB2 = [W - 5, 9]; s.S1 = [CX - 8, 17]; s.S2 = [CX + 8, 17]; }
   return s;
 }
 

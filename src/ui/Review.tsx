@@ -1,7 +1,7 @@
 import { fmtClock } from '../game/describe';
 import { GRADE_INFO } from '../game/grade';
 import type { Session } from '../game/session';
-import { rating } from '../game/share';
+import { rateSpot } from '../game/rating';
 import type { SpotResult } from '../game/storage';
 import { Spark } from './Scoreboard';
 
@@ -17,6 +17,7 @@ interface Props {
 export function SpotReview({ result, session, trail, onContinue, continueLabel, lastPlay }: Props) {
   const graded = session.records.filter((r) => r.grade);
   const beatAi = result.aiLost - result.lost;
+  const rt = rateSpot(result);
   return (
     <section className={`review ${result.win ? 'win' : 'loss'}`}>
       <div className="rv-head">
@@ -26,10 +27,12 @@ export function SpotReview({ result, session, trail, onContinue, continueLabel, 
       {lastPlay && <p className="rv-last"><span className="k">Final play</span>{lastPlay}</p>}
       {result.ot && <p className="muted small">Tied at the gun. Overtime: {result.win ? 'your kicker won it.' : 'they kicked the winner.'}</p>}
       <div className="rv-stats">
-        <div className="stat"><span className="k">Rating</span><b>{graded.length ? rating([result]) : '—'}</b></div>
-        <div className="stat"><span className="k">Calls</span><b>{graded.length}</b></div>
+        <div className="stat big" title="Performance = 55% Decisions + 45% Result"><span className="k">Performance</span><b>{rt.performance}</b></div>
+        <div className="stat" title="100 = you never gave up win chance versus the best call"><span className="k">Decisions</span><b>{graded.length ? rt.decisions : '—'}</b></div>
+        <div className="stat" title="A win scores 75-100, a loss 0-25; harder spots score higher"><span className="k">Result</span><b>{rt.result}</b></div>
         <div className="stat"><span className="k">vs AI</span><b className={beatAi > 0.5 ? 'pos' : beatAi < -0.5 ? 'neg' : ''}>{Math.abs(beatAi) < 0.5 ? 'Even' : (beatAi > 0 ? '+' : '') + beatAi.toFixed(1)}</b></div>
       </div>
+      <p className="rv-how">Performance blends your decisions (55%) with the result (45%). You gave up {result.lost.toFixed(1)} points of win chance across {graded.length} call{graded.length === 1 ? '' : 's'}.</p>
       {trail.length > 1 && <div className="rv-spark"><span className="k">Your win chance, call by call</span><Spark values={trail} h={36} /></div>}
       <ol className="rv-calls">
         {graded.map((rec, i) => {

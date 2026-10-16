@@ -40,6 +40,18 @@ export function situation(s: State, teams: [TeamInfo, TeamInfo]): string {
   return `${score} with ${fmtClock(s.t)} left. ${ball}. ${tos}.`;
 }
 
+/** The offense's likely intentions, read from the situation (the AI's call is never revealed). */
+export function tendency(s: State): string {
+  const l = leadOf(s, s.off), yt = ytg(s);
+  if (yt <= 5) return 'Inside your 5: expect a run, a quick throw or a fade.';
+  if (l > 0) return 'They lead: expect runs to keep the clock moving.';
+  if (s.down >= 3 && s.dist >= 7) return `${ord(s.down)} and long: expect a pass past the sticks.`;
+  if (s.dist <= 2) return 'Short yardage: expect a run or a quick throw.';
+  if (l < 0 && s.t <= 300) return 'They trail with the clock running down: expect passes, especially toward the sidelines.';
+  if (l === 0 && s.t <= 120) return 'Tied late: they want field goal range without wasting time.';
+  return 'Balanced situation: they could run or throw.';
+}
+
 export function headline(s: State): string {
   const l = leadOf(s, 0);
   if (s.off === 0) {

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ARCHETYPES } from '../engine/data';
 import { SPOTS_PER_DAY, dailyScenarios, dayNumber, utcDate } from '../engine/scenario';
 import { GRADE_INFO } from '../game/grade';
-import { archetype, dailyShare, rating, shareText } from '../game/share';
+import { archetype, dailyShare, shareText } from '../game/share';
+import { rateSpot, rateSpots } from '../game/rating';
 import { streak, type Store, type SpotResult } from '../game/storage';
 import { track } from '../game/analytics';
 import { GameScreen } from './GameScreen';
@@ -34,7 +35,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
       delete d.cur;
       s.history.push(r);
       if (s.history.length > 300) s.history.splice(0, s.history.length - 300);
-      if (i === SPOTS_PER_DAY - 1) track('daily_complete', { wins: d.spots.filter((x) => x.win).length, rating: rating(d.spots) });
+      if (i === SPOTS_PER_DAY - 1) track('daily_complete', { wins: d.spots.filter((x) => x.win).length, performance: rateSpots(d.spots).performance });
     });
   };
 
@@ -100,7 +101,8 @@ function DaySummary({ date, spots, streakN, toast, go }: { date: string; spots: 
     <section className="summary">
       <div className="sum-stats">
         <div className="stat big"><span className="k">Record</span><b>{wins}–{spots.length - wins}</b></div>
-        <div className="stat"><span className="k">Coach rating</span><b>{rating(spots)}</b></div>
+        <div className="stat" title="Average of the three spots. Each spot: 55% decisions + 45% result"><span className="k">Performance</span><b>{rateSpots(spots).performance}</b></div>
+        <div className="stat" title="How close your calls were to the best ones, all three spots"><span className="k">Decisions</span><b>{rateSpots(spots).decisions}</b></div>
         <div className="stat"><span className="k">Streak</span><b>{streakN}</b></div>
         <div className="stat"><span className="k">vs AI coach</span><b>{Math.abs(aiLost - lost) < 0.5 ? 'Even' : (aiLost - lost > 0 ? '+' : '') + (aiLost - lost).toFixed(1)}</b></div>
       </div>
@@ -110,7 +112,7 @@ function DaySummary({ date, spots, streakN, toast, go }: { date: string; spots: 
           return (
             <div key={i} className="sum-spot">
               <span className={`tile ${s.win ? 'won' : 'lost'}`}>{s.win ? 'W' : 'L'}</span>
-              <span className="sum-score">{s.teams[0]} {s.score[0]} – {s.score[1]} {s.teams[1]}{s.ot ? ' (OT)' : ''}</span>
+              <span className="sum-score">{s.teams[0]} {s.score[0]} – {s.score[1]} {s.teams[1]}{s.ot ? ' (OT)' : ''} <em className="sum-perf" title="Performance for this spot: 55% decisions + 45% result">{rateSpot(s).performance} <small>perf</small></em></span>
               <span className="sum-grades">
                 {counts.filter(([, n]) => n).map(([g, n]) => <span key={g} className={`gcount g-${g}`}>{GRADE_INFO[g].glyph} {n}</span>)}
               </span>

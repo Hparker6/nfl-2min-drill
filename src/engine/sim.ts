@@ -9,6 +9,7 @@
  */
 import { CALL, DROPS, ROUTES, TEMPO, type Call, type DropId } from './data';
 import { clip, gauss, pickWeighted, type Rng } from './rng';
+import { DEF_CALLS, defFx, goalLineSituation } from './defense';
 import type { Choice, DefClock, Ev, KickChoice, Look, OffClock, PatChoice, PlayResult, Rcv, RouteId, State, StChoice, Team } from './types';
 
 export const ytg = (s: State) => 100 - s.yl;
@@ -26,17 +27,7 @@ export function clone(s: State): State {
   return { ...s, score: [s.score[0], s.score[1]], to: [s.to[0], s.to[1]] };
 }
 
-// how each defensive look shifts runs and passes
-const RUN_LOOK: Record<Look, { m: number; big: number; stuff: number }> = {
-  blitz: { m: -0.3, big: 1.6, stuff: 0.07 },
-  load: { m: -1.1, big: 0.6, stuff: 0.08 },
-  soft: { m: 1.0, big: 0.8, stuff: -0.07 },
-};
-const PASS_LOOK: Record<Look, { sack: number; short: number; deep: number; screen: number; yac: number; int: number }> = {
-  blitz: { sack: 1.75, short: -0.04, deep: 0.03, screen: 0.08, yac: 1.35, int: 1.1 },
-  load: { sack: 1.1, short: -0.02, deep: 0.04, screen: 0, yac: 1.1, int: 1 },
-  soft: { sack: 0.7, short: 0.07, deep: -0.13, screen: -0.02, yac: 0.75, int: 1.25 },
-};
+// what each defensive call does to runs and passes: see defense.ts
 
 function base(kind: PlayResult['kind'], call: string, look: Look | null): PlayResult {
   return { kind, call, look, carrier: 'QB', yards: 0, oob: false, td: false, safety: false, turnover: false, dur: 0, side: 1 };
@@ -46,18 +37,14 @@ function base(kind: PlayResult['kind'], call: string, look: Look | null): PlayRe
 
 function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0): PlayResult {
   const R = s.rat[s.off], D = s.rat[other(s.off)];
-  const L = RUN_LOOK[look];
+  const F = defFx(look, s), L = F.run;
   let m = c.ypc! + bonus + (R.off - D.def) * 0.05 + L.m;
   const sd = c.sd!;
   let big = c.big! * L.big;
   let stuff = c.stuff! + L.stuff;
-  if (c.draw) {
-    if (look === 'blitz') { m += 1.6; big *= 1.3; } else if (look === 'soft') m += 0.6; else m -= 0.3;
-  }
-  if (c.option && look === 'load') m += 0.6;
-  if (c.trick) {
-    if (look === 'load') { m += 1.5; big *= 1.4; } else if (look === 'soft') m -= 0.8;
-  }
+  if (c.draw) { m += F.draw; if (F.draw > 1) big *= 1.3; }
+  if (c.option) m += F.option;
+  if (c.trick) { m += F.trick; if (F.trick >= 1) big *= 1.4; }
   if (c.short && s.dist <= 2) stuff -= 0.05;
   const yt = ytg(s);
   if (yt <= 5) { m *= 0.75; big = 0; }
@@ -84,7 +71,7 @@ function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0): PlayResul
 
 function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: RouteId, dropId: DropId): PlayResult {
   const R = s.rat[s.off], D = s.rat[other(s.off)];
-  const drop = DROPS[dropId], RT = ROUTES[route], L = PASS_LOOK[look];
+  const drop = DROPS[dropId], RT = ROUTES[route], F = defFx(look, s), L = F.pass;
   const yt = ytg(s);
   const res = base('pass', c.id, look);
   res.target = tgt;
@@ -121,8 +108,10 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   const deep = RT.depth >= 15;
   let comp = RT.comp + (c.adj || 0) + (R.rcv[tgt] - 80) * 0.006 + (R.qb - D.def) * 0.004 + rzPen;
   comp += route === 'screen' || route === 'flat' ? L.screen : deep ? L.deep : L.short;
-  if (c.pa) comp += look === 'load' ? 0.09 : look === 'soft' ? -0.03 : 0;
-  if (dropId === 'flea') comp += look === 'soft' ? -0.06 : 0.1;
+  if (dropId === 'quick' || dropId === 'screen') comp += L.quick;
+  comp += F.routes[route] ?? 0;
+  if (c.pa) comp += F.pa;
+  if (dropId === 'flea') comp += F.flea;
   if (route === 'hail') comp = yt + 3 > 62 ? 0.01 : clip(0.17 - (yt - 30) * 0.004, 0.04, 0.2);
   comp = clip(comp, 0.02, 0.95);
   const fl = flight(depth);
@@ -143,7 +132,8 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   }
   if (deep && r() < 0.045) {
     res.penalty = 'dpi';
-    res.yards = Math.max(1, Math.min(depth, yt - 1));
+    // spot of the foul, but never past the 1: from the 1 itself it is a first down with the ball where it is
+    res.yards = Math.max(0, Math.min(depth, yt - 1));
     res.dur = drop.release + fl;
     return res;
   }
@@ -192,7 +182,7 @@ export function resolveSnap(s: State, play: string, look: Look, r: Rng, ch?: Cho
   if (c.kind === 'rpo') {
     // the QB reads the defense: a loaded box or a blitz means throw the quick route, otherwise hand it off.
     // He misreads it one time in four.
-    const throwIt = look === 'load' || look === 'blitz';
+    const throwIt = defFx(look, s).rpoThrow;
     if (throwIt !== r() < 0.25) {
       const tgt = c.tgt!;
       const res = resolvePass(s, c, look, r, tgt, c.routes![tgt], 'screen');
@@ -394,14 +384,14 @@ function clockStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) 
     s.to[d]--;
     s.running = false;
     ev?.push({ type: 'timeout', team: d, t: s.t, left: s.to[d] });
-    if (oc === 'kneel') snap(s, r, 'kneel', 'load', null, ev);
+    if (oc === 'kneel') snap(s, r, 'kneel', 'balanced', null, ev);
     else s.stage = 'call';
     return;
   }
   if (oc === 'spike' || oc === 'kneel') {
     if (runoff(s, oc === 'spike' ? 3 + r() * 2 : 38)) { ev?.push({ type: 'warning', t: s.t }); s.stage = 'call'; return; }
     if (s.t <= 0) { s.stage = 'over'; ev?.push({ type: 'expire', t: 0 }); return; }
-    snap(s, r, oc, 'load', null, ev);
+    snap(s, r, oc, 'balanced', null, ev);
     return;
   }
   const T = TEMPO[oc];
@@ -570,13 +560,15 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
   return pickWeighted(r, w);
 }
 
+/** The AI defensive coordinator: calls what the situation suggests, with enough mix not to be predictable. */
 export function aiDefLook(s: State, r: Rng): Look {
   const od = leadOf(s, s.off);
+  if (100 - s.yl <= 5) return pickWeighted<Look>(r, { goal: 0.4, man: 0.25, blitz: 0.15, zone: 0.1, load: 0.1 });
   const runish = od > 0 || (s.dist <= 2 && s.t > 60);
   const passish = od < 0 && s.t <= 300;
-  if (runish) return pickWeighted<Look>(r, { load: 0.55, blitz: 0.25, soft: 0.2 });
-  if (passish) return pickWeighted<Look>(r, { soft: 0.45, blitz: 0.3, load: 0.25 });
-  return pickWeighted<Look>(r, { soft: 0.34, blitz: 0.33, load: 0.33 });
+  if (runish) return pickWeighted<Look>(r, goalLineSituation(s) ? { goal: 0.3, load: 0.35, blitz: 0.2, man: 0.15 } : { load: 0.45, blitz: 0.2, balanced: 0.15, man: 0.1, zone: 0.1 });
+  if (passish) return pickWeighted<Look>(r, { prevent: 0.3, zone: 0.25, man: 0.15, blitz: 0.2, balanced: 0.1 });
+  return pickWeighted<Look>(r, { balanced: 0.25, zone: 0.2, man: 0.15, blitz: 0.15, load: 0.15, prevent: 0.1 });
 }
 
 export function aiPat(s: State): PatChoice {
@@ -595,7 +587,6 @@ export const aiST = (play: string): StChoice => (play === 'fg' ? 'safe' : 'retur
 // --------------------------------------------------------- helpers for UI ---
 
 export function lookOther(look: Look, r: Rng): Look {
-  const all: Look[] = ['blitz', 'load', 'soft'];
-  const rest = all.filter((x) => x !== look);
+  const rest = DEF_CALLS.filter((x) => x !== look && x !== 'goal');
   return rest[Math.floor(r() * rest.length)];
 }

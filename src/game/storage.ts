@@ -21,6 +21,7 @@ export interface SpotResult {
   lost: number;          // total points of win chance given up
   aiLost: number;        // what the AI coach would have given up on the same decisions
   tags: string[];        // what kind of calls were made (for the coach profile)
+  baseWp?: number;       // how often the simulated coach wins from the starting spot (absent on old saves)
 }
 
 export interface DayRecord {

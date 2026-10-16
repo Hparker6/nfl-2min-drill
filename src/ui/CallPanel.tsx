@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CALL, LOOK_READ, POS_NAME, ROUTES } from '../engine/data';
+import { CALL, LOOK_READ, LOOKS, POS_NAME, ROUTES } from '../engine/data';
+import { tendency } from '../game/describe';
 import type { Decision, Opt } from '../game/session';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import type { Look, Rcv, RouteId, State, TeamInfo } from '../engine/types';
@@ -77,8 +78,8 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
       if (n >= 1 && n <= keyed.length) {
         e.preventDefault();
         const o = keyed[n - 1];
-        if (isPlay) onSelect(o); else onSnap(o);
-      } else if (isPlay && e.key === 'Enter' && selected) {
+        if (isPlay || dec.step === 'look') onSelect(o); else onSnap(o);
+      } else if ((isPlay || dec.step === 'look') && e.key === 'Enter' && selected) {
         e.preventDefault();
         onSnap(selected);
       } else if (isPlay) {
@@ -90,9 +91,56 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
     return () => window.removeEventListener('keydown', onKey);
   });
 
+  if (dec.step === 'look') {
+    const look = selected?.choice.look;
+    const info = look ? LOOKS[look] : null;
+    return (
+      <section className="cp def" aria-label="Call the defense">
+        <Prev prev={prev} />
+        <header className="cp-head">
+          <span className="def-flag">Defense · your call</span>
+          <h2>{dec.title}</h2>
+          <div className="read tend"><b>Their offense:</b> {tendency(s)}</div>
+        </header>
+        <div className="cp-list" role="listbox" aria-label="Defensive calls">
+          {dec.options.map((o, i) => {
+            const wp = hints?.get(o.key);
+            const sel = selected?.key === o.key;
+            const L = LOOKS[o.choice.look!];
+            return (
+              <button key={o.key} role="option" aria-selected={sel} className={`prow fam-def${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
+                <MiniPlay look={o.choice.look} />
+                <span className="prow-txt">
+                  <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
+                  <span className="prow-sub">{o.sub}</span>
+                  {sel && <span className="def-trade in-row"><span><b>Stops:</b> {L.stops}</span><span><b>Gives up:</b> {L.risk}</span></span>}
+                </span>
+                <span className="prow-side">
+                  {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : <span className={`riskchip r${L.tilt}`}>{['', 'Safe', 'Trade-off', 'Gamble'][L.tilt]}</span>}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {info && <div className="def-trade strip"><span><b>Stops:</b> {info.stops}</span><span><b>Gives up:</b> {info.risk}</span></div>}
+        <footer className={`cp-foot${selected ? ' ready' : ''}`}>
+          <div className="cp-sel">
+            {info ? (
+              <>
+                <span className="cp-sel-k">Your defense</span>
+                <span className="cp-sel-name">{info.label}</span>
+              </>
+            ) : <span className="cp-sel-sub">Pick a defense to see it on the field.<span className="keys"> Keys: 1–{dec.options.length} pick · Enter calls it</span></span>}
+          </div>
+          <button className="btn snap" disabled={!selected} onClick={() => selected && onSnap(selected)}>Call it<kbd>Enter</kbd></button>
+        </footer>
+      </section>
+    );
+  }
+
   if (!isPlay) {
-    // clock, defense, kicks, tries: each button is the whole decision, one tap
-    const isLook = dec.step === 'look';
+    // clock, kicks, tries: each button is the whole decision, one tap
+    const isLook = false;
     return (
       <section className="cp" aria-label="Your decision">
         <Prev prev={prev} />

@@ -7,7 +7,7 @@ import { ballOn, downDist, fmtClock, headline, situation, tell, type Told } from
 import { GRADE_INFO, type Grade } from '../game/grade';
 import { GradeJob } from '../game/grader';
 import { Session, type Decision, type Opt, type Pick } from '../game/session';
-import { tagsOf } from '../game/share';
+import { spotResult } from '../game/rating';
 import type { Settings, SpotResult } from '../game/storage';
 import { track } from '../game/analytics';
 import { CallPanel } from './CallPanel';
@@ -137,12 +137,7 @@ export function GameScreen(p: Props) {
   const finish = useCallback(() => {
     const r = session.result();
     const recs = session.records.filter((x) => x.grade);
-    const res: SpotResult = {
-      id: sc.id, mode: sc.mode, date: utcDate(), teams: [sc.teams[0].id, sc.teams[1].id], win: r.win, ot: r.ot, score: r.score,
-      grades: recs.map((x) => x.grade!.g), scores: recs.map((x) => x.grade!.score),
-      lost: recs.reduce((a, x) => a + x.grade!.lost, 0), aiLost: recs.reduce((a, x) => a + x.grade!.aiLost, 0),
-      tags: tagsOf(session.records),
-    };
+    const res: SpotResult = spotResult(session, utcDate());
     setResult(res);
     setView(clone(session.s));
     setWp(r.win ? 1 : 0);
@@ -447,7 +442,7 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over }: RCPro
           <div className="grade-top">
             <span className="grade-chip">{GRADE_INFO[g.g].glyph} {GRADE_INFO[g.g].word}</span>
             <span className="grade-call">{last.label}</span>
-            <span className="grade-score">{g.score}<small>/100</small></span>
+            <span className="grade-score" title="Call grade: 100 minus 7 for every point of win chance given up versus the best call">{g.score}<small>/100</small><em>call grade</em></span>
           </div>
           {g.lost < 0.05
             ? <div className="grade-best">The best call on the board.</div>

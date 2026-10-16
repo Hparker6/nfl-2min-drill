@@ -9,6 +9,7 @@ import {
 } from '../engine/sim';
 import { hash, rng } from '../engine/rng';
 import { READ_ACCURACY } from '../engine/evaluate';
+import { DEF_CALLS, goalLineSituation } from '../engine/defense';
 import type { Scenario } from '../engine/scenario';
 import type { Choice, Ev, State } from '../engine/types';
 import type { Grade } from './grade';
@@ -64,7 +65,9 @@ export class Session {
       const d = this.decision();
       if (!d) { this.auto(); continue; }
       const p = saved[i++];
-      const opt = d.options.find((o) => o.key === p.key);
+      // 'soft' was the old name of the prevent defense
+      const key = d.step === 'look' && p.key === 'soft' ? 'prevent' : p.key;
+      const opt = d.options.find((o) => o.key === key);
       if (!opt) throw new Error(`saved call ${p.key} is not on the board`);
       this.choose({ ...opt, choice: p.choice }, p.grade);
     }
@@ -123,8 +126,13 @@ export class Session {
         return { step: 'st', title: 'They are punting', options, aiKey: aiST('punt'), state: clone(s) };
       }
       if (pp === 'kneel' || pp === 'spike') return null;
-      const options: Opt[] = (Object.keys(LOOKS) as (keyof typeof LOOKS)[]).map((k) => ({ key: k, label: LOOKS[k].label, sub: LOOKS[k].sub, group: 'def', choice: { look: k } }));
-      return { step: 'look', title: 'Call the defense', options, aiKey: aiDefLook(s, aiR), state: clone(s) };
+      // goal-line defense is offered where it belongs: near the goal line or on short yardage
+      const calls = DEF_CALLS.filter((k) => k !== 'goal' || goalLineSituation(s) || ytg(s) <= 10);
+      const options: Opt[] = calls.map((k) => ({ key: k, label: LOOKS[k].label, sub: LOOKS[k].sub, group: 'def', choice: { look: k }, risk: LOOKS[k].tilt }));
+      const ai = aiDefLook(s, aiR);
+      const goal = s.dist >= ytg(s) ? 'Goal' : String(s.dist);
+      const title = s.down === 4 ? `4th & ${goal}: they're going for it` : `${['1st', '2nd', '3rd'][s.down - 1]} & ${goal}: call the defense`;
+      return { step: 'look', title, options, aiKey: options.some((o) => o.key === ai) ? ai : 'balanced', state: clone(s) };
     }
     if (s.stage === 'pat') {
       if (s.off !== 0) return null;

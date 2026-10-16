@@ -1,6 +1,7 @@
 /** Core models shared by the engine, the evaluator worker and the UI. Team 0 is always the player ("you"). */
 export type Team = 0 | 1;
-export type Look = 'blitz' | 'load' | 'soft';
+/** Defensive calls. 'soft' is the old name of 'prevent', kept so saved games replay. */
+export type Look = 'balanced' | 'blitz' | 'load' | 'zone' | 'man' | 'prevent' | 'goal' | 'soft';
 export type Stage = 'pre' | 'call' | 'pat' | 'kick' | 'over';
 export type Rcv = 'WR1' | 'WR2' | 'WR3' | 'TE' | 'RB';
 export type RouteId =
