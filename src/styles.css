@@ -801,11 +801,13 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 @media (prefers-reduced-motion: reduce) { .wx-snowfall, .wx-rainfall { animation: none; } }
 
 /* wide desktops: the whole clock row on one line */
-@media (min-width: 1280px) {
-  .clockrow { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
-  .clockrow.def { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .clockrow .majors:empty { display: none; }
-  .clockrow:has(.majors:empty), .clockrow:not(:has(.majors)) { grid-template-columns: 1fr; }
-}
+/* the clock row: tempo on one line, the big buttons on one line under it, every cell the same size */
+.tempo { grid-template-columns: auto repeat(3, minmax(0, 1fr)); }
+.tbtn { padding: 8px 4px; }
+.tbtn-name { font-size: 14px; }
+.mbtn { padding: 8px 4px; }
+.mbtn-name { font-size: 15px; }
+.mbtn-sub { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.mbtn-sub:empty { display: none; }
 .cp-sel-sub b { color: var(--accent); }
 .cp.def .cp-sel-sub b { color: var(--def); }

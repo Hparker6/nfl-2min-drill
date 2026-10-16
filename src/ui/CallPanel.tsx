@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CALL, LOOK_READ, LOOKS, POS_NAME, POS_ROUTES, ROUTES, TEMPO } from '../engine/data';
-import { DESIGN } from '../engine/formation';
+import { CALL, LOOK_READ, LOOKS, POS_NAME, ROUTES, TEMPO } from '../engine/data';
 import { WEATHER } from '../engine/sim';
 import { tendency } from '../game/describe';
 import type { Decision, Opt } from '../game/session';
@@ -123,7 +122,7 @@ function ClockRow({ clock, clockSel, hints, s, onClock, onMajor }: { clock: Deci
             return (
               <button key={o.key} className={`mbtn ${o.key}${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} onClick={() => onMajor(o)} title={o.sub}>
                 <span className="mbtn-name">{o.label}</span>
-                <span className="mbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : o.sub}</span>
+                <span className="mbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : o.key === 'timeout' ? `${s.to[0]} left` : o.key === 'spike' ? 'Costs a down' : o.key === 'kneel' ? 'Runs the clock' : o.key === 'drain' ? 'To 0:03, then timeout' : o.key === 'let' ? '' : o.sub}</span>
               </button>
             );
           })}
@@ -269,21 +268,14 @@ export function CallPanel(p: Props) {
 
   const call = selected?.choice.play ? CALL[selected.choice.play] : null;
   const isPass = !!call?.routes && call.kind === 'pass' && call.id !== 'hail';
-  const design = call ? DESIGN[call.id] : undefined;
   const tgt = (edits.target ?? call?.tgt) as Rcv | undefined;
   const routeOf = (r: Rcv): RouteId => edits.routes[r] ?? call!.routes![r];
   const rt = isPass && tgt ? routeOf(tgt) : null;
-  const last = (r: Rcv) => teams[0].players[r]?.name.split(' ').slice(-1)[0] ?? POS_NAME[r];
-  const receivers: Rcv[] = isPass && design ? (['WR1', 'WR2', 'WR3', 'TE', 'RB'] as Rcv[]).filter((r) => !((r === 'RB' && design.rb !== 'route') || (r === 'TE' && design.te !== 'route'))) : [];
+  const last = (r: Rcv) => { const parts = (teams[0].players[r]?.name ?? POS_NAME[r]).split(' ').filter((w) => !/^(Jr\.?|Sr\.?|II|III|IV)$/.test(w)); return parts[parts.length - 1]; };
   const fourth = s.down === 4;
   const T = TABS.find((x) => x.id === tab)!;
   const setSide = (side: 1 | -1) => onEdit({ ...edits, side });
   const toggleMod = (k: keyof PassMods) => onEdit({ ...edits, mods: { ...edits.mods, [k]: !edits.mods[k] } });
-  const cycle = (r: Rcv) => {
-    const listR = POS_ROUTES[r];
-    const i = listR.indexOf(routeOf(r));
-    onEdit({ ...edits, target: r, routes: { ...edits.routes, [r]: listR[(i + 1) % listR.length] } });
-  };
 
   const row = (o: Opt, i: number) => {
     const wp = hints?.get(o.key);
@@ -309,15 +301,6 @@ export function CallPanel(p: Props) {
         )}
         {sel && isPass && o.key === call?.id && (
           <div className="passopts">
-            <div className="chips" role="group" aria-label="Throw to">
-              <span className="chips-k">Throw to</span>
-              {receivers.map((r) => (
-                <button key={r} className={`rchip${r === tgt ? ' on' : ''}${edits.routes[r] ? ' edited' : ''}`} onClick={() => (r === tgt ? cycle(r) : onEdit({ ...edits, target: r }))}
-                  title={r === tgt ? 'Tap again to change his route' : `Throw to ${last(r)}`}>
-                  <b>{last(r)}</b><span>{ROUTES[routeOf(r)].name}{r === tgt ? ' ↻' : ''}</span>
-                </button>
-              ))}
-            </div>
             <div className="chips" role="group" aria-label="Adjustments">
               <span className="chips-k">Signal</span>
               {MODS.map((m) => (
@@ -354,7 +337,7 @@ export function CallPanel(p: Props) {
     if (!selected) return null;
     if (isPass && tgt && rt) {
       const sig = MODS.filter((m) => edits.mods[m.k]).map((m) => m.label.toLowerCase());
-      return <>To <b>{last(tgt)}</b> on a {ROUTES[rt].name.toLowerCase()}{sig.length ? `, ${sig.join(', ')}` : ''}.{!edited && <span className="cp-tip"> Tap a receiver on the field or above to change the throw.</span>}</>;
+      return <>To <b>{last(tgt)}</b> on a {ROUTES[rt].name.toLowerCase()}{sig.length ? `, ${sig.join(', ')}` : ''}.{!edited && <span className="cp-tip"> Tap a receiver on the field to throw to him; tap him again to change his route.</span>}</>;
     }
     if (sided(selected.choice.play)) return <>To the <b>{edits.side === 1 ? 'strong' : 'weak'} side</b>. {selected.sub}</>;
     return <>{selected.sub}</>;
