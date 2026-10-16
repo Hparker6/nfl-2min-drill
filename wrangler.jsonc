@@ -1,0 +1,9 @@
+{
+  // Static site: Cloudflare serves the Vite build output from dist/.
+  "name": "nfl-2min-drill",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  }
+}
