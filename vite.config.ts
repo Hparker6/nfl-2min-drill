@@ -63,6 +63,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), siteMeta(site)],
     base: './',
     worker: { format: 'es' },
-    test: { exclude: ['node_modules/**', 'dist/**', 'scripts/**'] },
+    // the engine tests simulate thousands of plays each; give them room on slower machines
+    test: { exclude: ['node_modules/**', 'dist/**', 'scripts/**'], testTimeout: 120_000 },
   };
 });

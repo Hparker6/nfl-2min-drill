@@ -16,7 +16,7 @@ import { DurableObject } from 'cloudflare:workers';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
-  status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'" },
 });
 
 // names are public on the board: letters, digits and a little punctuation, 20 characters, no obvious abuse
@@ -27,33 +27,52 @@ function cleanName(s) {
   return BLOCK.test(n) ? 'Coach' : n;
 }
 
-function summarize(day, scores, token) {
-  const list = Object.entries(scores).map(([tok, e]) => ({ tok, ...e }));
-  const sorted = [...list].sort((a, b) => b.score - a.score || a.t - b.t);
-  const mine = token ? sorted.find((e) => e.tok === token) : null;
-  const bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-  let sum = 0;
-  for (const e of list) { bands[Math.min(9, Math.floor(e.score / 10))]++; sum += e.score; }
-  const rank = mine ? sorted.filter((e) => e.score > mine.score).length + 1 : null;
-  const tied = mine ? sorted.filter((e) => e.score === mine.score).length - 1 : 0;
-  return {
-    day, count: list.length, rank, tied, bands,
-    best: sorted.slice(0, 10).map((e) => ({ name: e.name, score: e.score })),
-    average: list.length ? Math.round((sum / list.length) * 10) / 10 : 0,
-  };
-}
 
 /** One day's scores. */
+/**
+ * One day's scores, in the Durable Object's own SQLite: a row per browser token, ranked by index, so a busy day (or
+ * a flood) never builds one huge value. Each address can post a limited number of times a day.
+ */
+const POSTS_PER_ADDRESS = 30;   // (a Worker module may export only handlers and classes)
 export class DayBoard extends DurableObject {
-  async summary(day, token) {
-    return summarize(day, (await this.ctx.storage.get('scores')) || {}, token);
+  constructor(ctx, env) {
+    super(ctx, env);
+    this.sql = ctx.storage.sql;
+    ctx.blockConcurrencyWhile(async () => {
+      this.sql.exec(`CREATE TABLE IF NOT EXISTS scores (tok TEXT PRIMARY KEY, name TEXT, score INTEGER, grades TEXT, win INTEGER, t INTEGER);
+        CREATE INDEX IF NOT EXISTS by_score ON scores (score DESC, t ASC);
+        CREATE TABLE IF NOT EXISTS posts (addr TEXT PRIMARY KEY, n INTEGER)`);
+      // the first version kept the day as one object: move it into the table once
+      const old = await ctx.storage.get('scores');
+      if (old && typeof old === 'object') {
+        for (const [tok, e] of Object.entries(old)) this.sql.exec('INSERT OR REPLACE INTO scores VALUES (?, ?, ?, ?, ?, ?)', tok, e.name, e.score, e.grades ?? '', e.win ? 1 : 0, e.t ?? Date.now());
+        await ctx.storage.delete('scores');
+      }
+    });
   }
-  async submit(day, entry) {
-    const scores = (await this.ctx.storage.get('scores')) || {};
-    const prev = scores[entry.token];
-    scores[entry.token] = { name: entry.name, score: entry.score, grades: entry.grades, win: entry.win, t: prev?.t ?? Date.now() };
-    await this.ctx.storage.put('scores', scores);
-    return summarize(day, scores, entry.token);
+  summary(day, token) {
+    const q = (s, ...b) => this.sql.exec(s, ...b).toArray();
+    const { count, average } = q('SELECT COUNT(*) AS count, AVG(score) AS average FROM scores')[0];
+    const mine = token ? q('SELECT score FROM scores WHERE tok = ?', token)[0] : null;
+    const bands = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (const r of q('SELECT MIN(9, score / 10) AS b, COUNT(*) AS n FROM scores GROUP BY b')) bands[r.b] = r.n;
+    return {
+      day, count, bands,
+      rank: mine ? q('SELECT COUNT(*) AS n FROM scores WHERE score > ?', mine.score)[0].n + 1 : null,
+      tied: mine ? q('SELECT COUNT(*) AS n FROM scores WHERE score = ?', mine.score)[0].n - 1 : 0,
+      best: q('SELECT name, score FROM scores ORDER BY score DESC, t ASC LIMIT 10'),
+      average: count ? Math.round(average * 10) / 10 : 0,
+    };
+  }
+  /** null when this address has posted too often today. */
+  submit(day, entry, addr) {
+    const n = this.sql.exec('SELECT n FROM posts WHERE addr = ?', addr).toArray()[0]?.n ?? 0;
+    if (n >= POSTS_PER_ADDRESS) return null;
+    this.sql.exec('INSERT INTO posts VALUES (?, 1) ON CONFLICT(addr) DO UPDATE SET n = n + 1', addr);
+    this.sql.exec(`INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tok) DO UPDATE SET name = excluded.name, score = excluded.score, grades = excluded.grades, win = excluded.win`,
+    entry.token, entry.name, entry.score, entry.grades, entry.win ? 1 : 0, Date.now());
+    return this.summary(day, entry.token);
   }
 }
 
@@ -80,12 +99,19 @@ async function api(request, env, url) {
     // only today and yesterday (UTC) take scores, so old days stay fixed
     const now = Date.now(), dayMs = Date.parse(day + 'T00:00:00Z');
     if (!(now - dayMs < 2 * 864e5 && now - dayMs > -864e5)) return json({ error: 'day closed' }, 400);
+    // a score is a few dozen bytes; anything big is not one
+    const raw = await request.text();
+    if (raw.length > 2048) return json({ error: 'too large' }, 413);
     let body;
-    try { body = await request.json(); } catch { return json({ error: 'bad json' }, 400); }
+    try { body = JSON.parse(raw); } catch { return json({ error: 'bad json' }, 400); }
     const token = String(body.token || '').slice(0, 64);
     const score = Number(body.score);
     if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100) return json({ error: 'bad score' }, 400);
-    const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win });
+    // the address only counts posts, and only as a salted hash: no IP is stored
+    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const addr = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(day + ':' + ip)))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win }, addr);
+    if (!sum) return json({ error: 'too many scores from this address today' }, 429);
     await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum);
     return json(sum);
   }
