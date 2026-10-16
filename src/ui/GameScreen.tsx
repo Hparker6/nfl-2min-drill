@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CALL, POS_ROUTES } from '../engine/data';
+import { DESIGN } from '../engine/formation';
 import { WEATHER, clone } from '../engine/sim';
 import { utcDate, type Scenario } from '../engine/scenario';
 import type { Ev, Rcv, State } from '../engine/types';
@@ -287,6 +288,7 @@ export function GameScreen(p: Props) {
     if (phase !== 'deciding' || !sel?.choice.play) return;
     const c = CALL[sel.choice.play];
     if (!c?.routes || c.kind !== 'pass' || c.id === 'hail') return;
+    if (DESIGN[c.id]?.qb === 'lateral' && pos === 'WR2') return;   // he's the one throwing it
     const cur = edits.target ?? c.tgt!;
     if (pos !== cur) { setEdits({ ...edits, target: pos }); return; }
     const list = POS_ROUTES[pos];

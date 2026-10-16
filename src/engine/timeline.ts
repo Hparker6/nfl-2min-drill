@@ -248,7 +248,7 @@ export function choreograph(inp: ChoreoInput): Timeline {
     // ---- receivers: routes at their own speed. The target is timed to the catch point.
     for (const rk of RCV) {
       const key = 'o:' + rk;
-      if (rk === 'RB' && design?.rb === 'fake') continue;
+      if (rk === 'RB' && design?.rb === 'fake' && tgt !== 'RB') continue;   // thrown to, he fakes and then runs his route
       if (rk === 'RB' && design?.rb === 'block' && tgt !== 'RB') {
         // stays in to protect: steps up beside the quarterback and picks up the first free rusher
         ag[key].goal = (t) => (t < 0.5 ? [CX + (P(key)[0] < CX ? -1.6 : 1.6), -4.6] : null);
@@ -413,11 +413,12 @@ export function choreograph(inp: ChoreoInput): Timeline {
       carrier.push({ t: catchT, key: ik });
       if (res.defTd) events.push({ t: result.tEnd, kind: 'td', who: ik });
       else if (!res.touchback) {
-        // the intended receiver turns tackler
+        // the intended receiver runs his route to the pick, then turns tackler
         const tk = 'o:' + tgt;
+        const route = ag[tk].script;
         let from: Pt | null = null;
         ag[tk].script = (t) => {
-          if (t < catchT) return null;
+          if (t < catchT) return route ? route(t) : null;
           if (!from) from = ag[tk].p;
           return lerpP(from, [back[0] - 0.7, back[1] - 0.6], clip((t - catchT) / Math.max(0.2, retT), 0, 1));
         };

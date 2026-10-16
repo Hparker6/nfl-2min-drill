@@ -213,3 +213,33 @@ describe('every call is its own play', () => {
     }
   });
 });
+
+describe('interceptions', () => {
+  it('the intended receiver runs his route to the catch point before the pick, then turns tackler', () => {
+    const base = resolveSnap(s0, PASSES[0], 'balanced', rng(3));
+    for (const call of PASSES) for (const [tgt, cb] of [['WR1', 'CB1'], ['WR2', 'CB2'], ['WR3', 'S1'], ['TE', 'S1']] as const) {
+      if (DESIGN[call]?.qb === 'lateral' && tgt === 'WR2') continue;   // the receiver pass: WR2 is the thrower
+      for (const route of ['slant', 'out', 'dig', 'go'] as const) {
+        const depth = route === 'go' ? 25 : route === 'dig' ? 12 : 5;
+        const res: PlayResult = { ...base, kind: 'pass', call, target: tgt, route, air: depth, yards: depth, complete: false, intercepted: true, turnover: true, touchback: false, defTd: false, retYds: 8, carrier: cb, penalty: undefined, td: false, oob: false, side: tgt === 'WR1' || tgt === 'WR3' ? -1 : 1 };
+        const tl = choreograph({ res, yl0: s0.yl, off: s0.rat[0], def: s0.rat[1], seed: 9 });
+        const pick = tl.events.find((e) => e.kind === 'int')!;
+        const tr = tl.tracks['o:' + tgt];
+        const atCatch = at(tr, pick.t);
+        // he got there: the ball was thrown to where he was, not to an empty spot
+        expect([call, tgt, route, d(atCatch, pick.at!) < 2.5]).toEqual([call, tgt, route, true]);
+        expect([call, tgt, route, d(at(tr, pick.t * 0.6), at(tr, 0)) > 1.5]).toEqual([call, tgt, route, true]);
+      }
+    }
+  });
+  it('a back thrown to on a play-action or bootleg design runs his route, not just the fake', () => {
+    for (const call of PASSES.filter((c) => DESIGN[c]?.rb === 'fake')) for (const route of ['flat', 'wheel'] as const) for (const complete of [true, false]) {
+      const base = resolveSnap(s0, call, 'balanced', rng(4));
+      const depth = route === 'wheel' ? 16 : 1;
+      const res: PlayResult = { ...base, kind: 'pass', call, target: 'RB', route, air: depth, yards: complete ? depth + 3 : 0, complete, intercepted: false, turnover: false, carrier: complete ? 'RB' : 'QB', penalty: undefined, td: false, oob: false, side: 1 };
+      const tl = choreograph({ res, yl0: s0.yl, off: s0.rat[0], def: s0.rat[1], seed: 9 });
+      const ev = tl.events.find((e) => e.kind === 'catch' || e.kind === 'incomplete')!;
+      expect([call, route, complete, d(at(tl.tracks['o:RB'], ev.t), ev.at!) < 2.5]).toEqual([call, route, complete, true]);
+    }
+  });
+});
