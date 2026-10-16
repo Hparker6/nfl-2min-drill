@@ -240,3 +240,32 @@
 }
 /* nothing inside may widen the page (a long row of category buttons scrolls instead) */
 .cr-page, .cr-stack, .cg { grid-template-columns: minmax(0, 1fr); }
+
+/* ---------- phone polish ---------- */
+.cr-arch-pick { display: none; font-size: 14px; color: var(--ink-2); }
+.cr-board li { grid-template-columns: 32px 1fr; row-gap: 2px; }
+.cr-board li b { grid-column: 2; }
+.cr-board-sub { grid-column: 2; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+.cr-board-sub em { grid-column: auto; }
+.cr-drafted .cr-chip.big { justify-self: start; }
+.cg-top .btn { white-space: nowrap; }
+.cr-box .cr-seg { margin-top: 2px; }
+.cr-box-cols { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 640px) {
+  /* the hub tabs: two even rows instead of one row and a straggler */
+  .cr-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; }
+  .cr-tabs button { padding: 8px 2px; font-size: 13px; letter-spacing: .03em; }
+  .cr-tabs .cr-gear { margin-left: 0; }
+  /* new career: styles two to a row, compact; colleges two to a row; Start stays in reach */
+  .cr-arch { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .cr-archcard { padding: 10px; gap: 4px; }
+  .cr-arch-name { font-size: 19px; }
+  .cr-arch-tag { font-size: 10px; letter-spacing: .05em; }
+  .cr-arch-blurb, .cr-arch-sig { display: none; }
+  .cr-bar { grid-template-columns: 1fr 22px; row-gap: 1px; }
+  .cr-bar .k { grid-column: 1 / -1; font-size: 10px; }
+  .cr-colleges { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .cr-col span { font-size: 13px; }
+  .cr-new .cr-card > .btn.primary.big { position: sticky; bottom: 10px; z-index: 3; box-shadow: 0 6px 24px rgba(0, 0, 0, .45); }
+  .cr-arch-pick { display: block; }
+}

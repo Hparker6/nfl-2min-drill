@@ -146,6 +146,8 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
             );
           })}
         </div>
+        {/* phones: the cards are compact, so the pick's description sits under them */}
+        <p className="cr-arch-pick"><b>{ARCH[arch].name}.</b> {ARCH[arch].blurb} Starts with <b>{ABILITIES[ARCH[arch].sig].name}</b>: {ABILITIES[ARCH[arch].sig].blurb}</p>
         <h3 className="cr-sub">College</h3>
         <div className="cr-colleges">
           {COLLEGES.map((col, i) => (

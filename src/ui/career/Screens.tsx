@@ -48,9 +48,9 @@ export function DraftNight({ c, commit, onDone }: { c: Career; commit: Commit; o
         <h3>The board</h3>
         <ol className="cr-board">
           {d.picks.slice(0, shown).map((p) => { const t = teamById(c.league, p.team); return (
-            <li key={p.pick} className={p.you ? 'you' : ''}><span className="num">{p.pick}</span><TeamTag t={t} /><b>{p.name}</b><em>{p.pos} · {p.college}</em></li>
+            <li key={p.pick} className={p.you ? 'you' : ''}><span className="num">{p.pick}</span><b>{p.name}</b><span className="cr-board-sub"><TeamTag t={t} /><em>{p.pos} · {p.college}</em></span></li>
           ); }).reverse()}
-          {!done && <li className="cr-clock"><span className="num">{shown + 1}</span><TeamTag t={teamById(c.league, d.picks[shown].team)} /><b>On the clock…</b></li>}
+          {!done && <li className="cr-clock"><span className="num">{shown + 1}</span><b>On the clock…</b><span className="cr-board-sub"><TeamTag t={teamById(c.league, d.picks[shown].team)} /></span></li>}
         </ol>
       </section>
     </div>
@@ -93,6 +93,7 @@ export function BoxScore({ box, teams, c }: { box: Box; teams: [TeamInfo, TeamIn
   const rows = (side: 0 | 1, slots: string[], f: (l: Line) => (string | number)[], keep: (l: Line) => boolean) =>
     slots.filter((s) => keep(L(side, s))).map((s) => <tr key={s}><td>{nm(side, s)} <span className="muted small">{POS_LABEL[s]}</span></td>{f(L(side, s)).map((v, i) => <td key={i} className="num">{v}</td>)}</tr>);
   const quarters = Math.max(box.byQ[0].length, 4);
+  const [side, setSide] = useState<0 | 1>(0);
   return (
     <section className="cr-card cr-box">
       <h3>Box score</h3>
@@ -100,8 +101,11 @@ export function BoxScore({ box, teams, c }: { box: Box; teams: [TeamInfo, TeamIn
         <thead><tr><th />{Array.from({ length: quarters }, (_, i) => <th key={i} className="num">{i < 4 ? i + 1 : 'OT'}</th>)}<th className="num">T</th></tr></thead>
         <tbody>{([0, 1] as const).map((s) => <tr key={s}><td>{teams[s].id}</td>{Array.from({ length: quarters }, (_, i) => <td key={i} className="num">{box.byQ[s][i] ?? 0}</td>)}<td className="num"><b>{box.final[s]}</b></td></tr>)}</tbody>
       </table>
+      <div className="cr-seg" role="tablist" aria-label="Team">
+        {([0, 1] as const).map((s) => <button key={s} role="tab" aria-selected={side === s} className={side === s ? 'on' : ''} onClick={() => setSide(s)}>{teams[s].city} {teams[s].name}</button>)}
+      </div>
       <div className="cr-box-cols">
-        {([0, 1] as const).map((s) => (
+        {([side] as const).map((s) => (
           <div key={s}>
             <h4 className="k">{teams[s].city} {teams[s].name}</h4>
             <p className="small muted">{box.team[s].yds} yards ({box.team[s].py} pass, {box.team[s].ry} rush) · {box.team[s].fd} first downs · {box.team[s].to} turnovers · 3rd down {box.team[s].td3}/{box.team[s].att3}</p>
@@ -112,7 +116,7 @@ export function BoxScore({ box, teams, c }: { box: Box; teams: [TeamInfo, TeamIn
             <table className="cr-t"><thead><tr><th>Receiving</th><th className="num">Rec</th><th className="num">Yds</th><th className="num">TD</th></tr></thead>
               <tbody>{rows(s, ['WR1', 'WR2', 'WR3', 'TE', 'RB'], (l) => [`${l.rec ?? 0}/${l.tgt ?? 0}`, l.rcy ?? 0, l.rctd ?? 0], (l) => !!l.tgt)}</tbody></table>
             <table className="cr-t"><thead><tr><th>Defense</th><th className="num">Tkl</th><th className="num">Sck</th><th className="num">INT</th></tr></thead>
-              <tbody>{rows(s, ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'], (l) => [l.tk ?? 0, l.sck ?? 0, l.int ?? 0], (l) => !!(l.tk || l.sck || l.int))}</tbody></table>
+              <tbody>{rows(s, ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'].sort((a, b) => (L(s, b).tk ?? 0) + (L(s, b).sck ?? 0) * 3 + (L(s, b).int ?? 0) * 3 - (L(s, a).tk ?? 0) - (L(s, a).sck ?? 0) * 3 - (L(s, a).int ?? 0) * 3).slice(0, 6), (l) => [l.tk ?? 0, l.sck ?? 0, l.int ?? 0], (l) => !!(l.tk || l.sck || l.int))}</tbody></table>
           </div>
         ))}
       </div>

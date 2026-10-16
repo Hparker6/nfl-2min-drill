@@ -108,7 +108,9 @@ export default function App() {
           <h2 id="foot-about-h">Play the NFL 2-minute drill</h2>
           <p>The 4th Call is a free NFL 2 min drill game that puts you on the sideline for the end of a close game: run the two-minute drill, go for it on fourth down, protect a lead or make a goal-line stand. Call every play, manage the clock and your timeouts, and call the defense when they have the ball. Teams use real NFL rosters and season stats, and every call is graded against every option you had by playing the rest of the game out thousands of times. Free in your browser, no sign-up, a new game every day.</p>
         </section>}
-        <p>An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0); ratings and outcomes are this game's own estimates from a simplified simulation.</p>
+        {mode === 'career'
+          ? <p>Career mode is a fictional league: every team, player and college is made up. An independent game, not affiliated with or endorsed by the NFL.</p>
+          : <p>An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0); ratings and outcomes are this game's own estimates from a simplified simulation.</p>}
       </footer>
       {modal === 'help' && <Help onClose={closeModal} />}
       {modal === 'stats' && <Stats store={store} onClose={closeModal} />}
