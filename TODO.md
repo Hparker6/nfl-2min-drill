@@ -27,7 +27,7 @@ Goal: rank first for "nfl 2 min drill", "nfl 2 minute drill game", "2min nfl dri
 
 ## 4. Domain
 
-- [ ] Make `www.nfl-2min-drill.com` redirect to `https://nfl-2min-drill.com/` (Cloudflare → Rules → Redirect Rules),
+- [x] Make `www.nfl-2min-drill.com` redirect to `https://nfl-2min-drill.com/` (Cloudflare → Rules → Redirect Rules),
       so both spellings land on one indexed page.
 
 ## 5. Check progress (2–4 weeks after step 1)
