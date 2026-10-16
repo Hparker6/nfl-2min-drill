@@ -9,9 +9,20 @@ const SOURCE: Record<string, string> = {
   estimated: 'Game ratings estimated (no individual stats)',
 };
 
-export function PlayerCard({ team, pos }: { team: TeamInfo; pos: string }) {
+export function PlayerCard({ team, pos, compact }: { team: TeamInfo; pos: string; compact?: boolean }) {
   const p = team.players[pos];
   if (!p) return null;
+  // phones: one line and one number, in the corner, so it never covers the routes
+  if (compact) {
+    return (
+      <div className="pcard compact" role="status" aria-live="polite">
+        <span className="pcard-num" style={{ background: team.color, color: team.color2 }}>{p.number ?? '–'}</span>
+        <b className="pcard-cname">{p.name}</b>
+        <span className="pcard-cpos">{pos.replace(/\d$/, '')}</span>
+        <span className="pcard-ovr" title="Overall game rating">{p.rating}</span>
+      </div>
+    );
+  }
   const group = SLOT_GROUP[pos];
   const attrs = group ? GROUP_ATTRS[group] : [];
   return (

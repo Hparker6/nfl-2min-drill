@@ -25,6 +25,8 @@ interface Props {
 
 export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather }, ref) {
   const [inspect, setInspect] = useState<{ side: 'o' | 'd'; pos: string } | null>(null);
+  // touch screens and narrow windows get the one-line card: the full table would cover the field
+  const compact = typeof matchMedia === 'function' && matchMedia('(pointer: coarse), (max-width: 999px)').matches;
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const rRef = useRef<FieldRenderer | null>(null);
@@ -66,7 +68,7 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
         </div>
       )}
       {children}
-      {inspect && <PlayerCard team={teams[inspect.side === 'o' ? offense : offense === 0 ? 1 : 0]} pos={inspect.pos} />}
+      {inspect && <PlayerCard team={teams[inspect.side === 'o' ? offense : offense === 0 ? 1 : 0]} pos={inspect.pos} compact={compact} />}
     </div>
   );
 });

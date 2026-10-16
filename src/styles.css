@@ -894,3 +894,10 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
   .sb-dd { font-size: 17px; }
   .f-name-tight { display: none; }
 }
+
+/* phones: the player card is one line in the bottom corner, shown only while a player is held */
+.pcard.compact { top: auto; bottom: 8px; left: 8px; right: auto; width: auto; max-width: calc(100% - 16px); display: flex; align-items: center; gap: 8px; padding: 5px 10px 5px 5px; border-radius: 999px; }
+.pcard.compact .pcard-num { min-width: 26px; height: 26px; border-radius: 50%; font-size: 14px; }
+.pcard-cname { font: 700 15px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pcard-cpos { font: 600 11px var(--body); color: #9fb0a6; letter-spacing: .06em; }
+.pcard.compact .pcard-ovr { font-size: 20px; line-height: 1; }

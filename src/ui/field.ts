@@ -43,6 +43,7 @@ export interface Preview {
 /** What the play came to, fired when it happens on the field (not after the hold). */
 export type Outcome = 'tackle' | 'catch' | 'drop' | 'pick' | 'td' | 'oob' | 'sack' | 'kick' | 'none';
 
+const COARSE = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const LINE_KEYS = new Set(['LT', 'LG', 'C', 'RG', 'RT', 'EDGE1', 'DL1', 'DL2', 'EDGE2']);
 interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement; mk: SVGElement }
 
@@ -203,12 +204,13 @@ export class FieldRenderer {
         g.addEventListener('pointerdown', (e) => {
           if (e.pointerType === 'mouse') return;
           held = false;
-          hold = setTimeout(() => { held = true; show(); }, 450);
+          hold = setTimeout(() => { held = true; show(); }, 500);
         });
         g.addEventListener('pointerup', endHold);
         g.addEventListener('pointercancel', endHold);
         g.addEventListener('contextmenu', (e) => e.preventDefault());   // the long press is ours, not the browser's menu
-        g.addEventListener('focus', () => { if (g.matches(':focus-visible')) show(); });
+        // keyboard focus only: a tap can focus the marker too (iOS), and that must not open the card
+        g.addEventListener('focus', () => { if (!COARSE() && g.matches(':focus-visible')) show(); });
         g.addEventListener('blur', hide);
         if (side === 'o' && (RECEIVERS as string[]).includes(pos)) {
           // a press-and-hold to read his ratings is not also a tap
