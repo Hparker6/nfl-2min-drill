@@ -88,3 +88,56 @@ footer nav a { color: var(--ink-2); }
   .lede { font-size: 18px; }
   th, td { padding: 8px 6px; font-size: 15px; }
 }
+
+/* ---------- polish: hero, panels, leaderboard rows, benchmarks ---------- */
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font: 700 13px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: #3fbf6a; box-shadow: 0 0 0 4px rgba(63, 191, 106, .18); }
+h2 { display: flex; align-items: center; gap: 10px; }
+h2::before { content: ''; width: 6px; height: 1em; border-radius: 3px; background: var(--accent); flex: none; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px 4px; margin: 12px 0 10px; overflow: hidden; }
+.panel table { margin: 0; }
+.panel th:first-child, .panel td:first-child { padding-left: 16px; }
+.panel th:last-child, .panel td:last-child { padding-right: 16px; }
+.panel tbody tr:last-child td { border-bottom: 0; }
+.panel .bars { padding: 10px 14px; margin: 0; }
+.rank { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; font: 800 15px var(--display); background: var(--panel-2); color: var(--ink-2); }
+tr.r1 .rank { background: #f5c518; color: #1b1600; } tr.r2 .rank { background: #c9d1d6; color: #1a1f22; } tr.r3 .rank { background: #d08a4e; color: #1d1206; }
+tr.r1 td { color: var(--ink); font-weight: 700; }
+td.score { font: 800 20px var(--display); color: var(--ink); }
+tr.bench td { color: var(--muted); font-style: italic; background: color-mix(in srgb, var(--panel-2) 60%, transparent); }
+tr.bench td.score { color: var(--muted); font-weight: 700; }
+.badge { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); font: 700 10px var(--body); letter-spacing: .08em; text-transform: uppercase; font-style: normal; color: var(--muted); vertical-align: 2px; }
+.note { font-size: 13px; color: var(--muted); margin: 6px 2px 0; }
+.bar i { background: linear-gradient(90deg, #2f9d55, #3fbf6a); }
+.bars .hd { display: grid; grid-template-columns: 40px 1fr 48px; gap: 10px; font: 700 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-bottom: 2px; }
+.next { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
+.next b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.hero-img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); margin: 22px 0 6px; aspect-ratio: 1200 / 630; object-fit: cover; }
+.cta .btn { text-align: center; }
+footer .in { display: grid; gap: 6px; }
+footer .brandline { font: 800 18px var(--display); text-transform: uppercase; color: var(--ink); }
+footer .brandline em { font-style: normal; color: var(--accent); }
+@media (min-width: 860px) {
+  .hero { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+  .hero .hero-img { margin: 0; }
+}
+@media (max-width: 640px) {
+  .cta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cta .btn { padding: 13px 8px; font-size: 16px; letter-spacing: .04em; }
+  .cta .btn:only-child { grid-column: 1 / -1; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .stats.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stat { padding: 12px; }
+  .stat b { font-size: 30px; }
+  .stat span { font-size: 11px; }
+  .hide-sm { display: none; }
+  .rank { width: 24px; height: 24px; font-size: 13px; }
+  td.score { font-size: 18px; }
+  .panel th:first-child, .panel td:first-child { padding-left: 10px; }
+  .panel th:last-child, .panel td:last-child { padding-right: 10px; }
+  h2 { font-size: 24px; margin-top: 32px; }
+}
+
+/* the rank column only needs room for its badge */
+.panel .rk { width: 64px; }
+@media (max-width: 640px) { .panel .rk { width: 44px; } .panel td:first-child { white-space: nowrap; } }

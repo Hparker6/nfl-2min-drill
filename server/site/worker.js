@@ -13,6 +13,7 @@
  * (re-submitting the same day replaces that browser's entry). Nothing that identifies the player.
  */
 import { DurableObject } from 'cloudflare:workers';
+import PCT from '../../src/data/percentiles.json';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
@@ -137,7 +138,7 @@ const PAGE_HEADERS = {
   'referrer-policy': 'strict-origin-when-cross-origin',
 };
 
-function page({ path, title, description, h1, body, jsonld }) {
+function page({ path, title, description, h1, body, jsonld, eyebrow }) {
   const nav = [['/how-to-play/', 'How to play'], ['/leaderboard/', 'Leaderboard'], ['/stats/', 'Stats']]
     .map(([href, label]) => `<a href="${href}"${href === path ? ' aria-current="page"' : ''}>${label}</a>`).join('');
   return `<!doctype html>
@@ -161,8 +162,8 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(
 <a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="18" height="18"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="currentColor"/></g></svg></span><span>The <em>4th</em> Call</span></a>
 <nav class="nav" aria-label="Site">${nav}<a class="play" href="/">Play</a></nav>
 </div></header>
-<main><h1>${h1}</h1>${body}</main>
-<footer><div class="in"><nav aria-label="More"><a href="/">Play</a><a href="/how-to-play/">How to play</a><a href="/leaderboard/">Leaderboard</a><a href="/stats/">Stats</a></nav>
+<main>${eyebrow ? `<p class="eyebrow">${eyebrow}</p>` : ''}<h1>${h1}</h1>${body}</main>
+<footer><div class="in"><span class="brandline">The <em>4th</em> Call</span><nav aria-label="More"><a href="/">Play</a><a href="/how-to-play/">How to play</a><a href="/leaderboard/">Leaderboard</a><a href="/stats/">Stats</a></nav>
 An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0). Scores are reported by each player's browser.</div></footer>
 </body></html>`;
 }
@@ -172,32 +173,64 @@ const breadcrumb = (name, path) => ({ '@type': 'BreadcrumbList', itemListElement
   { '@type': 'ListItem', position: 2, name, item: `${SITE}${path}` },
 ] });
 
+// benchmarks: the simulated play-callers behind the game's "better than X%" (src/data/percentiles.json). Shown
+// labeled, never ranked, so a new day's board has something to beat without pretending anyone played.
+const SIM = [...PCT.scores].sort((a, b) => a - b);
+const simAt = (q) => SIM[Math.min(SIM.length - 1, Math.floor(q * (SIM.length - 1)))];
+const BENCH = [
+  { name: 'Simulated pro', tag: 'Top 10%', score: simAt(0.9) },
+  { name: 'Simulated coach', tag: 'Average', score: simAt(0.5) },
+];
+const untilNext = () => {
+  const ms = Date.parse(utcDay(Date.now() + 864e5) + 'T00:00:00Z') - Date.now();
+  const h = Math.floor(ms / 36e5), m = Math.floor((ms % 36e5) / 6e4);
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+};
+const shortDay = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+/** Players and benchmarks in one table: players ranked 1, 2, 3…; benchmarks sit at their score, unranked. */
+function boardTable(best, withBench) {
+  const rows = best.map((e, i) => ({ ...e, rank: i + 1 }));
+  if (withBench) for (const b of BENCH) rows.push({ ...b, bench: true });
+  rows.sort((a, b) => b.score - a.score || (a.bench ? 1 : 0) - (b.bench ? 1 : 0));
+  const tr = rows.map((e) => e.bench
+    ? `<tr class="bench"><td class="rk"><span class="rank" aria-hidden="true">·</span></td><td>${esc(e.name)}<span class="badge">${esc(e.tag)}</span></td><td class="num score">${e.score}</td></tr>`
+    : `<tr class="r${e.rank}"><td class="rk"><span class="rank">${e.rank}</span></td><td>${esc(e.name)}</td><td class="num score">${e.score}</td></tr>`).join('');
+  return `<div class="panel"><table><thead><tr><th class="rk">#</th><th>Coach</th><th class="num">Score</th></tr></thead><tbody>${tr}</tbody></table></div>`;
+}
+
 function bandBars(bands) {
   const max = Math.max(1, ...bands);
-  return `<div class="bars" aria-label="How today's scores spread out">${bands.map((n, i) => `<div class="bar"><span>${i * 10}${i === 9 ? '+' : ''}</span><i style="width:${Math.round((n / max) * 100)}%"></i><b>${n}</b></div>`).join('')}</div>`;
+  const rows = bands.map((n, i) => `<div class="bar"><span>${i * 10}${i === 9 ? '+' : ''}</span><i style="width:${Math.round((n / max) * 100)}%"></i><b>${n}</b></div>`).join('');
+  return `<div class="panel"><div class="bars" aria-label="How today's scores spread out"><div class="hd"><span>Score</span><span></span><span style="text-align:right">Players</span></div>${rows}</div></div>`;
 }
 
 async function leaderboardPage(env) {
   const today = utcDay(), yesterday = utcDay(Date.now() - 864e5);
   const [t, y] = await Promise.all([today, yesterday].map((d) => env.DAY_BOARD.get(env.DAY_BOARD.idFromName(d)).summary(d, null)));
-  const rows = t.best.map((e, i) => `<tr${i === 0 ? ' class="top1"' : ''}><td class="num">${i + 1}</td><td>${esc(e.name)}</td><td class="num">${e.score}</td></tr>`).join('');
+  const yest = y.best.length
+    ? `${boardTable(y.best.slice(0, 3), false)}<p class="note">${y.count.toLocaleString('en-US')} played Daily #${dayNumber(yesterday)} (${esc(shortDay(yesterday))}), average ${y.average}.</p>`
+    : '<p class="empty">No scores yesterday.</p>';
   const body = `
-<p class="lede">Daily #${dayNumber(today)}, ${esc(fmtDay(today))}: everyone plays the same NFL two-minute drill spot today. These are the best play-callers so far. Scores are the game's Performance rating (0–100), from every call graded against every option.</p>
-<div class="cta"><a class="btn primary" href="/">Play today's game</a><a class="btn" href="/how-to-play/">How it's scored</a></div>
-<div class="stats">
+<p class="lede">Everyone plays the same NFL two-minute drill spot today. These are the best play-callers so far, scored on the game's Performance rating (0–100): every call graded against every option.</p>
+<div class="cta"><a class="btn primary" href="/">Play today's game</a><a class="btn" href="/how-to-play/#grades">How it's scored</a></div>
+<p class="next">New Daily in <b>${untilNext()}</b> · midnight UTC</p>
+<div class="stats three">
   <div class="stat"><b>${t.count.toLocaleString('en-US')}</b><span>played today</span></div>
-  <div class="stat"><b>${t.count ? t.average : '–'}</b><span>average score</span></div>
-  <div class="stat"><b>${t.best[0]?.score ?? '–'}</b><span>best score</span></div>
+  <div class="stat"><b>${t.count ? t.average : '–'}</b><span>average</span></div>
+  <div class="stat"><b>${t.best[0]?.score ?? '–'}</b><span>top score</span></div>
 </div>
-<h2>Today's top ${t.best.length > 1 ? t.best.length : ''}</h2>
-${t.best.length ? `<table><thead><tr><th class="num">#</th><th>Coach</th><th class="num">Score</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="empty">No scores yet today. Be the first on the board: play the Daily, then post your name.</p>'}
+<h2>Today's board</h2>
+${boardTable(t.best, true)}
+<p class="note">${t.count ? '' : 'No scores yet today: be the first on the board. Play the Daily, then post your name. '}Rows marked <span class="badge" style="margin:0">Top 10%</span> and <span class="badge" style="margin:0">Average</span> are benchmarks from simulated play-callers, shown to beat. They are not players and are not ranked.</p>
 ${t.count ? `<h2>How today's scores spread out</h2>${bandBars(t.bands)}` : ''}
 <h2>Yesterday's best</h2>
-${y.best.length ? `<table><thead><tr><th class="num">#</th><th>Coach</th><th class="num">Score</th></tr></thead><tbody>${y.best.slice(0, 3).map((e, i) => `<tr><td class="num">${i + 1}</td><td>${esc(e.name)}</td><td class="num">${e.score}</td></tr>`).join('')}</tbody></table><p class="muted small">${y.count.toLocaleString('en-US')} played Daily #${dayNumber(yesterday)}, average ${y.average}.</p>` : '<p class="muted">No scores yesterday.</p>'}
-<p class="muted small">A new Daily starts at midnight UTC. More numbers on the <a href="/stats/">stats page</a>.</p>`;
+${yest}
+<p class="muted small" style="margin-top:22px">Every Daily's numbers are on the <a href="/stats/">stats page</a>.</p>`;
   return page({
-    path: '/leaderboard/', title: `Leaderboard: Daily #${dayNumber(today)} | The 4th Call, NFL 2-Minute Drill Game`,
-    description: `Today's best play-callers in The 4th Call, the free NFL 2-minute drill game: ${t.count} played Daily #${dayNumber(today)}${t.best[0] ? `, top score ${t.best[0].score}` : ''}. Play the same game and post your score.`,
+    path: '/leaderboard/', eyebrow: `<i></i>Live · Daily #${dayNumber(today)} · ${esc(fmtDay(today))}`,
+    title: `Leaderboard: Daily #${dayNumber(today)} | The 4th Call, NFL 2-Minute Drill Game`,
+    description: `Today's best play-callers in The 4th Call, the free NFL 2-minute drill game. ${t.count ? `${t.count} played Daily #${dayNumber(today)}, top score ${t.best[0].score}.` : `Daily #${dayNumber(today)} is open.`} Play the same game and post your score.`,
     h1: 'Daily <em>leaderboard</em>', body, jsonld: { '@context': 'https://schema.org', '@graph': [breadcrumb('Leaderboard', '/leaderboard/')] },
   });
 }
@@ -208,24 +241,30 @@ async function statsPage(env) {
   const total = list.reduce((a, d) => a + days[d].count, 0);
   const most = list.reduce((a, d) => Math.max(a, days[d].count), 0);
   const bestEver = list.reduce((a, d) => { const b = days[d].best[0]; return b && (!a || b.score > a.score) ? { ...b, day: d } : a; }, null);
-  const rows = list.slice(0, 30).map((d) => `<tr><td>${esc(fmtDay(d))}</td><td class="num">#${dayNumber(d)}</td><td class="num">${days[d].count.toLocaleString('en-US')}</td><td class="num">${days[d].average}</td><td class="num">${days[d].best[0]?.score ?? '–'}</td><td>${esc(days[d].best[0]?.name ?? '')}</td></tr>`).join('');
+  const rows = list.slice(0, 30).map((d) => `<tr><td>${esc(shortDay(d))}</td><td class="num hide-sm">#${dayNumber(d)}</td><td class="num">${days[d].count.toLocaleString('en-US')}</td><td class="num">${days[d].average}</td><td class="num score">${days[d].best[0]?.score ?? '–'}</td><td>${esc(days[d].best[0]?.name ?? '')}</td></tr>`).join('');
+  const table = list.length
+    ? `<div class="panel"><table><thead><tr><th>Day</th><th class="num hide-sm">Daily</th><th class="num">Played</th><th class="num">Avg</th><th class="num">Best</th><th>Top coach</th></tr></thead><tbody>${rows}</tbody></table></div>`
+    : '<p class="empty">No Dailies scored yet. Play today and yours is the first.</p>';
   const body = `
-<p class="lede">Every day, everyone plays the same NFL two-minute drill game. Here is how the play-callers did: how many played each Daily, the average Performance score, and the best of the day.</p>
-<div class="cta"><a class="btn primary" href="/">Play today's game</a><a class="btn" href="/leaderboard/">Today's leaderboard</a></div>
+<p class="lede">Every day, everyone plays the same NFL two-minute drill game. Here is how the play-callers did: how many played each Daily, the average Performance score and the best of the day.</p>
+<div class="cta"><a class="btn primary" href="/">Play today's game</a><a class="btn" href="/leaderboard/">Today's board</a></div>
 <div class="stats">
   <div class="stat"><b>${total.toLocaleString('en-US')}</b><span>games scored</span></div>
-  <div class="stat"><b>${list.length}</b><span>Dailies played</span></div>
-  <div class="stat"><b>${most.toLocaleString('en-US')}</b><span>most in one day</span></div>
-  <div class="stat"><b>${bestEver ? bestEver.score : '–'}</b><span>best score ever</span></div>
+  <div class="stat"><b>${list.length}</b><span>Dailies</span></div>
+  <div class="stat"><b>${most.toLocaleString('en-US')}</b><span>most in a day</span></div>
+  <div class="stat"><b>${bestEver ? bestEver.score : '–'}</b><span>best ever</span></div>
 </div>
 ${bestEver ? `<p>The best score so far is <b>${bestEver.score}</b>, by <b>${esc(bestEver.name)}</b> on Daily #${dayNumber(bestEver.day)} (${esc(fmtDay(bestEver.day))}).</p>` : ''}
 <h2>Day by day</h2>
-${list.length ? `<table><thead><tr><th>Day</th><th class="num">Daily</th><th class="num">Players</th><th class="num">Avg</th><th class="num">Best</th><th>Top coach</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="empty">No Dailies scored yet. Play today and yours is the first.</p>'}
+${table}
+<h2>Scores to beat</h2>
+<p>Simulated play-callers set the bar: across ${SIM.length} simulated games, the top 10% scored <b>${simAt(0.9)}</b> or better and the average was <b>${simAt(0.5)}</b>. Your end-of-game screen shows how you compare.</p>
 <h2>About the numbers</h2>
 <p>A score is the game's Performance rating: 55% Decisions (how much win chance your calls gave up against the best option each time) and 45% Result (a win scores 75–100, a loss 0–25). See <a href="/how-to-play/#grades">how calls are graded</a>.</p>`;
   return page({
-    path: '/stats/', title: 'Stats: Every Daily Game | The 4th Call, NFL 2-Minute Drill Game',
-    description: `Results from every Daily of The 4th Call, the free NFL 2-minute drill game: ${total} games scored over ${list.length} days, players per day, average scores and the best play-callers.`,
+    path: '/stats/', eyebrow: 'Every Daily, all time',
+    title: 'Stats: Every Daily Game | The 4th Call, NFL 2-Minute Drill Game',
+    description: 'Results from every Daily of The 4th Call, the free NFL 2-minute drill game: games scored, players per day, average scores and the best play-callers.',
     h1: 'Everyone\'s <em>stats</em>', body, jsonld: { '@context': 'https://schema.org', '@graph': [breadcrumb('Stats', '/stats/')] },
   });
 }
