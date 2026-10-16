@@ -1,6 +1,6 @@
 /**
  * The field: an SVG drawn in yards (x across, 0-53.3; y down the field). Your end zone is at the bottom, theirs at
- * the top. Players are positioned in the offense's frame ([x from the offense's left sideline, yards past the line])
+ * the top. Offense is drawn as blue circles and defense as light diamonds for every team. Players are positioned in the offense's frame ([x from the offense's left sideline, yards past the line])
  * and mapped onto the field, so the same formation code works whichever way the offense is going.
  *
  * The camera is a window onto the field whose height follows the element's aspect ratio (resize()), so the field
@@ -38,7 +38,6 @@ function defSet(look: Look | null): Record<string, Pt> {
   return s;
 }
 
-const ratingColor = (r: number) => `hsl(${Math.round(Math.max(0, Math.min(1, (r - 60) / 35)) * 120)} 80% 52%)`;
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
 const easeIn = (f: number) => f * f;
 const easeOut = (f: number) => 1 - (1 - f) * (1 - f);
@@ -79,7 +78,6 @@ function hexRgb(h: string): [number, number, number] {
   const n = parseInt(m.length === 3 ? m.split('').map((c) => c + c).join('') : m, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
-const colorDist = (a: string, b: string) => { const x = hexRgb(a), y = hexRgb(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
 const lum = (h: string) => { const [r, g, b] = hexRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 
 export interface Preview {
@@ -108,7 +106,6 @@ export class FieldRenderer {
   private dots = new Map<string, Dot>();
   private pos = new Map<string, Pt>();      // where each marker is drawn now (field coordinates)
   private teams: [TeamInfo, TeamInfo] | null = null;
-  private colors: [string, string] = ['#888', '#444'];
   private s: State | null = null;
   private lastOff: Team | null = null;
   private viewH = 46;          // yards of field in view, set from the element's aspect ratio
@@ -119,6 +116,8 @@ export class FieldRenderer {
   private panning = false;
   private finish: (() => void) | null = null;   // resolves the play in progress if something interrupts it
   onTap: ((pos: Rcv) => void) | null = null;
+  /** Hover/focus on a player: which side ('o' offense, 'd' defense) and position; nulls when the pointer leaves. */
+  onInspect: ((side: 'o' | 'd' | null, pos: string | null) => void) | null = null;
 
   constructor(svg: SVGSVGElement) {
     this.svg = svg;
@@ -129,9 +128,10 @@ export class FieldRenderer {
     this.gFx = this.el('g', { class: 'f-fx' }) as SVGGElement;
     this.gPlayers = this.el('g', { class: 'f-players' }) as SVGGElement;
     const defs = this.el('defs', {});
-    defs.innerHTML = `<marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="3.2" markerHeight="3.2" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker>`;
+    const head = (id: string, fill: string, size: number) => `<marker id="${id}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="${size}" markerHeight="${size}" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${fill}"/></marker>`;
+    defs.innerHTML = head('ah-tgt', '#f5c518', 3.2) + head('ah-dec', '#ffffff', 3.6) + head('ah-run', '#f0a43a', 3) + head('ah-dir', 'rgba(255,255,255,.7)', 3.4);
     this.shadow = this.el('ellipse', { rx: 0.5, ry: 0.3, class: 'f-ball-sh' }) as SVGEllipseElement;
-    this.ball = this.el('ellipse', { rx: 0.48, ry: 0.78, class: 'f-ball' }) as SVGEllipseElement;
+    this.ball = this.el('ellipse', { rx: 0.42, ry: 0.7, class: 'f-ball' }) as SVGEllipseElement;
     this.ballLace = this.el('line', { class: 'f-lace' }) as SVGLineElement;
     svg.append(defs, this.gField, this.gMarks, this.gRoutes, this.gFx, this.gPlayers, this.shadow, this.ball, this.ballLace);
     this.applyCam();
@@ -159,10 +159,6 @@ export class FieldRenderer {
 
   setTeams(teams: [TeamInfo, TeamInfo]) {
     this.teams = teams;
-    // the two sides must be told apart at a glance: if the colors are close, the opponent wears its second color
-    const a = teams[0].color;
-    const b = colorDist(a, teams[1].color) >= 120 ? teams[1].color : colorDist(a, teams[1].color2) > colorDist(a, teams[1].color) ? teams[1].color2 : teams[1].color;
-    this.colors = [a, b];
     this.drawField();
   }
 
@@ -214,17 +210,26 @@ export class FieldRenderer {
         const g = this.el('g', { class: `f-dot f-${side}` }, this.gPlayers) as SVGGElement;
         // offense: circles; defense: diamonds. The outline is the player's rating, red to green.
         const ring = side === 'o'
-          ? this.el('circle', { r: 1.05, class: 'f-ring' }, g)
-          : this.el('rect', { x: -0.98, y: -0.98, width: 1.96, height: 1.96, rx: 0.3, transform: 'rotate(45)', class: 'f-ring' }, g);
+          ? this.el('circle', { r: 1.12, class: 'f-ring' }, g)
+          : this.el('rect', { x: -1.02, y: -1.02, width: 2.04, height: 2.04, rx: 0.3, transform: 'rotate(45)', class: 'f-ring' }, g);
         const body = side === 'o'
-          ? this.el('circle', { r: 0.8, class: 'f-body' }, g)
-          : this.el('rect', { x: -0.74, y: -0.74, width: 1.48, height: 1.48, rx: 0.22, transform: 'rotate(45)', class: 'f-body' }, g);
+          ? this.el('circle', { r: 0.86, class: 'f-body' }, g)
+          : this.el('rect', { x: -0.74, y: -0.74, width: 1.48, height: 1.48, rx: 0.2, transform: 'rotate(45)', class: 'f-body' }, g);
         const lab = this.el('text', { y: 0.3, class: 'f-lab' }, g) as SVGTextElement;
         lab.textContent = POS_LABEL[pos];
         if (side === 'o' && (RECEIVERS as string[]).includes(pos)) {
           g.addEventListener('click', () => this.onTap?.(pos as Rcv));
+          // Enter on a focused receiver retargets the throw; it must not also reach the panel's Enter-to-snap
+          g.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); this.onTap?.(pos as Rcv); } });
           g.setAttribute('data-rcv', pos);
         }
+        // details on hover or keyboard focus, never on the field all the time
+        const show = () => this.onInspect?.(side, pos);
+        const hide = () => this.onInspect?.(null, null);
+        g.addEventListener('mouseenter', show);
+        g.addEventListener('mouseleave', hide);
+        g.addEventListener('focus', show);
+        g.addEventListener('blur', hide);
         this.el('title', {}, g).textContent = pos;
         this.dots.set(`${side}:${pos}`, { g, body, ring, lab });
       }
@@ -280,9 +285,12 @@ export class FieldRenderer {
       p = [p[0], Math.max(p[1], -s.yl - 8)];
       const d = this.dots.get(`o:${pos}`)!;
       const pl = T[off].players[pos];
-      this.paint(d, this.colors[off], pl?.rating ?? 75);
+      this.paint(d, 'o');
       d.g.classList.toggle('tgt', pv.target === pos || (!!pv.play && passCall && !pv.target && CALL[pv.play]?.tgt === pos));
-      d.g.classList.toggle('tappable', passCall && (RECEIVERS as string[]).includes(pos));
+      const tappable = passCall && (RECEIVERS as string[]).includes(pos);
+      d.g.classList.toggle('tappable', tappable);
+      if (tappable) { d.g.setAttribute('tabindex', '0'); d.g.setAttribute('role', 'button'); d.g.setAttribute('aria-label', `Throw to ${pl?.name}, ${pos}`); }
+      else { d.g.removeAttribute('tabindex'); d.g.removeAttribute('role'); d.g.removeAttribute('aria-label'); }
       d.g.classList.remove('carrier');
       d.g.querySelector('title')!.textContent = `${pl?.name} · ${pos} · rated ${pl?.rating}`;
       targets.set(`o:${pos}`, map(p));
@@ -292,7 +300,7 @@ export class FieldRenderer {
       const p = ds[pos];
       const d = this.dots.get(`d:${pos}`)!;
       const pl = T[def].players[pos];
-      this.paint(d, this.colors[def], pl?.rating ?? 75);
+      this.paint(d, 'd');
       d.g.classList.remove('tgt', 'tappable', 'carrier');
       d.g.querySelector('title')!.textContent = `${pl?.name} · ${pos} · rated ${pl?.rating}`;
       targets.set(`d:${pos}`, map([p[0], Math.min(p[1], yt + 9)]));
@@ -309,7 +317,7 @@ export class FieldRenderer {
     }
     // direction of attack: a chevron on the sideline behind the ball
     const a1 = map([W - 1.6, -3.5]), a2 = map([W - 1.6, -0.8]);
-    this.el('line', { x1: a1[0], x2: a2[0], y1: a1[1], y2: a2[1], class: 'f-dir', 'marker-end': 'url(#arrow)' }, this.gMarks);
+    this.el('line', { x1: a1[0], x2: a2[0], y1: a1[1], y2: a2[1], class: 'f-dir', 'marker-end': 'url(#ah-dir)' }, this.gMarks);
 
     this.drawPreview(s, pv);
 
@@ -341,10 +349,10 @@ export class FieldRenderer {
     if (instant) { this.cam = this.camTarget; this.applyCam(); } else this.pan();
   }
 
-  private paint(d: Dot, color: string, rating: number) {
-    d.body.setAttribute('fill', color);
-    d.ring.setAttribute('stroke', ratingColor(rating));
-    d.lab.setAttribute('fill', lum(color) > 0.62 ? '#10150f' : '#fff');
+  /** Offense and defense look the same for every team: blue circles and light diamonds, for an instant read. */
+  private paint(d: Dot, side: 'o' | 'd') {
+    d.body.setAttribute('class', `f-body ${side === 'o' ? 'f-body-o' : 'f-body-d'}`);
+    d.lab.setAttribute('class', `f-lab ${side === 'o' ? 'f-lab-o' : 'f-lab-d'}`);
   }
 
   private setBall(p: Pt, h: number, scale: number) {
@@ -355,8 +363,8 @@ export class FieldRenderer {
     const y = p[1] - h * 0.45;
     this.ball.setAttribute('cx', p[0].toFixed(2));
     this.ball.setAttribute('cy', y.toFixed(2));
-    this.ball.setAttribute('rx', (0.48 * scale).toFixed(2));
-    this.ball.setAttribute('ry', (0.78 * scale).toFixed(2));
+    this.ball.setAttribute('rx', (0.42 * scale).toFixed(2));
+    this.ball.setAttribute('ry', (0.7 * scale).toFixed(2));
     this.ballLace.setAttribute('x1', p[0].toFixed(2));
     this.ballLace.setAttribute('x2', p[0].toFixed(2));
     this.ballLace.setAttribute('y1', (y - 0.32 * scale).toFixed(2));
@@ -387,7 +395,8 @@ export class FieldRenderer {
     const line = (pts: Pt[], cls: string) => {
       const d = pts.map((p, i) => `${i ? 'L' : 'M'}${map(p)[0].toFixed(2)},${map(p)[1].toFixed(2)}`).join(' ');
       this.el('path', { d, class: `${cls} under` }, this.gRoutes);
-      this.el('path', { d, class: cls, 'marker-end': 'url(#arrow)' }, this.gRoutes);
+      const head = cls.includes('tgt') ? 'ah-tgt' : cls.includes('run') ? 'ah-run' : 'ah-dec';
+      this.el('path', { d, class: cls, 'marker-end': `url(#${head})` }, this.gRoutes);
     };
     if (c.routes) {
       const tgt = pv.target ?? c.tgt;

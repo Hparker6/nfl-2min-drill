@@ -7,6 +7,29 @@ import { DEF_POS, FIRST, FRANCHISES, LAST, OFF_POS } from './data';
 import { evaluate } from './evaluate';
 import { clip, hash, pickWeighted, rng, type Rng } from './rng';
 import type { Player, Ratings, State, Team, TeamInfo } from './types';
+import { GROUP_ATTRS, SLOT_GROUP, units, type Attr, type PosGroup, type RosterMeta, type RosterPlayer } from './roster';
+
+/** The current rosters are fictional: every name, number and rating below is generated. */
+export const FICTIONAL_ROSTER: RosterMeta = { sourceName: 'Generated for fictional teams (The 4th Call)' };
+
+// numbers each position usually wears; a team never repeats one
+const NUMBER_POOL: Record<PosGroup, number[]> = {
+  QB: range(1, 19), RB: [...range(20, 39), ...range(2, 9)], WR: [...range(10, 19), ...range(80, 89), ...range(1, 9)],
+  TE: [...range(80, 89), ...range(40, 49)], OL: [...range(60, 79), ...range(50, 59)], DL: [...range(90, 99), ...range(50, 59)],
+  LB: [...range(40, 59), ...range(90, 99)], CB: [...range(20, 39), ...range(1, 9)], S: [...range(20, 49)],
+  K: [...range(1, 19)], P: [...range(1, 19)],
+};
+function range(a: number, b: number) { return Array.from({ length: b - a + 1 }, (_, i) => a + i); }
+
+/**
+ * Game ratings for a generated player: each attribute of the position spreads up to 7 points either side of the
+ * player's level, so two equally rated receivers can still be a burner and a route technician.
+ */
+function genAttrs(group: PosGroup, level: number, r: Rng): Partial<Record<Attr, number>> {
+  const out: Partial<Record<Attr, number>> = {};
+  for (const a of GROUP_ATTRS[group]) out[a] = clip(Math.round(level + (r() * 2 - 1) * 7), 40, 99);
+  return out;
+}
 
 export type Mode = 'daily' | 'survivor' | 'practice';
 
@@ -50,16 +73,27 @@ export function makeTeam(id: string, seed: string): TeamInfo {
       if (!used.has(n)) { used.add(n); return n; }
     }
   };
-  for (const p of OFF_POS) {
-    const rating = p === 'QB' ? rat.qb : p in rat.rcv ? rat.rcv[p as keyof Ratings['rcv']] : j(rat.ol, 4);
-    players[p] = { name: name(), rating };
+  const levels: Record<string, number> = {};
+  // linemen and backs are generated on the same scale as the defense they face (the team rating has them 2 lower)
+  for (const p of OFF_POS) levels[p] = p === 'QB' ? rat.qb : p === 'RB' ? rat.rcv.RB + 2 : p in rat.rcv ? rat.rcv[p as keyof Ratings['rcv']] : j(rat.ol + 2, 4);
+  for (const p of DEF_POS) levels[p] = p.startsWith('EDGE') || p.startsWith('DL') ? j(rat.dl, 4) : j(def, 6);
+  levels.K = rat.k;
+  levels.P = j(78, 8);
+  const ar = rng(hash('attrs', id, seed));
+  const nr = rng(hash('numbers', id));
+  const taken = new Set<number>();
+  const roster: Record<string, RosterPlayer> = {};
+  for (const slot of [...OFF_POS, ...DEF_POS, 'K', 'P']) {
+    const g = SLOT_GROUP[slot];
+    const attrs = genAttrs(g, levels[slot], ar);
+    const vals = Object.values(attrs) as number[];
+    const pool = NUMBER_POOL[g].filter((n) => !taken.has(n));
+    const number = pool[Math.floor(nr() * Math.min(pool.length, 8))];
+    taken.add(number);
+    roster[slot] = { name: name(), number, rating: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length), attrs, source: 'generated' };
   }
-  for (const p of DEF_POS) {
-    const rating = p.startsWith('EDGE') || p.startsWith('DL') ? j(rat.dl, 4) : j(def, 6);
-    players[p] = { name: name(), rating };
-  }
-  players.K = { name: name(), rating: rat.k };
-  players.P = { name: name(), rating: j(78, 8) };
+  for (const slot in roster) players[slot] = roster[slot];
+  rat.units = units(roster);
   return { id: f[0], city: f[1], name: f[2], color: f[3], color2: f[4], rat, players };
 }
 

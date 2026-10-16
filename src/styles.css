@@ -594,3 +594,37 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 @media (max-width: 999px) { .def-trade.strip { display: none; } .def-trade.in-row { display: grid; } }
 @media (min-width: 1000px) and (max-height: 820px) { .cp.def .read.tend { padding: 5px 9px; font-size: 13px; } .cp.def .def-flag { display: none; } }
 .sum-perf small { font: 600 10px var(--body); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- broadcast markers: blue offense, light defense, rings only to highlight ---------- */
+.f-dot .f-body-o { fill: #1f6fd6; stroke: rgba(255, 255, 255, .85); stroke-width: .1; }
+.f-dot .f-body-d { fill: #eceae3; stroke: rgba(16, 20, 22, .55); stroke-width: .1; }
+.f-dot .f-lab-o { fill: #ffffff; }
+.f-dot .f-lab-d { fill: #14181a; }
+.f-dot .f-lab { font: 700 .8px var(--body); }
+.f-dot .f-ring { fill: none; stroke: transparent; stroke-width: .3; transition: stroke .15s; }
+.f-dot.tappable .f-ring { stroke: rgba(255, 255, 255, .45); stroke-width: .16; stroke-dasharray: .35 .25; }
+.f-dot.tgt .f-ring { stroke: var(--accent) !important; stroke-width: .42; stroke-dasharray: none; }
+.f-dot.carrier .f-ring { stroke: #ffffff !important; stroke-width: .38; stroke-dasharray: none; }
+.f-dot:focus { outline: none; }
+.f-dot:focus-visible .f-ring { stroke: var(--los) !important; stroke-width: .42; stroke-dasharray: none; }
+.f-ball { fill: #7b4320; stroke: #2a1407; stroke-width: .08; }
+.f-lace { stroke: #f6efe6; stroke-width: .1; }
+.lg-o { background: #1f6fd6 !important; border-radius: 50%; }
+.lg-d { background: #eceae3 !important; }
+/* the player card: details on hover or focus */
+.pcard { position: absolute; top: 12px; right: 12px; z-index: 3; width: 250px; padding: 10px 12px; border-radius: 10px; background: rgba(9, 13, 11, .94); border: 1px solid #2c3a32; color: #e6ece8; pointer-events: none; box-shadow: 0 8px 22px rgba(0, 0, 0, .4); animation: fade .12s; }
+.pcard-head { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.pcard-num { min-width: 34px; height: 34px; border-radius: 7px; display: grid; place-items: center; font: 800 18px var(--display); }
+.pcard-name { display: grid; min-width: 0; }
+.pcard-name b { font: 700 17px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard-name span { font-size: 12px; color: #9fb0a6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard-ovr { font: 800 26px var(--display); color: var(--accent); }
+.pcard-attrs { list-style: none; margin: 8px 0 4px; padding: 0; display: grid; gap: 3px; }
+.pcard-attrs li { display: grid; grid-template-columns: 104px 1fr 24px; gap: 8px; align-items: center; font-size: 12px; }
+.pcard-attrs i { height: 5px; border-radius: 3px; background: #2a3731; overflow: hidden; }
+.pcard-attrs i b { display: block; height: 100%; background: #9fb0a6; }
+.pcard-attrs em { font-style: normal; text-align: right; font-weight: 700; }
+.pcard-src { margin: 0; font-size: 11px; color: #8b9b91; }
+/* the five categories keep their full names; they wrap to two lines when the panel is narrow */
+.tab5-name { white-space: normal; text-align: center; justify-content: center; line-height: 1.05; }
+@media (max-width: 999px) { .pcard { top: auto; bottom: 8px; right: 8px; width: 220px; } }

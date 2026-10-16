@@ -10,6 +10,7 @@
 import { CALL, DROPS, ROUTES, TEMPO, type Call, type DropId } from './data';
 import { clip, gauss, pickWeighted, type Rng } from './rng';
 import { DEF_CALLS, defFx, goalLineSituation } from './defense';
+import { passMods, runMods } from './attributes';
 import type { Choice, DefClock, Ev, KickChoice, Look, OffClock, PatChoice, PlayResult, Rcv, RouteId, State, StChoice, Team } from './types';
 
 export const ytg = (s: State) => 100 - s.yl;
@@ -38,10 +39,11 @@ function base(kind: PlayResult['kind'], call: string, look: Look | null): PlayRe
 function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0): PlayResult {
   const R = s.rat[s.off], D = s.rat[other(s.off)];
   const F = defFx(look, s), L = F.run;
-  let m = c.ypc! + bonus + (R.off - D.def) * 0.05 + L.m;
+  const P = runMods(R, D, c.carrier ?? 'RB');
+  let m = c.ypc! + bonus + P.m + L.m;
   const sd = c.sd!;
-  let big = c.big! * L.big;
-  let stuff = c.stuff! + L.stuff;
+  let big = c.big! * L.big * P.bigMul;
+  let stuff = c.stuff! + L.stuff + P.stuff;
   if (c.draw) { m += F.draw; if (F.draw > 1) big *= 1.3; }
   if (c.option) m += F.option;
   if (c.trick) { m += F.trick; if (F.trick >= 1) big *= 1.4; }
@@ -81,7 +83,8 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
 
   if (r() < 0.022) { res.penalty = 'hold'; res.dur = drop.release + 1.5; return res; }
 
-  const ps = drop.sack * L.sack * (1 + (D.dl - R.ol) * 0.025);
+  const PM = passMods(R, D, tgt, RT.depth >= 15);
+  const ps = drop.sack * L.sack * PM.sackMul;
   if (r() < ps) {
     res.kind = 'sack';
     res.dur = 4 + r();
@@ -93,7 +96,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   }
   if (dropId !== 'quick' && dropId !== 'screen' && dropId !== 'hail' && r() < 0.03) {
     res.kind = 'scramble';
-    const y = clip(Math.round(4 + gauss(r) * 4), -3, yt);
+    const y = clip(Math.round(4 + PM.scramble + gauss(r) * 4), -3, yt);
     res.yards = y;
     res.td = y >= yt;
     res.oob = !res.td && r() < 0.4;
@@ -106,7 +109,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   if (route === 'hail') depth = Math.min(yt + 3, 62);
   else if (depth > 0 && depth >= yt - 1) { depth = Math.min(depth, yt + 4); rzPen = yt < 12 ? -0.08 : -0.03; }
   const deep = RT.depth >= 15;
-  let comp = RT.comp + (c.adj || 0) + (R.rcv[tgt] - 80) * 0.006 + (R.qb - D.def) * 0.004 + rzPen;
+  let comp = RT.comp + (c.adj || 0) + PM.comp + rzPen;
   comp += route === 'screen' || route === 'flat' ? L.screen : deep ? L.deep : L.short;
   if (dropId === 'quick' || dropId === 'screen') comp += L.quick;
   comp += F.routes[route] ?? 0;
@@ -117,7 +120,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   const fl = flight(depth);
   res.air = depth;
 
-  const pint = RT.int * L.int * (1 + (D.def - R.qb) * 0.03) * (c.trick ? 1.4 : 1);
+  const pint = RT.int * L.int * PM.intMul * (c.trick ? 1.4 : 1);
   if (r() < pint) {
     res.intercepted = true;
     res.turnover = true;
@@ -145,8 +148,8 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
     catchY = Math.min(catchY, yt + 9);
     res.air = catchY;
     if (catchY >= yt) { res.td = true; res.yards = yt; res.dur = drop.release + fl + 0.5; return res; }
-    let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * (1 + (R.rcv[tgt] - 80) * 0.02));
-    if (r() < 0.018) yac += 12 + Math.round(r() * 30);
+    let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * PM.yacMul);
+    if (r() < 0.018 * PM.bigYac) yac += 12 + Math.round(r() * 30);
     if (route === 'screen' && look === 'blitz') yac += 2;
     let y = catchY + yac;
     if (s.yl + y <= 0) y = 1 - s.yl;

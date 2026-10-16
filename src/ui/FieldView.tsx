@@ -1,6 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type ReactNode } from 'react';
 import { FieldRenderer, type Outcome, type Preview } from './field';
+import { useState } from 'react';
 import type { Ev, Rcv, State, TeamInfo } from '../engine/types';
+import { PlayerCard } from './PlayerCard';
 
 export interface FieldHandle {
   setup(s: State, pv?: Preview, instant?: boolean): void;
@@ -14,9 +16,11 @@ interface Props {
   onTap?: (pos: Rcv) => void;
   banner?: Banner | null;
   children?: ReactNode;      // overlays (legend)
+  offense?: 0 | 1;           // which team has the ball, so hovering a marker shows the right player
 }
 
-export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children }, ref) {
+export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0 }, ref) {
+  const [inspect, setInspect] = useState<{ side: 'o' | 'd'; pos: string } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const rRef = useRef<FieldRenderer | null>(null);
@@ -36,6 +40,17 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
     if (rRef.current) rRef.current.onTap = onTap ?? null;
   }, [onTap]);
 
+  useEffect(() => {
+    if (rRef.current) rRef.current.onInspect = (side, pos) => setInspect(side && pos ? { side, pos } : null);
+  }, [teams]);
+
+  // touch screens have no 'pointer left': a tapped player's card clears itself
+  useEffect(() => {
+    if (!inspect || typeof matchMedia !== 'function' || !matchMedia('(pointer: coarse)').matches) return;
+    const id = setTimeout(() => setInspect(null), 2500);
+    return () => clearTimeout(id);
+  }, [inspect]);
+
   useImperativeHandle(ref, () => ({
     setup: (s, pv, instant) => rRef.current?.setup(s, pv, instant),
     play: (ev, speed, onOutcome) => rRef.current?.play(ev, speed, onOutcome) ?? Promise.resolve(),
@@ -51,6 +66,7 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
         </div>
       )}
       {children}
+      {inspect && <PlayerCard team={teams[inspect.side === 'o' ? offense : offense === 0 ? 1 : 0]} pos={inspect.pos} />}
     </div>
   );
 });

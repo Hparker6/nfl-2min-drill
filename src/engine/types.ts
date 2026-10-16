@@ -13,7 +13,10 @@ export type StChoice = 'block' | 'safe' | 'return' | 'rush';
 export type PatChoice = 'xp' | 'two';
 export type KickChoice = 'deep' | 'onside';
 
-export interface Player { name: string; rating: number }
+import type { Attr, RatingSource, Units } from './roster';
+
+/** A player: name, jersey number, overall game rating and per-attribute game ratings (0-100). See roster.ts. */
+export interface Player { name: string; rating: number; number?: number; attrs?: Partial<Record<Attr, number>>; source?: RatingSource }
 
 export interface Ratings {
   ovr: number;
@@ -24,6 +27,7 @@ export interface Ratings {
   dl: number;
   k: number;
   rcv: Record<Rcv, number>;
+  units?: Units;          // player-level matchups (roster.ts); absent on old saves and in some tests
 }
 
 export interface TeamInfo {

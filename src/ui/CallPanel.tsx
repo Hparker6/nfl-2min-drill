@@ -24,8 +24,8 @@ type Tab = 'run' | 'short' | 'deep' | 'rpo' | 'trick';
 const SHORT = new Set(['quick_out', 'slants', 'screen', 'mesh', 'boot']);
 const TABS: { id: Tab; label: string; key: string; fam: string; blurb: string }[] = [
   { id: 'run', label: 'Run', key: 'r', fam: 'run', blurb: 'Runs: hand it off. The clock keeps moving unless he gets out of bounds.' },
-  { id: 'short', label: 'Short', key: 's', fam: 'pass', blurb: 'Short passes: quick, high-percentage throws.' },
-  { id: 'deep', label: 'Deep', key: 'd', fam: 'pass', blurb: 'Deep passes: chunk plays downfield, with more sacks and interceptions.' },
+  { id: 'short', label: 'Short Pass', key: 's', fam: 'pass', blurb: 'Short passes: quick, high-percentage throws.' },
+  { id: 'deep', label: 'Deep Pass', key: 'd', fam: 'pass', blurb: 'Deep passes: chunk plays downfield, with more sacks and interceptions.' },
   { id: 'rpo', label: 'RPO', key: 'o', fam: 'rpo', blurb: 'Run-pass option: the quarterback reads the defense after the snap.' },
   { id: 'trick', label: 'Trick', key: 't', fam: 'trick', blurb: 'Misdirection. Big upside, big risk.' },
 ];
