@@ -961,3 +961,6 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 /* the Career tab is new: a dot until it's the old news */
 .modes button.new { position: relative; }
 .modes button.new:not(.on)::after { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.modes .beta { font: 700 8px var(--body); letter-spacing: .06em; margin-left: 3px; vertical-align: 6px; color: var(--accent); }
+.modes button.on .beta { color: inherit; }
+@media (max-width: 420px) { .modes .beta { display: none; } }

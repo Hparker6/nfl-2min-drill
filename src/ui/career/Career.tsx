@@ -15,11 +15,16 @@ import { download } from '../../game/shareImage';
 import { LiveGameView } from './LiveGame';
 import { Hub } from './Hub';
 import { DraftNight, Offseason, Postgame, SeasonDone } from './Screens';
+import { CareerBoundary } from './Boundary';
 import './career.css';
 
 export type Commit = (fn: (c: Career) => void) => void;
 
 export function CareerMode({ app }: { app: AppSettings }) {
+  return <CareerBoundary><CareerInner app={app} /></CareerBoundary>;
+}
+
+function CareerInner({ app }: { app: AppSettings }) {
   const [c, setC] = useState<Career | null>(loadCareer);
   const [post, setPost] = useState<string | null>(null);      // the game id whose postgame is showing
   const [busy, setBusy] = useState<string | null>(null);
@@ -111,7 +116,7 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
   return (
     <div className="cr-page cr-new">
       <header className="cr-hero">
-        <div className="eyebrow">New · Career mode</div>
+        <div className="eyebrow">New · Career mode (beta)</div>
         <h1>Become the <em>franchise</em> quarterback</h1>
         <p className="cr-lede">Create your quarterback. Play one college game in front of the scouts, hear your name on draft night, then play a full 17-game season, the playoffs and the Gridiron Bowl. Call your own plays when the game's on the line. Get better every week.</p>
       </header>

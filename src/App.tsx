@@ -71,7 +71,7 @@ export default function App() {
           <nav className="modes" aria-label="Game modes">
             {(['daily', 'survivor', 'practice', 'career'] as Mode[]).map((m) => (
               <button key={m} className={`${mode === m ? 'on' : ''}${m === 'career' ? ' new' : ''}`} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
-                {m === 'daily' ? 'Daily' : m === 'survivor' ? 'Survivor' : m === 'practice' ? 'Practice' : 'Career'}
+                {m === 'daily' ? 'Daily' : m === 'survivor' ? 'Survivor' : m === 'practice' ? 'Practice' : <>Career<sup className="beta">Beta</sup></>}
               </button>
             ))}
           </nav>
