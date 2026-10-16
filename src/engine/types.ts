@@ -74,6 +74,16 @@ export interface State {
   weather?: Weather;
   mix?: boolean;          // the AI defense calls the full playbook (Tampa 2, fire zone…), not only the seven base calls
   rat: [Ratings, Ratings];
+  // ---- full games (career mode). All absent on a late-game spot, which plays as the fourth quarter as it always has.
+  q?: number;             // the period: 1-4, 5 and up overtime. When set, t is the seconds left in this period
+  qLen?: number;          // seconds in a quarter
+  po?: boolean;           // a playoff game: overtime repeats until someone wins
+  rec?: Team;             // the team that received the opening kickoff (the other one receives the second half's)
+  held?: Stage;           // the stage the period ended on, carried into the next period
+  brk?: number;           // a period just started (or 0: the game just ended); reported as an event by advance()
+  otOwn?: Team;           // overtime: whose possession it is, by the overtime rules
+  otp?: number;           // overtime: possessions so far (1 = the first team's, 2 = the second's, 3+ sudden death)
+  otS?: [number, number]; // overtime: the score when last checked
 }
 
 /** A decision. Only the fields for the stage being decided are read; the rest fall to the AI. */
@@ -130,4 +140,6 @@ export type Ev =
   | { type: 'expire'; t: number }
   | { type: 'snap'; off: Team; yl0: number; down0: number; dist0: number; t0: number; t: number; res: PlayResult; first: boolean }
   | { type: 'kick'; kind: 'kickoff' | 'onside' | 'free'; kicker: Team; recover: Team; touchback: boolean; td: boolean; yl: number; t: number }
-  | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number };
+  | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number }
+  | { type: 'period'; q: number; t: number }       // full games: a new quarter, halftime (q 3) or overtime (q 5+)
+  | { type: 'final'; t: number; ot: boolean };     // full games: the game is over

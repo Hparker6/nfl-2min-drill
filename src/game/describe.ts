@@ -97,6 +97,12 @@ export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
     }
     case 'snap':
       return tellSnap(ev, teams);
+    case 'period':
+      return ev.q === 3 ? { text: 'Halftime.', banner: 'Halftime', tone: 'neutral' }
+        : ev.q >= 5 ? { text: ev.q === 5 ? 'Tied at the end of regulation: overtime.' : 'Still tied: another overtime period.', banner: 'Overtime', tone: 'neutral' }
+        : { text: `End of the ${ev.q === 2 ? 'first' : 'third'} quarter.`, banner: `End of Q${ev.q - 1}`, tone: 'neutral' };
+    case 'final':
+      return { text: ev.ot ? 'Final, in overtime.' : 'Final.', banner: 'Final', tone: 'neutral' };
   }
 }
 

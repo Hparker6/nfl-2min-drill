@@ -146,7 +146,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   const fl = flight(depth);
   res.air = depth;
 
-  const pint = RT.int * L.int * PM.intMul * (c.trick ? 1.4 : 1) * Wx.int;
+  const pint = RT.int * L.int * PM.intMul * (c.trick ? 1.4 : 1) * Wx.int * (s.q != null ? FULL_GAME_INT : 1);
   if (r() < pint) {
     res.intercepted = true;
     res.turnover = true;
@@ -270,7 +270,82 @@ function tick(s: State, secs: number): boolean {
 }
 
 function endCheck(s: State) {
-  if (s.t <= 0 && (s.stage === 'pre' || s.stage === 'call' || s.stage === 'kick')) s.stage = 'over';
+  if (s.t <= 0 && (s.stage === 'pre' || s.stage === 'call' || s.stage === 'kick')) expire(s);
+}
+
+/** The clock hit 0:00. A late-game spot is over; a full game moves on to the next period (or ends). */
+function expire(s: State) {
+  if (s.q == null) { s.stage = 'over'; return; }
+  s.held = s.stage;
+  s.stage = 'over';
+  endPeriod(s);
+}
+
+/** Overtime's length: 10 minutes of a 15-minute-quarter game in the regular season, a full quarter in the playoffs. */
+export const otLen = (s: State) => Math.round((s.qLen ?? 900) * (s.po ? 1 : 2 / 3));
+
+/**
+ * Full games, at 0:00 of a period: the next quarter (same ball, same down), halftime (timeouts back, the second-half
+ * kickoff to the team that kicked first), overtime on a tie after the fourth (a seeded toss, two timeouts each) or the
+ * final. Regular-season overtime can end tied; in the playoffs it repeats until someone wins.
+ */
+function endPeriod(s: State) {
+  const q = s.q!, len = s.qLen ?? 900, held = s.held ?? 'pre';
+  s.held = undefined;
+  s.running = false;
+  s.pendLook = s.shownLook = s.pendPlay = null;
+  s.adj = 0;
+  const tied = s.score[0] === s.score[1];
+  if (q >= 4 && (!tied || (q >= 5 && !s.po))) { s.stage = 'over'; s.brk = 0; return; }
+  s.q = q + 1;
+  s.brk = s.q;
+  if (q === 2) {
+    s.t = len; s.to = [3, 3]; s.warned = true;
+    s.kicker = s.rec ?? 0; s.safetyKick = false; s.stage = 'kick';
+    return;
+  }
+  if (q === 4) {
+    s.t = otLen(s); s.to = [2, 2]; s.warned = s.t <= 120;
+    // the toss: seeded by the game so far, so a replay gets the same one
+    const recv = ((s.k + s.score[0] * 7 + s.score[1] * 13) & 1) as Team;
+    s.kicker = other(recv); s.safetyKick = false; s.stage = 'kick';
+    s.otOwn = recv; s.otp = 1; s.otS = [s.score[0], s.score[1]];
+    return;
+  }
+  if (q >= 5) {
+    // another playoff overtime period: play on from where the ball is
+    s.t = otLen(s); s.to = [2, 2]; s.warned = s.t <= 120;
+    s.stage = held === 'kick' ? 'kick' : 'pre';
+    return;
+  }
+  // end of the first or third quarter: switch ends, same ball and down
+  s.t = len;
+  s.warned = s.q === 3 || len <= 120;
+  s.stage = held === 'kick' ? 'kick' : 'pre';
+}
+
+/**
+ * Overtime by the NFL's current rules: both teams get the ball once. The defense scoring on the first possession
+ * ends it; on the second, the game ends as soon as the second team leads, or when its possession ends with anyone
+ * ahead. After that, the next score wins.
+ */
+function otCheck(s: State) {
+  if (s.stage === 'over' || s.stage === 'pat' || s.otp == null) return;
+  const S = s.otS ?? [s.score[0], s.score[1]];
+  const scorer: Team | -1 = s.score[0] > S[0] ? 0 : s.score[1] > S[1] ? 1 : -1;
+  s.otS = [s.score[0], s.score[1]];
+  const unequal = s.score[0] !== s.score[1];
+  const end = () => { s.stage = 'over'; s.brk = 0; };
+  if (scorer !== -1) {
+    if (s.otp === 1 && scorer !== s.otOwn) return end();
+    if (s.otp === 2 && unequal && (scorer !== s.otOwn || leadOf(s, s.otOwn!) > 0)) return end();
+    if (s.otp >= 3 && unequal) return end();
+  }
+  if ((s.stage === 'pre' || s.stage === 'call') && s.off !== s.otOwn) {
+    if (s.otp === 2 && unequal) return end();
+    s.otp++;
+    s.otOwn = s.off;
+  }
 }
 
 function changePoss(s: State, yl: number) {
@@ -360,12 +435,23 @@ export function applySnap(s: State, res: PlayResult): boolean {
     if (!inc) s.dist -= res.yards;
   }
   if (s.down > 4) { changePoss(s, 100 - s.yl); return false; }
-  s.running = !(inc || warn || (res.oob && s.t <= 120));
-  if (res.oob && s.t > 120) s.adj = -7;
+  // out of bounds stops the clock only late in a half (the fourth quarter's rule for a late-game spot)
+  const late = s.t <= 120 && (s.q == null || s.q === 2 || s.q >= 4);
+  s.running = !(inc || warn || (res.oob && late));
+  if (res.oob && !late) s.adj = -7;
   s.stage = 'pre';
   endCheck(s);
   return first;
 }
+
+/**
+ * Full games: a normal huddle runs the play clock down further than the late-game huddle (the NFL averages about 33
+ * seconds from whistle to snap), and passes are picked off at the NFL's full-game rate rather than the late-game one.
+ * Tuned against NFL season averages (see career/calibrate.test.ts).
+ */
+export const fullGamePace = (oc: OffClock) => (oc === 'huddle' ? FULL_GAME_HUDDLE : 0);
+export const FULL_GAME_HUDDLE = 11;
+const FULL_GAME_INT = 0.8;
 
 /** Pre-snap runoff with the clock running. Returns true when the two-minute warning stopped it. */
 function runoff(s: State, secs: number): boolean {
@@ -420,15 +506,15 @@ function clockStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) 
   }
   if (oc === 'spike' || oc === 'kneel') {
     if (runoff(s, oc === 'spike' ? 3 + r() * 2 : 38)) { ev?.push({ type: 'warning', t: s.t }); s.stage = 'call'; return; }
-    if (s.t <= 0) { s.stage = 'over'; ev?.push({ type: 'expire', t: 0 }); return; }
+    if (s.t <= 0) { if (s.q == null) ev?.push({ type: 'expire', t: 0 }); expire(s); return; }
     snap(s, r, oc, 'balanced', null, ev);
     return;
   }
   const T = TEMPO[oc];
-  const secs = Math.max(3, T.secs + T.sd * gauss(r) + s.adj);
+  const secs = Math.max(3, T.secs + T.sd * gauss(r) + s.adj + (s.q != null ? fullGamePace(oc) : 0));
   s.adj = 0;
   if (runoff(s, secs)) { ev?.push({ type: 'warning', t: s.t }); s.stage = 'call'; return; }
-  if (s.t <= 0) { s.stage = 'over'; ev?.push({ type: 'expire', t: 0 }); return; }
+  if (s.t <= 0) { if (s.q == null) ev?.push({ type: 'expire', t: 0 }); expire(s); return; }
   s.stage = 'call';
 }
 
@@ -500,6 +586,12 @@ export function advance(s: State, r: Rng, ch?: Choice | null, ev?: Ev[]) {
     case 'kick': kickStage(s, r, ch, ev); break;
     default: break;
   }
+  if (s.q == null) return;
+  if ((s.q ?? 0) >= 5) otCheck(s);
+  if (s.brk != null) {
+    ev?.push(s.brk === 0 ? { type: 'final', t: s.t, ot: (s.q ?? 4) >= 5 } : { type: 'period', q: s.brk, t: s.t });
+    s.brk = undefined;
+  }
 }
 
 /** Play the rest of the game with the AI on both sides. */
@@ -531,7 +623,13 @@ export function canKneel(s: State): boolean {
   return s.t <= burn;
 }
 
+/** A full game before the fourth quarter: the late-game logic (kneel it out, hurry when behind) waits until then. */
+const early = (s: State) => s.q != null && s.q < 4;
+/** The last two minutes of the first half. */
+const halfEnd = (s: State) => s.q === 2 && s.t <= 120;
+
 export function aiOffClock(s: State, r: Rng): OffClock {
+  if (early(s)) return earlyOffClock(s, r);
   const o = s.off, d = leadOf(s, o), t = s.t;
   if (d > 0) return canKneel(s) ? 'kneel' : 'milk';
   const fgOk = fgDist(s) <= 55;
@@ -543,7 +641,21 @@ export function aiOffClock(s: State, r: Rng): OffClock {
   return 'nohuddle';
 }
 
+function earlyOffClock(s: State, r: Rng): OffClock {
+  const o = s.off, t = s.t;
+  if (!halfEnd(s)) return leadOf(s, o) >= 17 && s.q === 3 ? 'milk' : 'huddle';
+  // backed up with little time: let the half run out
+  if (s.yl < 35 && t <= 40) return 'milk';
+  if (s.to[o] > 0 && t <= 60 && r() < 0.7) return 'timeout';
+  if (s.to[o] === 0 && s.down < 4 && t <= 25 && r() < 0.6) return 'spike';
+  return 'nohuddle';
+}
+
 export function aiDefClock(s: State, r: Rng): DefClock {
+  if (early(s)) {
+    // late in the half, against an offense in its own end: stop the clock to get the ball back with time
+    return halfEnd(s) && s.to[other(s.off)] > 0 && s.yl < 45 && s.t > 30 && r() < 0.5 ? 'timeout' : 'let';
+  }
   const dd = other(s.off);
   if (s.to[dd] === 0) return 'let';
   const l = leadOf(s, dd);
@@ -555,7 +667,9 @@ export function aiDefClock(s: State, r: Rng): DefClock {
 export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
   const o = s.off, d = leadOf(s, o), t = s.t, yt = ytg(s), fd = fgDist(s);
   const fgWins = d >= -3 && d <= 0;
-  if (!normalOnly) {
+  const E = early(s);
+  if (E && !normalOnly) { const x = earlySpecial(s, r); if (x) return x; }
+  if (!E && !normalOnly) {
     if (d > 0 && canKneel(s)) return 'kneel';
     if (t <= 6 && fd <= 60 && fgWins) return 'fg';
     if (s.down === 4) {
@@ -565,11 +679,11 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
       if (!must && !shortGo) return 'punt';
     }
   }
-  if (t <= 8 && yt >= 25 && !(fd <= 60 && fgWins)) return 'hail';
+  if (!E && t <= 8 && yt >= 25 && !(fd <= 60 && fgWins)) return 'hail';
   const w: Record<string, number> = {};
   const add = (k: string, v: number) => (w[k] = (w[k] || 0) + v);
-  const hurry = d < 0 ? t <= 300 : d === 0 ? t <= 150 : false;
-  if (d > 0 && t < 360) {
+  const hurry = E ? halfEnd(s) : d < 0 ? t <= 300 : d === 0 ? t <= 150 : false;
+  if (!E && d > 0 && t < 360) {
     add('inside_zone', 3); add('power', 3); add('counter', 1.2); add('read_option', 1); add('outside_zone', 0.6);
     add('slants', 0.5); add('mesh', 0.4); add('boot', 0.3);
   } else if (hurry) {
@@ -581,6 +695,8 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
     add('slants', 1.2); add('quick_out', 1); add('mesh', 1.2); add('dig', 1.2); add('comeback', 0.8); add('seam', 0.6);
     add('deep_post', 0.6); add('go', 0.5); add('pa_deep', 0.6); add('boot', 0.6); add('screen', 0.7); add('rpo_bubble', 0.6);
     add('rpo_slant', 0.6); add('flea', 0.05); add('reverse', 0.05);
+    // a full game's early downs: closer to the NFL's run/pass balance than the late-game mix
+    if (s.q != null) { add('inside_zone', 1); add('power', 0.8); add('outside_zone', 0.6); add('counter', 0.3); }
   }
   if (s.dist <= 2) { add('power', 2.5); add('inside_zone', 1); if (s.dist <= 1) add('sneak', 2.5); }
   if (yt <= 20) {
@@ -588,6 +704,21 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
     w.go = (w.go || 0) * 0.3; w.deep_post = (w.deep_post || 0) * 0.4; w.pa_deep = (w.pa_deep || 0) * 0.3;
   }
   return pickWeighted(r, w);
+}
+
+/** Kicks, punts and fourth downs before the fourth quarter, and the end of the first half. */
+function earlySpecial(s: State, r: Rng): string | null {
+  const t = s.t, yt = ytg(s), fd = fgDist(s), d = leadOf(s, s.off);
+  if (s.q === 2) {
+    if (t <= 6) return fd <= 58 ? 'fg' : yt <= 60 && r() < 0.6 ? 'hail' : 'kneel';
+    if (t <= 35 && s.yl < 35 && s.down < 4) return 'kneel';
+  }
+  if (s.down !== 4) return null;
+  // modern fourth downs: short yardage past midfield is often a go; otherwise kick when in range, punt when not
+  const go = (s.dist <= 1 && s.yl >= 40 && r() < 0.45) || (s.dist <= 3 && s.yl >= 58 && fd > 54 && r() < 0.4)
+    || (s.dist <= 2 && yt <= 3 && r() < 0.5) || (s.q === 3 && d <= -17 && s.dist <= 5 && s.yl >= 40);
+  if (go) return null;
+  return fd <= 54 ? 'fg' : 'punt';
 }
 
 /** Within the family the AI picked, which play: base calls most often, the rest for variety. */
@@ -610,21 +741,23 @@ export function aiDefLook(s: State, r: Rng): Look {
 }
 
 function aiBaseLook(s: State, r: Rng): Look {
-  const od = leadOf(s, s.off);
+  const od = leadOf(s, s.off), E = early(s);
   if (100 - s.yl <= 5) return pickWeighted<Look>(r, { goal: 0.4, man: 0.25, blitz: 0.15, zone: 0.1, load: 0.1 });
-  const runish = od > 0 || (s.dist <= 2 && s.t > 60);
-  const passish = od < 0 && s.t <= 300;
+  const runish = E ? s.dist <= 2 || (od >= 14 && s.q === 3) : od > 0 || (s.dist <= 2 && s.t > 60);
+  const passish = E ? halfEnd(s) || (s.down >= 3 && s.dist >= 7) || od <= -14 : od < 0 && s.t <= 300;
   if (runish) return pickWeighted<Look>(r, goalLineSituation(s) ? { goal: 0.3, load: 0.35, blitz: 0.2, man: 0.15 } : { load: 0.45, blitz: 0.2, balanced: 0.15, man: 0.1, zone: 0.1 });
   if (passish) return pickWeighted<Look>(r, { prevent: 0.3, zone: 0.25, man: 0.15, blitz: 0.2, balanced: 0.1 });
   return pickWeighted<Look>(r, { balanced: 0.25, zone: 0.2, man: 0.15, blitz: 0.15, load: 0.15, prevent: 0.1 });
 }
 
 export function aiPat(s: State): PatChoice {
+  if (early(s)) return 'xp';
   const l = leadOf(s, s.off);
   return [-5, -2, 1, 5].includes(l) ? 'two' : 'xp';
 }
 
 export function aiKick(s: State): KickChoice {
+  if (early(s)) return 'deep';
   const l = leadOf(s, s.kicker);
   if (l >= 0) return 'deep';
   return s.t <= 75 || (s.t <= 150 && s.to[s.kicker] < 2) || (l <= -9 && s.t <= 300) ? 'onside' : 'deep';
