@@ -5,9 +5,10 @@ Goal: rank first for "nfl 2 min drill", "nfl 2 minute drill game", "2min nfl dri
 
 ## 1. Google Search Console (do this first)
 
-- [ ] Go to https://search.google.com/search-console and add a **Domain** property for `nfl-2min-drill.com`.
-- [ ] Verify it with the TXT record Google gives you (Cloudflare → DNS → Add record → TXT).
-- [ ] Sitemaps → submit `https://nfl-2min-drill.com/sitemap.xml`.
+- [x] Go to https://search.google.com/search-console and add a **Domain** property for `nfl-2min-drill.com`.
+- [x] Verify it with the TXT record Google gives you (Cloudflare → DNS → Add record → TXT).
+- [x] Sitemaps → submit the full address `https://nfl-2min-drill.com/sitemap.xml` (a Domain property rejects just
+      `sitemap.xml`). Processed 2026-10-16: 1 page discovered.
 - [ ] URL Inspection → paste `https://nfl-2min-drill.com/` → **Request indexing**.
 - [ ] In URL Inspection, "View crawled page" → check the screenshot shows the game and the HTML has the new title.
 
