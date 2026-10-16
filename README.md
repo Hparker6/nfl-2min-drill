@@ -32,7 +32,7 @@ Copy `.env.example` to `.env.production` (or set the same variables in your host
 | Variable | Required | What it does |
 | --- | --- | --- |
 | `VITE_SITE_URL` | Recommended | Your public address, e.g. `https://your-domain.com` (no trailing slash). Makes the social-preview image and canonical link absolute, which link previews need. |
-| `VITE_GA_ID` | Optional | A Google Analytics 4 measurement ID (`G-…`). Without it, no analytics code is loaded at all. |
+| `VITE_GA_ID` | Optional | Google Analytics 4 measurement ID. The site tag (`G-WVFFZZWS61`) is built in; set this to use another, or `off` to load no analytics (for local builds). |
 
 Analytics events (when enabled): `game_start`, `call_made`, `spot_complete`, `daily_complete`, `survivor_end`, `share`.
 No personal data is sent. If you enable analytics for visitors in the EU/UK, you may need a consent banner.

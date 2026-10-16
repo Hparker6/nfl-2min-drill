@@ -15,7 +15,7 @@ import { CX, DESIGN, W, defAlign, formation, type Pt } from '../engine/formation
 import { hash } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
-import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo } from '../engine/types';
+import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo, PassMods } from '../engine/types';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -33,6 +33,9 @@ export interface Preview {
   play?: string | null;        // selected call
   target?: Rcv | null;
   route?: RouteId | null;
+  edits?: Partial<Record<Rcv, RouteId>>;   // every edited route
+  side?: 1 | -1;               // runs: the side called
+  mods?: PassMods;             // play action, roll out, sideline
   look?: Look | null;          // the defense drawn (shown look, or your call on defense)
   routes?: boolean;            // draw routes / run arrows
 }
@@ -345,10 +348,16 @@ export class FieldRenderer {
     if (c.routes && c.kind === 'pass') {
       const tgt = pv.target ?? c.tgt;
       // decoys first, the target's route on top. Blockers run no route.
-      const running = RECEIVERS.filter((r) => !((r === 'RB' && design.rb !== 'route') || (r === 'TE' && design.te !== 'route')) || r === tgt);
+      const rbJob = (pv.mods?.pa || pv.mods?.roll) && design.rb === 'route' ? 'fake' : design.rb;
+      const running = RECEIVERS.filter((r) => !((r === 'RB' && rbJob !== 'route') || (r === 'TE' && design.te !== 'route')) || r === tgt);
+      // the quarterback's action when a signal changes it: the roll-out path, or the play fake with the back
+      const sideQ = design.side ?? (tgt === 'WR1' || tgt === 'WR3' ? -1 : 1);
+      if (pv.mods?.roll) line([fm.QB, [CX - sideQ * 1.2, -4], [CX + sideQ * 9, -6.4]], 'f-qb');
+      else if (pv.mods?.pa) line([fm.QB, [CX + sideQ * 1.2, -4.2], [CX, -8]], 'f-qb');
+      if (rbJob === 'fake' && tgt !== 'RB') line([fm.RB, [CX + sideQ * 1.2, -4.2], [CX + sideQ * 2.4, -1.5]], 'f-fake');
       for (const pos of [...running.filter((r) => r !== tgt), tgt!]) {
         const isT = tgt === pos;
-        const rt = isT && pv.route ? pv.route : c.routes[pos];
+        const rt = pv.edits?.[pos] ?? (isT && pv.route ? pv.route : c.routes[pos]);
         const ps = pts(pos, rt);
         line(ps, isT ? 'f-route tgt' : 'f-route');
         if (isT) {
@@ -361,7 +370,7 @@ export class FieldRenderer {
       }
     }
     if (c.kind === 'run' || c.kind === 'rpo') {
-      const side = design.side ?? 1;
+      const side = pv.side ?? design.side ?? 1;
       const holeX = Math.max(2, Math.min(W - 2, CX + side * (design.hole ?? 1.5)));
       const from: Pt = design.carrier === 'QB' ? fm.QB : design.carrier === 'WR2' ? fm.WR2 : fm.RB;
       const wide = Math.abs(design.hole ?? 0) >= 8;

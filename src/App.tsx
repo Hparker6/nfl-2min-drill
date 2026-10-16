@@ -5,6 +5,7 @@ import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
+import { setContext, setPlayerProperties, track } from './game/analytics';
 
 type Mode = 'daily' | 'survivor' | 'practice' | 'everyone';
 const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : 'daily');
@@ -30,6 +31,10 @@ export default function App() {
     setTimeout(() => setToast(null), 2600);
   }, []);
 
+  // the funnel: which screen, and who (new or returning)
+  useEffect(() => { setContext({ mode }); track('screen_view', { mode }); }, [mode]);
+  useEffect(() => { setPlayerProperties({ days_played: Object.keys(store.days).length, survivor_runs: store.surv.runs, theme: store.settings.theme }); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (modal) track('modal_open', { modal }); }, [modal]);
   useEffect(() => {
     const onHash = () => setMode(modeFromHash());
     window.addEventListener('hashchange', onHash);

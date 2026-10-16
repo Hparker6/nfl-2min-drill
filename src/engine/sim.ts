@@ -11,7 +11,20 @@ import { CALL, DROPS, ROUTES, TEMPO, type Call, type DropId } from './data';
 import { clip, gauss, pickWeighted, type Rng } from './rng';
 import { DEF_CALLS, defFx, goalLineSituation } from './defense';
 import { passMods, runMods } from './attributes';
-import type { Choice, DefClock, Ev, KickChoice, Look, OffClock, PatChoice, PlayResult, Rcv, RouteId, State, StChoice, Team } from './types';
+
+/**
+ * Weather, as it changes a play. Snow: the ball is hard to hold (catches down, fumbles way up, footing costs runs).
+ * Rain: hard to throw far and to hold on (deep catches down, interceptions and fumbles up). Wind: kicks and deep
+ * throws suffer (a field goal plays like one from several yards further out; punts die; deep balls sail).
+ */
+export const WEATHER: Record<Weather, { catch: number; deepCatch: number; fumble: number; int: number; run: number; yac: number; fgYards: number; punt: number; name: string; blurb: string }> = {
+  clear: { catch: 0, deepCatch: 0, fumble: 1, int: 1, run: 0, yac: 1, fgYards: 0, punt: 0, name: 'Clear', blurb: '' },
+  rain: { catch: -0.02, deepCatch: -0.08, fumble: 1.6, int: 1.15, run: 0, yac: 0.95, fgYards: 2, punt: -2, name: 'Rain', blurb: 'Wet ball: deep throws are hard, and so is holding on.' },
+  snow: { catch: -0.06, deepCatch: -0.06, fumble: 2.5, int: 1.05, run: -0.4, yac: 0.85, fgYards: 4, punt: -3, name: 'Snow', blurb: 'Snow: catches are hard, fumbles are easy, footing is bad.' },
+  wind: { catch: 0, deepCatch: -0.05, fumble: 1, int: 1.1, run: 0, yac: 1, fgYards: 8, punt: -6, name: 'Wind', blurb: 'Gusting wind: field goals and deep balls are a gamble.' },
+};
+const wx = (s: State) => WEATHER[s.weather ?? 'clear'];
+import type { Choice, DefClock, Ev, KickChoice, Look, OffClock, PassMods, PatChoice, PlayResult, Rcv, RouteId, State, StChoice, Team, Weather } from './types';
 
 export const ytg = (s: State) => 100 - s.yl;
 export const leadOf = (s: State, team: Team) => s.score[team] - s.score[1 - team];
@@ -36,14 +49,21 @@ function base(kind: PlayResult['kind'], call: string, look: Look | null): PlayRe
 
 // ------------------------------------------------------------------ snaps ---
 
-function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0): PlayResult {
+function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0, side?: 1 | -1): PlayResult {
   const R = s.rat[s.off], D = s.rat[other(s.off)];
   const F = defFx(look, s), L = F.run;
   const P = runMods(R, D, c.carrier ?? 'RB');
-  let m = c.ypc! + bonus + P.m + L.m;
+  const Wx = wx(s);
+  let m = c.ypc! + bonus + P.m + L.m + Wx.run;
   const sd = c.sd!;
   let big = c.big! * L.big * P.bigMul;
   let stuff = c.stuff! + L.stuff + P.stuff;
+  // the side: strong (the tight end's) has the extra blocker; weak is where the box is thinner when it is loaded
+  if (side) {
+    if (look === 'load' || look === 'goal') m += side === -1 ? 0.6 : -0.2;
+    else m += side === 1 ? 0.3 : -0.1;
+    if (c.lane === 'out' && side === -1) { big *= 1.25; stuff += 0.03; }
+  }
   if (c.draw) { m += F.draw; if (F.draw > 1) big *= 1.3; }
   if (c.option) m += F.option;
   if (c.trick) { m += F.trick; if (F.trick >= 1) big *= 1.4; }
@@ -60,31 +80,35 @@ function resolveRun(s: State, c: Call, look: Look, r: Rng, bonus = 0): PlayResul
   const res = base('run', c.id, look);
   res.carrier = c.carrier || (c.option && r() < 0.4 ? 'QB' : 'RB');
   res.lane = c.lane;
-  res.side = r() < 0.5 ? -1 : 1;
+  res.side = side ?? (r() < 0.5 ? -1 : 1);
   if (s.yl + y <= 0) { res.safety = true; res.yards = -s.yl; res.dur = 4; return res; }
   y = Math.min(y, yt);
   res.yards = y;
   res.td = y >= yt;
-  if (!res.td && r() < (c.trick ? 0.02 : 0.009)) { res.fumble = true; res.turnover = true; }
+  if (!res.td && r() < (c.trick ? 0.02 : 0.009) * Wx.fumble) { res.fumble = true; res.turnover = true; }
   res.oob = !res.td && !res.turnover && r() < c.oob! * (y > 8 ? 1.3 : 1);
   res.dur = c.id === 'sneak' ? 2.5 : 3.8 + Math.min(Math.abs(y), 50) / 7 + r() * 1.2;
   return res;
 }
 
-function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: RouteId, dropId: DropId): PlayResult {
+function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: RouteId, dropId: DropId, mods: PassMods = {}, routes?: Partial<Record<Rcv, RouteId>>): PlayResult {
   const R = s.rat[s.off], D = s.rat[other(s.off)];
   const drop = DROPS[dropId], RT = ROUTES[route], F = defFx(look, s), L = F.pass;
   const yt = ytg(s);
   const res = base('pass', c.id, look);
   res.target = tgt;
   res.route = route;
+  if (routes) res.routes = routes;
+  if (mods.pa || mods.roll || mods.oob) res.mods = mods;
+  const Wx = wx(s);
   res.carrier = 'QB';
   res.side = tgt === 'WR1' || tgt === 'WR3' ? -1 : 1;
 
   if (r() < 0.022) { res.penalty = 'hold'; res.dur = drop.release + 1.5; return res; }
 
   const PM = passMods(R, D, tgt, RT.depth >= 15);
-  const ps = drop.sack * L.sack * PM.sackMul;
+  // play action holds the ball longer; a roll-out gets the quarterback away from the rush
+  const ps = drop.sack * L.sack * PM.sackMul * (mods.pa && !c.pa ? 1.15 : 1) * (mods.roll ? 0.8 : 1);
   if (r() < ps) {
     res.kind = 'sack';
     res.dur = 4 + r();
@@ -113,14 +137,16 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   comp += route === 'screen' || route === 'flat' ? L.screen : deep ? L.deep : L.short;
   if (dropId === 'quick' || dropId === 'screen') comp += L.quick;
   comp += F.routes[route] ?? 0;
-  if (c.pa) comp += F.pa;
+  if (c.pa || mods.pa) comp += F.pa;
+  if (mods.roll) comp += deep ? -0.03 : 0.02;
+  comp += deep ? Wx.deepCatch : Wx.catch;
   if (dropId === 'flea') comp += F.flea;
   if (route === 'hail') comp = yt + 3 > 62 ? 0.01 : clip(0.17 - (yt - 30) * 0.004, 0.04, 0.2);
   comp = clip(comp, 0.02, 0.95);
   const fl = flight(depth);
   res.air = depth;
 
-  const pint = RT.int * L.int * PM.intMul * (c.trick ? 1.4 : 1);
+  const pint = RT.int * L.int * PM.intMul * (c.trick ? 1.4 : 1) * Wx.int;
   if (r() < pint) {
     res.intercepted = true;
     res.turnover = true;
@@ -148,7 +174,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
     catchY = Math.min(catchY, yt + 9);
     res.air = catchY;
     if (catchY >= yt) { res.td = true; res.yards = yt; res.dur = drop.release + fl + 0.5; return res; }
-    let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * PM.yacMul);
+    let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * PM.yacMul * Wx.yac * (mods.oob ? 0.55 : 1));
     if (r() < 0.018 * PM.bigYac) yac += 12 + Math.round(r() * 30);
     if (route === 'screen' && look === 'blitz') yac += 2;
     let y = catchY + yac;
@@ -156,8 +182,9 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
     y = Math.min(y, yt);
     res.yards = y;
     res.td = y >= yt;
-    if (!res.td && r() < 0.006) { res.fumble = true; res.turnover = true; }
-    res.oob = !res.td && !res.turnover && r() < RT.oob;
+    if (!res.td && r() < 0.006 * Wx.fumble) { res.fumble = true; res.turnover = true; }
+    // working the sideline: he gets out most of the time, for fewer yards
+    res.oob = !res.td && !res.turnover && r() < (mods.oob ? 0.85 : RT.oob);
     res.dur = drop.release + fl + Math.max(yac, 0) / 6 + 0.8;
     return res;
   }
@@ -181,7 +208,7 @@ export function resolveSnap(s: State, play: string, look: Look, r: Rng, ch?: Cho
     return res;
   }
   const c = CALL[play];
-  if (c.kind === 'run') return resolveRun(s, c, look, r);
+  if (c.kind === 'run') return resolveRun(s, c, look, r, 0, ch?.side);
   if (c.kind === 'rpo') {
     // the QB reads the defense: a loaded box or a blitz means throw the quick route, otherwise hand it off.
     // He misreads it one time in four.
@@ -191,13 +218,13 @@ export function resolveSnap(s: State, play: string, look: Look, r: Rng, ch?: Cho
       const res = resolvePass(s, c, look, r, tgt, c.routes![tgt], 'screen');
       return res;
     }
-    const res = resolveRun(s, CALL[c.run!], look, r);
+    const res = resolveRun(s, CALL[c.run!], look, r, 0, ch?.side);
     res.call = c.id;
     return res;
   }
   const tgt = ch?.target ?? c.tgt!;
-  const route = ch?.route ?? c.routes![tgt];
-  return resolvePass(s, c, look, r, tgt, route, c.drop!);
+  const route = ch?.routes?.[tgt] ?? ch?.route ?? c.routes![tgt];
+  return resolvePass(s, c, look, r, tgt, route, c.drop!, ch?.mods, ch?.routes);
 }
 
 export function resolveFG(s: State, st: StChoice, r: Rng): PlayResult {
@@ -209,7 +236,7 @@ export function resolveFG(s: State, st: StChoice, r: Rng): PlayResult {
   const blk = st === 'block' ? 0.06 : 0.015;
   if (r() < rough) { res.penalty = 'rough'; res.yards = Math.min(15, Math.floor(ytg(s) / 2)); return res; }
   if (r() < blk) { res.blocked = true; res.turnover = true; res.yards = -7; return res; }
-  res.good = r() < fgProb(fgDist(s), R.k);
+  res.good = r() < fgProb(fgDist(s) + wx(s).fgYards, R.k);
   if (!res.good) { res.turnover = true; res.yards = -7; }
   return res;
 }
@@ -222,7 +249,7 @@ export function resolvePunt(s: State, st: StChoice, r: Rng): PlayResult {
     if (r() < 0.03) { res.blocked = true; res.yards = -8; return res; }
     if (r() < 0.025) { res.penalty = 'rough'; res.turnover = false; res.yards = Math.min(15, Math.floor(ytg(s) / 2)); return res; }
   }
-  const gross = Math.round(45 + gauss(r) * 7);
+  const gross = Math.round(45 + wx(s).punt + gauss(r) * 7);
   res.air = gross;
   if (s.yl + gross >= 100) { res.touchback = true; res.yards = 80 - s.yl; return res; }
   const ret = st === 'return' ? Math.max(0, Math.round(8 + gauss(r) * 6)) : Math.max(0, Math.round(3 + gauss(r) * 3));

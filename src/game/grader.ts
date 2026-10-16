@@ -109,7 +109,7 @@ export class GradeJob {
 
   async grade(opt: Opt): Promise<Grade> {
     await this.ready;
-    const custom = !!(opt.choice.target || opt.choice.route);
+    const custom = !!(opt.choice.target || opt.choice.route || opt.choice.routes || opt.choice.side || opt.choice.mods);
     const ranked = [...this.stats.entries()].sort((a, b) => b[1].wp - a[1].wp).map(([k]) => k);
     const keys = new Set(ranked.slice(0, REFINE_TOP));
     if (!custom) keys.add(opt.key);

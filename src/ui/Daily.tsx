@@ -79,9 +79,9 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
           <p className="welcome-lead"><b>You call the plays at the end of a close game.</b> Pick each play, run the clock, win it. Every call is graded against every other option you had.</p>
           <p className="welcome-sub">One game a day, the same for everyone. About two minutes.</p>
           <div className="welcome-links">
-            <button className="link" onClick={() => { onboarded(); go('practice'); }}>Warm up in Practice</button>
+            <button className="link" onClick={() => { track('welcome_link', { to: 'practice' }); onboarded(); go('practice'); }}>Warm up in Practice</button>
             <span aria-hidden>·</span>
-            <button className="link" onClick={openHelp}>How it works</button>
+            <button className="link" onClick={() => { track('welcome_link', { to: 'help' }); openHelp(); }}>How it works</button>
           </div>
         </div>
       ) : undefined}
@@ -110,6 +110,7 @@ function DayScore({ date, result, store, update, toast, go }: { date: string; re
     if (!on) return;
     let live = true;
     const nick = store.settings.nickname;
+    if (nick) track('leaderboard_submit', { performance: rt.performance, win: result.win });
     (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win) : fetchBoard(date)).then((b) => { if (live && b) setBoard(b); });
     return () => { live = false; };
   }, [on, date, rt.performance, store.settings.nickname]); // eslint-disable-line react-hooks/exhaustive-deps

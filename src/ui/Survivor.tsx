@@ -22,6 +22,7 @@ export function Survivor({ store, update, toast }: Props) {
   const sc = useMemo(() => (run && idx != null ? survivorScenario(run.id, idx) : null), [run?.id, idx]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const newRun = () => {
+    track('survivor_new_run', { runs: store.surv.runs + 1, best: store.surv.best });
     setReviewing(null);
     update((s) => {
       s.surv.runs++;

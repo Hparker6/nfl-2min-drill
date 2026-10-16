@@ -156,7 +156,8 @@ METRIC.S = METRIC.CB;
 // ---- starters: the most-used players at each position on each team
 const byTeam = new Map();
 for (const r of latest.values()) {
-  if (!TEAMS[r.team] || r.status === 'RET') continue;
+  // released and retired players are off the team; the practice squad only fills a slot nobody else can
+  if (!TEAMS[r.team] || r.status === 'RET' || r.status === 'CUT') continue;
   if (!byTeam.has(r.team)) byTeam.set(r.team, []);
   byTeam.get(r.team).push(r);
 }
@@ -178,7 +179,7 @@ for (const [abbr, rows] of byTeam) {
   const used = new Set(), usedNums = new Set();
   // active players first; nobody takes a number already on the roster we are building
   const take = (slots, pred, key) => {
-    const chosen = pick(rows.filter((r) => !used.has(r.gsis_id) && !usedNums.has(num(r.jersey_number))), pred, slots.length, (r) => key(r) + (r.status === 'ACT' ? 1e6 : 0));
+    const chosen = pick(rows.filter((r) => !used.has(r.gsis_id) && !usedNums.has(num(r.jersey_number))), pred, slots.length, (r) => key(r) + (r.status === 'DEV' ? -1e6 : 0) + (r.status === 'ACT' ? 0.5 : 0));   // the most-used player starts, even on injured reserve
     chosen.forEach((r) => { used.add(r.gsis_id); usedNums.add(num(r.jersey_number)); });
     return Object.fromEntries(slots.map((s, i) => [s, chosen[i]]));
   };

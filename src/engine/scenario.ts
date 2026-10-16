@@ -6,7 +6,7 @@
 import { DEF_POS, FIRST, FRANCHISES, LAST, OFF_POS } from './data';
 import { evaluate } from './evaluate';
 import { clip, hash, pickWeighted, rng, type Rng } from './rng';
-import type { Player, Ratings, State, Team, TeamInfo } from './types';
+import type { Player, Ratings, State, Team, TeamInfo, Weather } from './types';
 import { GROUP_ATTRS, SLOT_GROUP, units, type Attr, type PosGroup, type RosterMeta, type RosterPlayer } from './roster';
 import { NFL_IDS, hasRealTeam, realTeam } from './nfl';
 
@@ -125,7 +125,11 @@ export interface SpotParams {
   to: [number, number];
   running: boolean;
   home: Team;
+  weather?: Weather;
 }
+
+/** How often each kind of weather turns up. Rare, so most games are clear. */
+export const WEATHER_ODDS: Record<Weather, number> = { clear: 0.9, rain: 0.04, wind: 0.04, snow: 0.02 };
 
 export function stateFrom(p: SpotParams, teams: [TeamInfo, TeamInfo]): State {
   const base = 14 + 3 * ((hash(p.you, p.them, p.t) % 6));
@@ -136,6 +140,7 @@ export function stateFrom(p: SpotParams, teams: [TeamInfo, TeamInfo]): State {
     down: p.down, dist: Math.min(p.dist, 100 - p.yl), yl: p.yl, running: p.running, stage: 'pre', warned: p.t <= 120,
     adj: 0, kicker: 0, safetyKick: false, pendLook: null, shownLook: null, pendPlay: null, k: 0,
     rat: [teams[0].rat, teams[1].rat],
+    weather: p.weather ?? 'clear',
   };
 }
 
@@ -154,6 +159,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
   const K = opts.kind;
   const teams: [TeamInfo, TeamInfo] = [makeTeam(a, seedStr), makeTeam(b, seedStr)];
   const hard = opts.hard ?? 0;   // survivor ramps this up: deeper holes, less time
+  const weather = pickWeighted<Weather>(r, WEATHER_ODDS);
 
   let best: { s: State; wp: number; p: SpotParams } | null = null;
   for (let tries = 0; tries < 14; tries++) {
@@ -179,7 +185,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     const toPick = () => Number(pickWeighted(r, { 0: 0.18, 1: 0.3, 2: 0.3, 3: 0.22 }));
     const p: SpotParams = {
       you: a, them: b, side, t, lead, yl, down, dist, to: [toPick(), toPick()],
-      running: r() < 0.5, home: r() < 0.5 ? 0 : 1,
+      running: r() < 0.5, home: r() < 0.5 ? 0 : 1, weather,
     };
     const s = stateFrom(p, teams);
     const wp = quickWp(s, hash(seedStr, tries));

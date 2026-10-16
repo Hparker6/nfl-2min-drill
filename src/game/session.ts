@@ -3,7 +3,7 @@
  * randomness from the scenario seed and the snap counter, so a list of picks replays the exact same game (that is
  * how progress survives a refresh, and why a daily spot plays the same for everyone who calls it the same way).
  */
-import { CALLS, CALL, LOOKS, TEMPO } from '../engine/data';
+import { CALLS, LOOKS, TEMPO } from '../engine/data';
 import {
   advance, aiDefClock, aiDefLook, aiKick, aiOffClock, aiOffPlay, aiPat, aiST, clone, fgDist, fgProb, leadOf, lookOther, otProb, ytg,
 } from '../engine/sim';
@@ -237,6 +237,12 @@ export class Session {
 }
 
 export function optLabel(opt: Opt): string {
-  if (opt.choice.target && opt.choice.play && CALL[opt.choice.play]) return `${opt.label} (custom)`;
-  return opt.label;
+  const c = opt.choice;
+  const bits: string[] = [];
+  if (c.side) bits.push(c.side === 1 ? 'strong' : 'weak');
+  if (c.mods?.pa) bits.push('play action');
+  if (c.mods?.roll) bits.push('roll out');
+  if (c.mods?.oob) bits.push('sideline');
+  if (c.target || c.routes) bits.push('custom routes');
+  return bits.length ? `${opt.label} (${bits.join(', ')})` : opt.label;
 }

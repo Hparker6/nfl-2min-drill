@@ -12,6 +12,10 @@ export type Special = 'kneel' | 'fg' | 'punt' | 'spike';
 export type StChoice = 'block' | 'safe' | 'return' | 'rush';
 export type PatChoice = 'xp' | 'two';
 export type KickChoice = 'deep' | 'onside';
+/** Weather. Rare on purpose: most games are clear. See sim.ts WEATHER for what each one does. */
+export type Weather = 'clear' | 'rain' | 'snow' | 'wind';
+/** Ways to adjust a pass call: fake the run first, roll the quarterback out, or work the sideline. */
+export interface PassMods { pa?: boolean; roll?: boolean; oob?: boolean }
 
 import type { Attr, RatingSource, Units } from './roster';
 
@@ -58,6 +62,7 @@ export interface State {
   shownLook: Look | null; // what the offense sees pre-snap (right most of the time)
   pendPlay: string | null;// the offense's call, drawn before the defense calls
   k: number;              // snap counter: seeds the real game's draws
+  weather?: Weather;
   rat: [Ratings, Ratings];
 }
 
@@ -68,6 +73,9 @@ export interface Choice {
   play?: string;          // call id or a Special
   target?: Rcv;
   route?: RouteId;
+  routes?: Partial<Record<Rcv, RouteId>>;   // every receiver's edited route (the target's is also in route)
+  side?: 1 | -1;          // runs: strong side (+1, the tight end's) or weak side (-1)
+  mods?: PassMods;
   look?: Look;
   st?: StChoice;
   pat?: PatChoice;
@@ -101,6 +109,8 @@ export interface PlayResult {
   dur: number;            // seconds the play took
   lane?: 'in' | 'out';
   side: -1 | 1;           // which way a run or route bends, from the offense's view (-1 left, 1 right)
+  routes?: Partial<Record<Rcv, RouteId>>;   // the routes as called, when the player edited them
+  mods?: PassMods;
 }
 
 /** What happened, for the play-by-play and the field animation. t is the clock after the event. */

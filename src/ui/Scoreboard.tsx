@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ballOn, downDist, fmtClock } from '../game/describe';
+import { WEATHER } from '../engine/sim';
 import type { State, TeamInfo } from '../engine/types';
+const WX_ICON: Record<string, string> = { rain: '🌧', snow: '❄', wind: '💨' };
 
 interface Props {
   s: State;
@@ -75,7 +77,7 @@ export function Scoreboard({ s, teams, wp, trail }: Props) {
         <Team team={teams[0]} score={s.score[0]} tos={s.to[0]} ball={live && s.off === 0} you />
         <div className="sb-center">
           <div className={`sb-clock${s.running && live ? ' running' : ''}`}>{fmtClock(clock)}</div>
-          <div className="sb-q">4th quarter{live && s.running ? ' · running' : live ? ' · stopped' : ''}</div>
+          <div className="sb-q">4th quarter{live && s.running ? ' · running' : live ? ' · stopped' : ''}{s.weather && s.weather !== 'clear' ? <span className={`sb-wx wx-${s.weather}`} title={WEATHER[s.weather].blurb}>{WX_ICON[s.weather]} {WEATHER[s.weather].name}</span> : null}</div>
         </div>
         <Team team={teams[1]} score={s.score[1]} tos={s.to[1]} ball={live && s.off === 1} you={false} right />
       </div>

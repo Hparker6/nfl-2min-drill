@@ -1,21 +1,37 @@
 import { useEffect, useState } from 'react';
-import { CALL, LOOK_READ, LOOKS, POS_NAME, ROUTES } from '../engine/data';
+import { CALL, LOOK_READ, LOOKS, POS_NAME, POS_ROUTES, ROUTES, TEMPO } from '../engine/data';
+import { DESIGN } from '../engine/formation';
+import { WEATHER } from '../engine/sim';
 import { tendency } from '../game/describe';
 import type { Decision, Opt } from '../game/session';
 import { GRADE_INFO, type Grade } from '../game/grade';
-import type { Look, Rcv, RouteId, State, TeamInfo } from '../engine/types';
+import type { PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
 import { MiniPlay } from './MiniPlay';
 
+/** What the play-caller changed about the selected call: the side, the receiver, the routes, the quarterback's action. */
+export interface Edits {
+  target: Rcv | null;
+  routes: Partial<Record<Rcv, RouteId>>;
+  side: 1 | -1;
+  mods: PassMods;
+}
+export const NO_EDITS: Edits = { target: null, routes: {}, side: 1, mods: {} };
+
 interface Props {
-  dec: Decision;
+  dec: Decision;                            // the call on the board: play / look / st / pat / kick, or a clock-only step
+  clock: Decision | null;                   // the clock decision that goes with it (tempo on offense, timeout on defense)
+  clockSel: Opt | null;
   s: State;
   teams: [TeamInfo, TeamInfo];
   selected: Opt | null;
-  target: Rcv | null;
-  route: RouteId | null;
-  hints: Map<string, number> | null;     // practice: win chance per option
-  prev: { label: string; g: Grade } | null; // the clock call just made, graded
+  edits: Edits;
+  hints: Map<string, number> | null;        // practice: win chance per option
+  clockHints: Map<string, number> | null;
+  prev: { label: string; g: Grade } | null; // the last complete decision, graded
+  onClock: (o: Opt) => void;                // pick a tempo (or let it run): part of this snap
+  onMajor: (o: Opt) => void;                // timeout, spike, kneel, run it down: the whole decision, one tap
   onSelect: (o: Opt) => void;
+  onEdit: (e: Edits) => void;
   onSnap: (o: Opt) => void;
 }
 
@@ -32,7 +48,17 @@ const TABS: { id: Tab; label: string; key: string; fam: string; blurb: string }[
 const tabOf = (o: Opt): Tab | null => (o.group === 'pass' ? (SHORT.has(o.key) ? 'short' : 'deep') : o.group === 'run' || o.group === 'rpo' || o.group === 'trick' ? o.group : null);
 // decisions that cost something you cannot get back: marked so they are not tapped by accident
 const MAJOR = new Set(['timeout', 'spike', 'kneel', 'drain', 'onside', 'two', 'block', 'rush', 'fg', 'punt']);
+const TEMPO_KEYS = new Set(['nohuddle', 'huddle', 'milk', 'let']);
 const RISK = ['', 'Safe', 'Balanced', 'Risky'];
+const MODS: { k: keyof PassMods; label: string; tip: string }[] = [
+  { k: 'pa', label: 'Play action', tip: 'Fake the handoff first. Freezes a loaded box; holds the ball a beat longer.' },
+  { k: 'roll', label: 'Roll out', tip: 'Move the pocket. Fewer sacks; the deep throws get harder.' },
+  { k: 'oob', label: 'Sideline', tip: 'Get out of bounds after the catch to stop the clock, for fewer yards.' },
+];
+
+/** Runs that have a side to pick: everything but a sneak. */
+const sided = (play: string | undefined) => !!play && CALL[play]?.kind === 'run' && play !== 'sneak';
+const WX_ICON: Record<string, string> = { rain: '🌧', snow: '❄', wind: '💨' };
 
 /** A tapped row that is partly hidden (under the Snap bar on phones, at the list's edge on desktop) scrolls fully into view. */
 function keepClear(el: HTMLElement) {
@@ -46,6 +72,7 @@ function hintClass(wp: number | undefined, best: number) {
   const lost = (best - wp) * 100;
   return lost <= 0.75 ? 'h-g' : lost <= 2.5 ? 'h-y' : lost <= 6 ? 'h-o' : 'h-r';
 }
+const bestOf = (m: Map<string, number> | null) => (m && m.size ? Math.max(...m.values()) : 0);
 
 function Prev({ prev }: { prev: Props['prev'] }) {
   if (!prev) return null;
@@ -58,13 +85,70 @@ function Prev({ prev }: { prev: Props['prev'] }) {
   );
 }
 
-export function CallPanel({ dec, s, teams, selected, target, route, hints, prev, onSelect, onSnap }: Props) {
+function WeatherChip({ s }: { s: State }) {
+  const w = s.weather ?? 'clear';
+  if (w === 'clear') return null;
+  return <span className={`wx-chip wx-${w}`} title={WEATHER[w].blurb}>{WX_ICON[w]} {WEATHER[w].name}</span>;
+}
+
+/**
+ * The clock row: on offense the tempo (part of the snap) plus Timeout / Spike / Kneel (complete on their own); on
+ * defense, Let it run (part of the call) or Timeout.
+ */
+function ClockRow({ clock, clockSel, hints, s, onClock, onMajor }: { clock: Decision; clockSel: Opt | null; hints: Map<string, number> | null; s: State; onClock: (o: Opt) => void; onMajor: (o: Opt) => void }) {
+  const best = bestOf(hints);
+  const tempos = clock.options.filter((o) => TEMPO_KEYS.has(o.key));
+  const majors = clock.options.filter((o) => !TEMPO_KEYS.has(o.key));
+  const off = clock.step === 'offClock';
+  return (
+    <div className={`clockrow${off ? '' : ' def'}`}>
+      <div className="tempo" role="radiogroup" aria-label={off ? 'Tempo' : 'Their clock'}>
+        <span className="tempo-k">{off ? 'Tempo' : 'Clock'}</span>
+        {tempos.map((o) => {
+          const wp = hints?.get(o.key);
+          const sel = clockSel?.key === o.key;
+          const secs = o.key in TEMPO ? TEMPO[o.key as keyof typeof TEMPO].secs : null;
+          return (
+            <button key={o.key} role="radio" aria-checked={sel} className={`tbtn${sel ? ' on' : ''} ${hintClass(wp, best)}`} onClick={() => onClock(o)} title={o.sub}>
+              <span className="tbtn-name">{o.label}</span>
+              <span className="tbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : secs != null ? `−${Math.min(secs, s.t)}s` : o.sub}</span>
+            </button>
+          );
+        })}
+      </div>
+      {majors.length > 0 && (
+        <div className="majors">
+          {majors.map((o) => {
+            const wp = hints?.get(o.key);
+            return (
+              <button key={o.key} className={`mbtn ${o.key}${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} onClick={() => onMajor(o)} title={o.sub}>
+                <span className="mbtn-name">{o.label}</span>
+                <span className="mbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : o.sub}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CallPanel(p: Props) {
+  const { dec, clock, clockSel, s, teams, selected, edits, hints, prev, onSelect, onSnap, onEdit } = p;
   const isPlay = dec.step === 'play';
+  const isLook = dec.step === 'look';
   const [tab, setTab] = useState<Tab>('short');
   const specials = dec.options.filter((o) => o.group === 'special');
-  const best = hints ? Math.max(...hints.values()) : 0;
+  const best = bestOf(hints);
+  const needClock = !!clock && !clockSel;
+  const canSnap = !!selected && !needClock;
 
-  useEffect(() => { if (isPlay) setTab('short'); }, [dec, isPlay]);
+  useEffect(() => { if (isPlay) setTab('short'); }, [dec.step === 'play' ? dec.title : null, isPlay]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // a row picked from the keyboard (or under the pinned field on phones) scrolls clear, with its options
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('.cp [aria-selected="true"]');
+    if (el) keepClear(el.closest<HTMLElement>('.prow-wrap') ?? el);
+  }, [selected?.key]);
 
   const list = isPlay ? dec.options.filter((o) => tabOf(o) === tab) : dec.options;
   // keys: 1-9 the list, then the special-teams buttons; R S D O T switch tabs; Enter snaps the selected call
@@ -78,8 +162,8 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
       if (n >= 1 && n <= keyed.length) {
         e.preventDefault();
         const o = keyed[n - 1];
-        if (isPlay || dec.step === 'look') onSelect(o); else onSnap(o);
-      } else if ((isPlay || dec.step === 'look') && e.key === 'Enter' && selected) {
+        if (isPlay || isLook) onSelect(o); else if (!needClock) onSnap(o);
+      } else if ((isPlay || isLook) && e.key === 'Enter' && selected && canSnap) {
         e.preventDefault();
         onSnap(selected);
       } else if (isPlay) {
@@ -91,71 +175,84 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  if (dec.step === 'look') {
+  const clockRow = clock && <ClockRow clock={clock} clockSel={clockSel} hints={p.clockHints} s={s} onClock={p.onClock} onMajor={p.onMajor} />;
+  const clockNote = needClock ? (clock!.step === 'offClock' ? 'Pick a tempo, then the play.' : 'Timeout, or let it run?') : null;
+  const snapLabel = (word: string) => (needClock ? (clock!.step === 'offClock' ? 'Pick a tempo' : 'Clock first') : word);
+
+  if (isLook) {
     const look = selected?.choice.look;
     const info = look ? LOOKS[look] : null;
+    // the calls in two groups: who you send, and how you cover
+    const pressure = dec.options.filter((o) => ['blitz', 'load', 'goal'].includes(o.key));
+    const coverage = dec.options.filter((o) => !pressure.includes(o));
+    const row = (o: Opt) => {
+      const i = dec.options.indexOf(o);
+      const wp = hints?.get(o.key);
+      const sel = selected?.key === o.key;
+      const L = LOOKS[o.choice.look!];
+      return (
+        <button key={o.key} role="option" aria-selected={sel} className={`prow fam-def${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
+          <MiniPlay look={o.choice.look} />
+          <span className="prow-txt">
+            <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
+            <span className="prow-sub">{o.sub}</span>
+            {sel && <span className="def-trade in-row"><span><b>Stops:</b> {L.stops}</span><span><b>Gives up:</b> {L.risk}</span></span>}
+          </span>
+          <span className="prow-side">
+            {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : <span className={`riskchip r${L.tilt}`}>{['', 'Safe', 'Trade-off', 'Gamble'][L.tilt]}</span>}
+          </span>
+        </button>
+      );
+    };
     return (
       <section className="cp def" aria-label="Call the defense">
         <Prev prev={prev} />
         <header className="cp-head">
-          <span className="def-flag">Defense · your call</span>
+          <div className="cp-flags"><span className="def-flag">Defense · your call</span><WeatherChip s={s} /></div>
           <h2>{dec.title}</h2>
           <div className="read tend"><b>Their offense:</b> {tendency(s)}</div>
         </header>
-        <div className="cp-list" role="listbox" aria-label="Defensive calls">
-          {dec.options.map((o, i) => {
-            const wp = hints?.get(o.key);
-            const sel = selected?.key === o.key;
-            const L = LOOKS[o.choice.look!];
-            return (
-              <button key={o.key} role="option" aria-selected={sel} className={`prow fam-def${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
-                <MiniPlay look={o.choice.look} />
-                <span className="prow-txt">
-                  <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
-                  <span className="prow-sub">{o.sub}</span>
-                  {sel && <span className="def-trade in-row"><span><b>Stops:</b> {L.stops}</span><span><b>Gives up:</b> {L.risk}</span></span>}
-                </span>
-                <span className="prow-side">
-                  {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : <span className={`riskchip r${L.tilt}`}>{['', 'Safe', 'Trade-off', 'Gamble'][L.tilt]}</span>}
-                </span>
-              </button>
-            );
-          })}
+        {clockRow}
+        <div className="cp-list def-list" role="listbox" aria-label="Defensive calls">
+          <div className="def-group-k">Coverage</div>
+          {coverage.map(row)}
+          {pressure.length > 0 && <div className="def-group-k">Pressure</div>}
+          {pressure.map(row)}
         </div>
         {info && <div className="def-trade strip"><span><b>Stops:</b> {info.stops}</span><span><b>Gives up:</b> {info.risk}</span></div>}
-        <footer className={`cp-foot${selected ? ' ready' : ''}`}>
+        <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
           <div className="cp-sel">
             {info ? (
               <>
-                <span className="cp-sel-k">Your defense</span>
+                <span className="cp-sel-k">Your defense{clockSel ? ` · ${clockSel.label.toLowerCase()}` : ''}</span>
                 <span className="cp-sel-name">{info.label}</span>
+                {clockNote && <span className="cp-sel-sub"><b>{clockNote}</b></span>}
               </>
-            ) : <span className="cp-sel-sub">Pick a defense to see it on the field.<span className="keys"> Keys: 1–{dec.options.length} pick · Enter calls it</span></span>}
+            ) : <span className="cp-sel-sub">{clockNote ?? 'Pick a defense to see it on the field.'}<span className="keys"> Keys: 1–{dec.options.length} pick · Enter calls it</span></span>}
           </div>
-          <button className="btn snap" disabled={!selected} onClick={() => selected && onSnap(selected)}>Call it<kbd>Enter</kbd></button>
+          <button className="btn snap" disabled={!canSnap} onClick={() => selected && canSnap && onSnap(selected)}>{snapLabel('Call it')}<kbd>Enter</kbd></button>
         </footer>
       </section>
     );
   }
 
   if (!isPlay) {
-    // clock, kicks, tries: each button is the whole decision, one tap
-    const isLook = false;
+    // kicks, tries, a clock-only step: each button is the whole decision, one tap
     return (
       <section className="cp" aria-label="Your decision">
         <Prev prev={prev} />
         <header className="cp-head">
+          <div className="cp-flags"><WeatherChip s={s} /></div>
           <h2>{dec.title}</h2>
-          {isLook && <p className="cp-note">{teams[1].city} has the ball and their play is called. Pick your defense.</p>}
           {dec.step === 'offClock' && <p className="cp-note">The clock is still running. How fast do you get to the next snap?</p>}
           {dec.step === 'defClock' && <p className="cp-note">They are letting the clock run.</p>}
         </header>
-        <div className={`cp-grid${isLook ? ' looks' : ''}`}>
+        {clockRow}
+        <div className="cp-grid">
           {dec.options.map((o, i) => {
             const wp = hints?.get(o.key);
             return (
-              <button key={o.key} className={`dbtn${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} onClick={() => onSnap(o)}>
-                {isLook && <MiniPlay look={o.key as Look} />}
+              <button key={o.key} className={`dbtn${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} disabled={needClock} onClick={() => onSnap(o)}>
                 <span className="dbtn-txt">
                   <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}</span>
                   {o.sub && <span className="dbtn-sub">{o.sub}</span>}
@@ -165,34 +262,73 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
             );
           })}
         </div>
-        <p className="cp-keys keys">Press 1–{dec.options.length} to choose</p>
+        <p className="cp-keys keys">{clockNote ?? `Press 1–${dec.options.length} to choose`}</p>
       </section>
     );
   }
 
+  const call = selected?.choice.play ? CALL[selected.choice.play] : null;
+  const isPass = !!call?.routes && call.kind === 'pass' && call.id !== 'hail';
+  const design = call ? DESIGN[call.id] : undefined;
+  const tgt = (edits.target ?? call?.tgt) as Rcv | undefined;
+  const routeOf = (r: Rcv): RouteId => edits.routes[r] ?? call!.routes![r];
+  const rt = isPass && tgt ? routeOf(tgt) : null;
+  const last = (r: Rcv) => teams[0].players[r]?.name.split(' ').slice(-1)[0] ?? POS_NAME[r];
+  const receivers: Rcv[] = isPass && design ? (['WR1', 'WR2', 'WR3', 'TE', 'RB'] as Rcv[]).filter((r) => !((r === 'RB' && design.rb !== 'route') || (r === 'TE' && design.te !== 'route'))) : [];
+  const fourth = s.down === 4;
+  const T = TABS.find((x) => x.id === tab)!;
+  const setSide = (side: 1 | -1) => onEdit({ ...edits, side });
+  const toggleMod = (k: keyof PassMods) => onEdit({ ...edits, mods: { ...edits.mods, [k]: !edits.mods[k] } });
+  const cycle = (r: Rcv) => {
+    const listR = POS_ROUTES[r];
+    const i = listR.indexOf(routeOf(r));
+    onEdit({ ...edits, target: r, routes: { ...edits.routes, [r]: listR[(i + 1) % listR.length] } });
+  };
+
   const row = (o: Opt, i: number) => {
     const wp = hints?.get(o.key);
     const sel = selected?.key === o.key;
+    const run = sided(o.choice.play);
     return (
-      <button key={o.key} role="option" aria-selected={sel} className={`prow fam-${o.group}${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
-        <MiniPlay play={o.choice.play} />
-        <span className="prow-txt">
-          <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
-          <span className="prow-sub">{o.sub}</span>
-        </span>
-        <span className="prow-side">
-          {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}
-        </span>
-      </button>
+      <div key={o.key} className={`prow-wrap${sel ? ' sel' : ''}`}>
+        <button role="option" aria-selected={sel} className={`prow fam-${o.group}${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget.parentElement ?? e.currentTarget); }}>
+          <MiniPlay play={o.choice.play} side={sel ? edits.side : undefined} routes={sel ? edits.routes : undefined} target={sel ? edits.target : undefined} mods={sel ? edits.mods : undefined} />
+          <span className="prow-txt">
+            <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
+            <span className="prow-sub">{o.sub}</span>
+          </span>
+          <span className="prow-side">
+            {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}
+          </span>
+        </button>
+        {sel && run && (
+          <div className="sides" role="radiogroup" aria-label="Which side">
+            <button role="radio" aria-checked={edits.side === 1} className={`sidebtn${edits.side === 1 ? ' on' : ''}`} onClick={() => setSide(1)} title="Toward the tight end: an extra blocker">Strong side →</button>
+            <button role="radio" aria-checked={edits.side === -1} className={`sidebtn${edits.side === -1 ? ' on' : ''}`} onClick={() => setSide(-1)} title="Away from the tight end: fewer blockers, fewer defenders">← Weak side</button>
+          </div>
+        )}
+        {sel && isPass && o.key === call?.id && (
+          <div className="passopts">
+            <div className="chips" role="group" aria-label="Throw to">
+              <span className="chips-k">Throw to</span>
+              {receivers.map((r) => (
+                <button key={r} className={`rchip${r === tgt ? ' on' : ''}${edits.routes[r] ? ' edited' : ''}`} onClick={() => (r === tgt ? cycle(r) : onEdit({ ...edits, target: r }))}
+                  title={r === tgt ? 'Tap again to change his route' : `Throw to ${last(r)}`}>
+                  <b>{last(r)}</b><span>{ROUTES[routeOf(r)].name}{r === tgt ? ' ↻' : ''}</span>
+                </button>
+              ))}
+            </div>
+            <div className="chips" role="group" aria-label="Adjustments">
+              <span className="chips-k">Signal</span>
+              {MODS.map((m) => (
+                <button key={m.k} className={`mchip${edits.mods[m.k] ? ' on' : ''}`} aria-pressed={!!edits.mods[m.k]} onClick={() => toggleMod(m.k)} title={m.tip}>{m.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     );
   };
-
-  const call = selected?.choice.play ? CALL[selected.choice.play] : null;
-  const isPass = !!call?.routes && call.kind === 'pass' && call.id !== 'hail';
-  const tgt = (target ?? call?.tgt) as Rcv | undefined;
-  const rt = isPass && tgt ? route ?? call!.routes![tgt] : null;
-  const fourth = s.down === 4;
-  const T = TABS.find((x) => x.id === tab)!;
 
   const specialRow = specials.length > 0 && (
     <div className={`cp-special${fourth ? ' urgent' : ''}`}>
@@ -213,10 +349,22 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
     </div>
   );
 
+  const edited = isPass && (!!edits.target || Object.keys(edits.routes).length > 0 || edits.mods.pa || edits.mods.roll || edits.mods.oob);
+  const summary = () => {
+    if (!selected) return null;
+    if (isPass && tgt && rt) {
+      const sig = MODS.filter((m) => edits.mods[m.k]).map((m) => m.label.toLowerCase());
+      return <>To <b>{last(tgt)}</b> on a {ROUTES[rt].name.toLowerCase()}{sig.length ? `, ${sig.join(', ')}` : ''}.{!edited && <span className="cp-tip"> Tap a receiver on the field or above to change the throw.</span>}</>;
+    }
+    if (sided(selected.choice.play)) return <>To the <b>{edits.side === 1 ? 'strong' : 'weak'} side</b>. {selected.sub}</>;
+    return <>{selected.sub}</>;
+  };
+
   return (
     <section className="cp" aria-label="Call the play">
       <Prev prev={prev} />
       <header className="cp-head">
+        <div className="cp-flags"><span className="off-flag">Your call</span><WeatherChip s={s} /></div>
         <h2>{dec.title}</h2>
         {s.shownLook && (
           <div className="read" title="Your pre-snap read is right about 7 times in 10">
@@ -225,6 +373,7 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
           </div>
         )}
       </header>
+      {clockRow}
       {fourth && specialRow}
       <div className="tabs5" role="tablist" aria-label="Kinds of plays">
         {TABS.map((t) => {
@@ -240,23 +389,18 @@ export function CallPanel({ dec, s, teams, selected, target, route, hints, prev,
       <p className="tab5-blurb">{T.blurb}</p>
       <div className="cp-list" role="listbox" aria-label={`${T.label} calls`}>{list.map(row)}</div>
       {!fourth && specialRow}
-      <footer className={`cp-foot${selected ? ' ready' : ''}`}>
+      <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
         <div className="cp-sel">
           {selected ? (
             <>
-              <span className="cp-sel-k">Selected</span>
-              <span className="cp-sel-mini"><MiniPlay play={selected.choice.play} /></span>
+              <span className="cp-sel-k">Selected{clockSel ? ` · ${clockSel.label.toLowerCase()}` : ''}</span>
+              <span className="cp-sel-mini"><MiniPlay play={selected.choice.play} side={edits.side} routes={edits.routes} target={edits.target} mods={edits.mods} /></span>
               <span className="cp-sel-name">{selected.label}</span>
-              {isPass && tgt && rt ? (
-                <span className="cp-sel-sub">
-                  To <b>{teams[0].players[tgt]?.name.split(' ').slice(-1)[0]}</b> ({POS_NAME[tgt].toLowerCase()}) on a {ROUTES[rt].name.toLowerCase()}.
-                  <span className="cp-tip"> Tap another receiver on the field to throw to him; tap him again to change his route.</span>
-                </span>
-              ) : <span className="cp-sel-sub">{selected.sub}</span>}
+              <span className="cp-sel-sub">{clockNote ? <b>{clockNote}</b> : summary()}</span>
             </>
-          ) : <span className="cp-sel-sub">Pick a play to see it on the field.<span className="keys"> Keys: 1–9 pick · R S D O T tabs · Enter snaps</span></span>}
+          ) : <span className="cp-sel-sub">{clockNote ?? 'Pick a play to see it on the field.'}<span className="keys"> Keys: 1–9 pick · R S D O T tabs · Enter snaps</span></span>}
         </div>
-        <button className="btn snap" disabled={!selected} onClick={() => selected && onSnap(selected)}>Snap<kbd>Enter</kbd></button>
+        <button className="btn snap" disabled={!canSnap} onClick={() => selected && canSnap && onSnap(selected)}>{snapLabel('Snap')}<kbd>Enter</kbd></button>
       </footer>
     </section>
   );

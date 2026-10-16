@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { CALL, POS_ROUTES } from '../engine/data';
-import { clone } from '../engine/sim';
+import { WEATHER, clone } from '../engine/sim';
 import { utcDate, type Scenario } from '../engine/scenario';
-import type { Ev, Rcv, RouteId, State } from '../engine/types';
+import type { Ev, Rcv, State } from '../engine/types';
 import { ballOn, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import { GradeJob } from '../game/grader';
 import { Session, type Decision, type Opt, type Pick } from '../game/session';
 import { spotResult } from '../game/rating';
 import type { Settings, SpotResult } from '../game/storage';
-import { track } from '../game/analytics';
-import { CallPanel } from './CallPanel';
+import { setContext, track } from '../game/analytics';
+import { CallPanel, NO_EDITS, type Edits } from './CallPanel';
 import { FieldView, type Banner, type FieldHandle } from './FieldView';
 import { MiniPlay } from './MiniPlay';
 import { Scoreboard } from './Scoreboard';
@@ -74,8 +74,10 @@ export function GameScreen(p: Props) {
   const [trail, setTrail] = useState<number[]>(() => [sc.baseWp, ...session.records.filter((r) => r.grade).map((r) => r.grade!.bestWp)]);
   const [hintMap, setHintMap] = useState<Map<string, number> | null>(null);
   const [sel, setSel] = useState<Opt | null>(null);
-  const [target, setTarget] = useState<Rcv | null>(null);
-  const [route, setRoute] = useState<RouteId | null>(null);
+  const [edits, setEdits] = useState<Edits>(NO_EDITS);
+  const [clockSel, setClockSel] = useState<Opt | null>(null);
+  const [clockHints, setClockHints] = useState<Map<string, number> | null>(null);
+  const peekJobRef = useRef<{ key: string; job: GradeJob } | null>(null);
   const [feed, setFeed] = useState<FeedLine[]>(() =>
     session.log.map((l) => ({ id: ++uid, t: l.ev.t, ...tell(l.ev, sc.teams) })).filter((l) => l.text).reverse());
   const [banner, setBanner] = useState<Banner | null>(null);
@@ -85,16 +87,45 @@ export function GameScreen(p: Props) {
   const [replaying, setReplaying] = useState(false);
   const [result, setResult] = useState<SpotResult | null>(null);
 
+  const shownAt = useRef(Date.now());       // when the current decision went on the board
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // the funnel: every phase, with where the game is, so a leave event says where people get stuck
+  useEffect(() => {
+    setContext({ phase, step: dec?.step ?? null, calls: session.records.length, kind: sc.kind ?? null });
+    track('phase', { phase, mode: sc.mode, calls: session.records.length });
+    if (phase === 'brief') track('brief_shown', { mode: sc.mode, kind: sc.kind ?? null });
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const speed = settings.speed === 'instant' || reduced ? 0 : settings.speed === 'fast' ? 1.6 : 1;
 
-  const preview = useCallback((d: Decision | null, o: Opt | null, t: Rcv | null, r: RouteId | null): Preview => {
+  const preview = useCallback((d: Decision | null, o: Opt | null, e: Edits): Preview => {
     const s = session.s;
     if (!d) return {};
-    if (d.step === 'play') return { play: o?.choice.play ?? null, target: t, route: r, look: s.shownLook, routes: true };
+    if (d.step === 'play') return { play: o?.choice.play ?? null, target: e.target, edits: e.routes, side: e.side, mods: e.mods, look: s.shownLook, routes: true };
     if (d.step === 'look') return { look: o?.choice.look ?? null };
     return {};
   }, [session]);
+
+  // With the clock running, the tempo and the play are one call. The play list comes from a look ahead: the game
+  // replayed with the tempo added, which is exactly where the snap will be called from.
+  const isClock = dec?.step === 'offClock' || dec?.step === 'defClock';
+  const peek = useMemo(() => {
+    if (!dec || !isClock) return null;
+    const pick = clockSel ?? dec.options.find((o) => o.key === (dec.step === 'offClock' ? 'huddle' : 'let')) ?? dec.options[0];
+    try {
+      const s2 = new Session(sc, [...session.picks.map((x) => ({ key: x.key, choice: x.choice })), { key: pick.key, choice: pick.choice }]);
+      const d2 = s2.decision();
+      return d2 && d2.step !== 'offClock' && d2.step !== 'defClock' ? { dec: d2, provisional: !clockSel, key: pick.key } : null;
+    } catch { return null; }
+  }, [dec, isClock, clockSel, sc, session]);
+  const mainDec = isClock ? peek?.dec ?? null : dec;
+  useEffect(() => {
+    // the look-ahead play call grades from its own state once the tempo is set
+    if (!peek || peek.provisional) { peekJobRef.current = null; return; }
+    const job = new GradeJob(peek.dec, sc.seed);
+    const entry = { key: peek.key, job };
+    peekJobRef.current = entry;
+    if (hints) job.ready.then(() => { if (peekJobRef.current === entry) setHintMap(new Map(peek.dec.options.map((o) => [o.key, job.wpOf(o.key) ?? 0]))); }).catch(() => {});
+  }, [peek, sc.seed, hints]);
 
   /** On phones the field is above the panel: bring it into view when a play starts. */
   const showStage = () => {
@@ -164,21 +195,26 @@ export function GameScreen(p: Props) {
   const present = useCallback((d: Decision) => {
     setDec(d);
     setSel(null);
-    setTarget(null);
-    setRoute(null);
+    setEdits(NO_EDITS);
+    setClockSel(null);
+    setClockHints(null);
     setHintMap(null);
+    peekJobRef.current = null;
     setBanner(null);
     const job = new GradeJob(d, sc.seed);
     jobRef.current = job;
     job.ready.then(() => {
       if (jobRef.current !== job) return;
       setWp(job.bestWp());
-      if (hints) setHintMap(new Map(d.options.map((o) => [o.key, job.wpOf(o.key) ?? 0])));
+      const m = new Map(d.options.map((o) => [o.key, job.wpOf(o.key) ?? 0]));
+      if (hints) { if (d.step === 'offClock' || d.step === 'defClock') setClockHints(m); else setHintMap(m); }
     }).catch(() => { /* the grade for this decision will report the failure */ });
     setView(clone(session.s));
-    field.current?.setup(session.s, preview(d, null, null, null));   // players jog from the last play to the new spot
+    field.current?.setup(session.s, preview(d, null, NO_EDITS));   // players jog from the last play to the new spot
     staleRef.current = false;
     setPhase('deciding');
+    shownAt.current = Date.now();
+    track('decision_shown', { mode: sc.mode, step: d.step, options: d.options.length, n: session.records.length });
   }, [sc, session, hints, preview]);
 
   /** Move on: play out anything that needs no decision, then present the next one. */
@@ -238,49 +274,93 @@ export function GameScreen(p: Props) {
 
   // keep the field preview in step with the selection
   useEffect(() => {
-    if (phase === 'deciding' && dec) field.current?.setup(session.s, preview(dec, sel, target, route));
-  }, [sel, target, route]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (phase === 'deciding' && mainDec) field.current?.setup(session.s, preview(mainDec, sel, edits));
+  }, [sel, edits, mainDec]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSelect = (o: Opt) => {
-    if (sel?.key === o.key) return;   // re-selecting keeps the receiver and route you set
-    setSel(o); setTarget(null); setRoute(null);
+    if (sel?.key === o.key) return;   // re-selecting keeps the receiver and routes you set
+    setSel(o); setEdits(NO_EDITS);
   };
 
+  /** Tap a receiver on the field: throw to him. Tap him again: his next route. Every edit stays. */
   const onTap = useCallback((pos: Rcv) => {
     if (phase !== 'deciding' || !sel?.choice.play) return;
     const c = CALL[sel.choice.play];
     if (!c?.routes || c.kind !== 'pass' || c.id === 'hail') return;
-    const cur = target ?? c.tgt!;
-    if (pos !== cur) { setTarget(pos); setRoute(c.routes[pos]); return; }
+    const cur = edits.target ?? c.tgt!;
+    if (pos !== cur) { setEdits({ ...edits, target: pos }); return; }
     const list = POS_ROUTES[pos];
-    const i = list.indexOf(route ?? c.routes[pos]);
-    setTarget(pos);
-    setRoute(list[(i + 1) % list.length]);
-  }, [phase, sel, target, route]);
+    const i = list.indexOf(edits.routes[pos] ?? c.routes[pos]);
+    setEdits({ ...edits, target: pos, routes: { ...edits.routes, [pos]: list[(i + 1) % list.length] } });
+  }, [phase, sel, edits]);
+
+  /** The option as called: the receiver, the routes, the side and the signals folded into the choice. */
+  const withEdits = (opt: Opt): Opt => {
+    if (!opt.choice.play) return opt;
+    const c = CALL[opt.choice.play];
+    if (!c) return opt;
+    if (c.kind === 'run') return c.id === 'sneak' ? opt : { ...opt, choice: { ...opt.choice, side: edits.side } };
+    if (!c.routes || c.kind !== 'pass' || c.id === 'hail') return opt;
+    const t = edits.target ?? c.tgt!;
+    const edited = Object.keys(edits.routes).length > 0;
+    const mods = edits.mods.pa || edits.mods.roll || edits.mods.oob ? edits.mods : undefined;
+    if (t === c.tgt && !edited && !mods) return opt;
+    const r = edits.routes[t] ?? c.routes[t];
+    return { ...opt, choice: { ...opt.choice, target: t, route: r, ...(edited ? { routes: edits.routes } : {}), ...(mods ? { mods } : {}) } };
+  };
 
   const onSnap = async (opt: Opt) => {
-    const d = dec;
-    const job = jobRef.current;
+    let d = dec;
+    let job = jobRef.current;
     if (!d || !job || busyRef.current || phase !== 'deciding') return;   // one transition per decision
     busyRef.current = true;
-    let o = opt;
-    if (d.step === 'play' && opt.choice.play && (target || route)) {
-      const c = CALL[opt.choice.play];
-      if (c?.routes) {
-        const t = target ?? c.tgt!;
-        const r = route ?? c.routes[t];
-        if (t !== c.tgt || r !== c.routes[c.tgt!]) o = { ...opt, choice: { ...opt.choice, target: t, route: r } };
+    let o = withEdits(opt);
+    const combined = isClock && opt.group !== 'clock';
+    if (combined) {
+      // first the tempo (a complete decision of its own), then the play from where it leaves the game
+      const cs = clockSel;
+      if (!cs) { busyRef.current = false; return; }
+      const ci = session.records.length;
+      const gc = job.grade(cs);
+      const evc = session.choose(cs);
+      onPicks(session.picks);
+      track('call_made', { mode: sc.mode, step: d.step, call: cs.key });
+      setSnapping(o);
+      setPhase('snapping');
+      await animate(evc);
+      gc.then((g) => { session.setGrade(ci, g); onPicks(session.picks); setTrail((t) => [...t, g.bestWp]); setPrev({ label: cs.label, g }); }).catch(() => {});
+      const d2 = session.decision();
+      const o2 = d2?.options.find((x) => x.key === opt.key);
+      if (!d2 || !o2) {
+        // the clock ran the game out (or the spot changed): carry on from wherever it is
+        busyRef.current = false;
+        setSnapping(null);
+        await proceed();
+        return;
       }
+      d = d2;
+      o = withEdits(o2);
+      const pj = peekJobRef.current;
+      job = pj && pj.key === cs.key ? pj.job : new GradeJob(d2, sc.seed);
+      jobRef.current = job;
+      setDec(d2);
     }
     setSnapping(o);
     setLast(null);
-    setPrev(null);
+    if (!combined) setPrev(null);   // a combined snap keeps the tempo's grade as "last call"
     setPhase('snapping');
     const recIdx = session.records.length;
+    const dStep = d.step;
     const gp = job.grade(o);
     const evs = session.choose(o);
     onPicks(session.picks);
-    track('call_made', { mode: sc.mode, step: d.step, call: o.key });
+    track('call_made', {
+      mode: sc.mode, step: dStep, call: o.key, n: recIdx, secs: Math.round((Date.now() - shownAt.current) / 1000),
+      tempo: combined ? clockSel?.key : undefined, side: o.choice.side === -1 ? 'weak' : o.choice.side === 1 ? 'strong' : undefined,
+      signals: o.choice.mods ? Object.keys(o.choice.mods).filter((k) => (o.choice.mods as Record<string, boolean>)[k]).join('+') || undefined : undefined,
+      edited_routes: o.choice.routes ? Object.keys(o.choice.routes).length : undefined, target: o.choice.target,
+    });
+    const gradedAt = Date.now();
     const settle = (g: Grade) => { session.setGrade(recIdx, g); onPicks(session.picks); setTrail((t) => [...t, g.bestWp]); };
     const playedOut = evs.some((e) => e.type === 'snap' || e.type === 'kick' || e.type === 'pat');
     try {
@@ -303,9 +383,11 @@ export function GameScreen(p: Props) {
         const g = await gp;
         settle(g);
         setLast({ evs, lines, head, grade: g, label: o.label });
+        track('result_shown', { mode: sc.mode, grade: g.g, lost: Math.round(g.lost * 10) / 10, grade_secs: Math.round((Date.now() - gradedAt) / 1000) });
       } catch {
         // the play stands; only its grade is missing. Never leave the player stuck.
         setLast({ evs, lines, head, grade: null, failed: true, label: o.label });
+        track('grade_failed', { mode: sc.mode, step: dStep, call: o.key });
       }
     } finally {
       busyRef.current = false;
@@ -318,6 +400,7 @@ export function GameScreen(p: Props) {
     const ev = last ? [...last.evs].reverse().find((e) => e.type === 'snap') as Extract<Ev, { type: 'snap' }> | undefined : undefined;
     if (!ev || replaying || busyRef.current) return;
     busyRef.current = true;
+    track('replay', { mode: sc.mode });
     setReplaying(true);
     setBanner(null);
     field.current?.setup(before(session.s, ev), { look: ev.res.look });
@@ -329,7 +412,7 @@ export function GameScreen(p: Props) {
     busyRef.current = false;
   };
 
-  const next = () => { if (!replaying && (last?.grade || last?.failed)) proceed(); };
+  const next = () => { if (!replaying && (last?.grade || last?.failed)) { track('next_play', { mode: sc.mode }); proceed(); } };
 
   // Enter or Space: Next play. R: replay.
   useEffect(() => {
@@ -353,7 +436,7 @@ export function GameScreen(p: Props) {
         {boot.lost && <p className="notice">Your saved progress on this spot couldn't be restored after an update, so it starts over.</p>}
         <div className="eyebrow">{p.label}</div>
         <h2 className="brief-head">{headline(s0)}</h2>
-        <p className="brief-sit">{situation(s0, T)}</p>
+        <p className="brief-sit">{situation(s0, T)}{s0.weather && s0.weather !== 'clear' ? <> <b className={`wx-word wx-${s0.weather}`}>{WEATHER[s0.weather].blurb}</b></> : null}</p>
         <div className="brief-odds">
           <div className="odds-bar"><i style={{ width: `${Math.round(sc.baseWp * 100)}%` }} /></div>
           <span>From here, our simulated coach wins <b>{Math.round(sc.baseWp * 100)}%</b> of the time. Can you do better?</span>
@@ -363,7 +446,9 @@ export function GameScreen(p: Props) {
       </section>
     );
   } else if (phase === 'deciding' && dec) {
-    side = <CallPanel dec={dec} s={session.s} teams={T} selected={sel} target={target} route={route} hints={hintMap} prev={prev} onSelect={onSelect} onSnap={onSnap} />;
+    side = <CallPanel dec={mainDec ?? dec} clock={mainDec && isClock ? dec : null} clockSel={clockSel} s={session.s} teams={T} selected={sel} edits={edits}
+      hints={isClock && !mainDec ? clockHints : hintMap} clockHints={clockHints} prev={prev}
+      onClock={(o) => { setClockSel(o); setHintMap(null); }} onMajor={onSnap} onSelect={onSelect} onEdit={setEdits} onSnap={onSnap} />;
   } else if (phase === 'snapping' && snapping) {
     side = (
       <section className="status">
@@ -396,7 +481,7 @@ export function GameScreen(p: Props) {
       <Scoreboard s={view} teams={T} wp={wp} trail={trail} />
       <div className="arena">
         <div className="stage" ref={stageRef}>
-          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off}>
+          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
             <div className="legend" aria-hidden>
               <span><i className="lg-o" />Offense: {T[view.off].name}</span>

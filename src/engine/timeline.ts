@@ -149,9 +149,14 @@ export function choreograph(inp: ChoreoInput): Timeline {
   const r = rng(inp.seed);
   const yt = 100 - inp.yl0;
   const call = CALL[res.call];
-  const design: Design | undefined = DESIGN[res.call];
+  const design0: Design | undefined = DESIGN[res.call];
+  // the player's adjustments: play action and a roll-out change the quarterback's action and the back's job
+  const design: Design | undefined = design0 && (res.mods?.roll || res.mods?.pa)
+    ? { ...design0, qb: res.mods.roll ? 'boot' : design0.qb === 'boot' ? 'boot' : 'pa', rb: design0.rb === 'route' || design0.rb === 'fake' ? 'fake' : design0.rb, scheme: res.mods.roll ? 'boot' : design0.scheme === 'quick' ? 'pa' : design0.scheme }
+    : design0;
   const look: Look = res.look ?? 'balanced';
-  const side: 1 | -1 = (design?.side ?? res.side ?? 1) as 1 | -1;
+  // runs go to the side the play-caller picked (strong is the tight end's side); passes bend toward the target
+  const side: 1 | -1 = (res.kind === 'run' ? res.side ?? design?.side ?? 1 : design?.side ?? res.side ?? 1) as 1 | -1;
   const fm = formation(design?.formation ?? 'gun');
   const da = defAlign(look);
   const start: Record<string, Pt> = {};
@@ -182,7 +187,7 @@ export function choreograph(inp: ChoreoInput): Timeline {
   // ======================================================================== passing plays
   if (isPassish) {
     const tgt: Rcv = res.target ?? call?.tgt ?? 'WR1';
-    const routes = call?.routes ?? { WR1: 'go', WR2: 'go', WR3: 'hitch', TE: 'flat', RB: 'flat' } as Record<Rcv, RouteId>;
+    const routes = { ...(call?.routes ?? { WR1: 'go', WR2: 'go', WR3: 'hitch', TE: 'flat', RB: 'flat' } as Record<Rcv, RouteId>), ...(res.routes ?? {}) } as Record<Rcv, RouteId>;
     const qbA = design?.qb ?? 'gun5';
     const rpoThrow = call?.kind === 'rpo';
     const qb0 = P('o:QB');

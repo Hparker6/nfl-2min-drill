@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NFL_IDS, realTeam } from '../engine/nfl';
 import { customScenario, genScenario, type Scenario, type SpotParams } from '../engine/scenario';
 import { fmtClock } from '../game/describe';
+import { track } from '../game/analytics';
 import type { Store } from '../game/storage';
 import { GameScreen } from './GameScreen';
 
@@ -21,8 +22,8 @@ export function Practice({ store, update }: Props) {
   const hints = store.settings.hints;
   const set = <K extends keyof SpotParams>(k: K, v: SpotParams[K]) => setP((x) => ({ ...x, [k]: v }));
 
-  const build = () => { setSc(customScenario(p, `practice:${Date.now()}`)); setN((x) => x + 1); };
-  const random = () => { setSc(genScenario(`practice:rand:${Date.now()}`, 'practice')); setN((x) => x + 1); };
+  const build = () => { track('practice_setup', { how: 'custom', side: p.side, weather: p.weather ?? 'clear', coach: hints }); setSc(customScenario(p, `practice:${Date.now()}`)); setN((x) => x + 1); };
+  const random = () => { track('practice_setup', { how: 'random', coach: hints }); setSc(genScenario(`practice:rand:${Date.now()}`, 'practice')); setN((x) => x + 1); };
 
   if (sc) {
     const meta = (
@@ -73,6 +74,11 @@ export function Practice({ store, update }: Props) {
           </label>
           <label>Their timeouts
             <select value={p.to[1]} onChange={(e) => set('to', [p.to[0], Number(e.target.value)])}>{[0, 1, 2, 3].map((d) => <option key={d}>{d}</option>)}</select>
+          </label>
+          <label>Weather
+            <select value={p.weather ?? 'clear'} onChange={(e) => set('weather', e.target.value as SpotParams['weather'])}>
+              <option value="clear">Clear</option><option value="rain">Rain</option><option value="snow">Snow</option><option value="wind">Wind</option>
+            </select>
           </label>
           <label className="check"><input type="checkbox" checked={p.running} onChange={(e) => set('running', e.target.checked)} /> Clock running</label>
           <label className="check"><input type="checkbox" checked={hints} onChange={(e) => update((s) => { s.settings.hints = e.target.checked; })} /> Coach mode: show win chance on every option</label>

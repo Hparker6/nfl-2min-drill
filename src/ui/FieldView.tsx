@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, type ReactNode } from 'react';
 import { FieldRenderer, type Outcome, type Preview } from './field';
 import { useState } from 'react';
-import type { Ev, Rcv, State, TeamInfo } from '../engine/types';
+import type { Ev, Rcv, State, TeamInfo, Weather } from '../engine/types';
 import { PlayerCard } from './PlayerCard';
 
 export interface FieldHandle {
@@ -19,9 +19,10 @@ interface Props {
   banner?: Banner | null;
   children?: ReactNode;      // overlays (legend)
   offense?: 0 | 1;           // which team has the ball, so hovering a marker shows the right player
+  weather?: Weather;         // tints the field
 }
 
-export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0 }, ref) {
+export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather }, ref) {
   const [inspect, setInspect] = useState<{ side: 'o' | 'd'; pos: string } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -61,7 +62,9 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
   }), []);
 
   return (
-    <div className="field-wrap" ref={wrapRef}>
+    <div className={`field-wrap wx-${weather ?? 'clear'}`} ref={wrapRef}>
+      {weather === 'snow' && <div className="wx-snowfall" aria-hidden />}
+      {weather === 'rain' && <div className="wx-rainfall" aria-hidden />}
       <svg ref={svgRef} className="field" role="img" aria-label="Field: your end zone at the bottom, theirs at the top" />
       {banner && (
         <div key={banner.id} className={`ribbon tone-${banner.tone}`} role="status">

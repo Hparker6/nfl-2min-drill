@@ -694,3 +694,118 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .hist-n { font: 600 11px var(--body); color: var(--ink-2); margin-bottom: 3px; }
 .hist-x { position: absolute; bottom: -18px; font-size: 11px; color: var(--muted); }
 .board-head { display: flex; justify-content: space-between; align-items: baseline; }
+
+/* ---------- play cards: the real formation and routes, drawn like the field ---------- */
+.mini.mp { background: #2c7246 !important; }
+.mp-turf { fill: #2e7a4a; }
+.mp-yd { stroke: rgba(255, 255, 255, .13); stroke-width: .35; }
+.mp-los { stroke: rgba(255, 255, 255, .55); stroke-width: .5; }
+.mp-ol { fill: rgba(255, 255, 255, .62); }
+.mp-o { fill: #fff; }
+.mp-o.qb { fill: #ffe9a8; }
+.mp-o.tgt { fill: var(--accent); stroke: #1b1600; stroke-width: .4; }
+.mp-o.car { fill: var(--run); stroke: #1b1600; stroke-width: .4; }
+.mp-route { fill: none; stroke: rgba(255, 255, 255, .72); stroke-width: .7; stroke-linecap: round; stroke-linejoin: round; }
+.mp-route.tgt { stroke: var(--accent); stroke-width: 1.3; }
+.mp-route.dash { stroke-dasharray: 1.6 1.1; }
+.mp-run { fill: none; stroke: var(--run); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.mini.fam-trick .mp-run { stroke: var(--trick); }
+.mp-qb { fill: none; stroke: #ffe9a8; stroke-width: .8; stroke-dasharray: 1.4 1; stroke-linecap: round; }
+.mp-fake { fill: none; stroke: rgba(255, 233, 168, .7); stroke-width: .7; stroke-dasharray: 1 1; }
+.mp-post { fill: none; stroke: var(--accent); stroke-width: .9; }
+.mp-arc { fill: none; stroke: #fff; stroke-width: .8; stroke-dasharray: 1.6 1; }
+.mp-d { fill: #e6ecf7; stroke: #16304a; stroke-width: .3; }
+.mp-d.rush { fill: #ff6a6a; }
+.mp-ghost { fill: rgba(255, 255, 255, .22); }
+.mp-zone { fill: rgba(45, 212, 191, .16); stroke: rgba(45, 212, 191, .55); stroke-width: .35; }
+.mp-man { stroke: rgba(45, 212, 191, .75); stroke-width: .45; stroke-dasharray: .8 .6; }
+.mp-rush { fill: none; stroke: #ff6a6a; stroke-width: .8; stroke-linecap: round; stroke-linejoin: round; }
+.prow .mini, .prow .mini.mp { width: 84px; height: 48px; }
+.prow { grid-template-columns: 84px minmax(0, 1fr) auto; }
+@media (max-width: 999px) { .prow { grid-template-columns: 72px minmax(0, 1fr) auto; } .prow .mini, .prow .mini.mp { width: 72px; height: 42px; } }
+@media (min-width: 1000px) and (max-width: 1279px) { .prow { grid-template-columns: 70px minmax(0, 1fr) auto; } .prow .mini, .prow .mini.mp { width: 70px; height: 40px; } }
+.cp-sel-mini .mini.mp { width: 64px; height: 38px; }
+.status-call .mini.mp { width: 92px; height: 54px; }
+.sbtn .mini.mp { width: 48px; height: 30px; background: #2c7246 !important; }
+
+/* field preview: the quarterback's action and the play fake */
+.f-qb { fill: none; stroke: #ffe9a8; stroke-width: .34; stroke-dasharray: .8 .5; stroke-linecap: round; }
+.f-fake { fill: none; stroke: rgba(255, 233, 168, .75); stroke-width: .28; stroke-dasharray: .5 .5; }
+.f-qb.under, .f-fake.under { stroke: rgba(6, 20, 12, .5); stroke-dasharray: none; stroke-width: .6; }
+
+/* ---------- the clock row: tempo and the big buttons, above the play list ---------- */
+.cp-flags { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+.off-flag { font: 700 12px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); padding: 3px 8px; border-radius: 4px; }
+.clockrow { display: grid; gap: 8px; padding: 10px; border-radius: var(--r-sm); background: var(--panel-2); border: 1px solid var(--line-2); }
+.tempo { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 6px; align-items: stretch; }
+.clockrow.def .tempo { grid-template-columns: auto minmax(0, 1fr); }
+.tempo-k, .chips-k { align-self: center; font: 600 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding-right: 4px; }
+.tbtn { display: grid; gap: 1px; justify-items: center; border: 1px solid var(--line-2); background: var(--panel); border-radius: 8px; padding: 7px 6px; cursor: pointer; min-width: 0; transition: background .16s, border-color .16s; }
+.tbtn:hover { background: var(--panel-3); }
+.tbtn.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); box-shadow: inset 0 0 0 1px var(--accent); }
+.tbtn-name { font: 700 15px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.tbtn-sub { font: 600 12px var(--body); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tbtn.on .tbtn-sub { color: var(--accent); }
+.tbtn.h-g .tbtn-sub { color: var(--g); } .tbtn.h-y .tbtn-sub { color: var(--y); } .tbtn.h-o .tbtn-sub { color: var(--o); } .tbtn.h-r .tbtn-sub { color: var(--r); }
+.majors { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.mbtn { display: grid; gap: 1px; justify-items: center; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line-2)); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-radius: 8px; padding: 9px 6px; cursor: pointer; min-width: 0; transition: background .16s; }
+.mbtn:hover { background: color-mix(in srgb, var(--accent) 20%, var(--panel)); }
+.mbtn:active { transform: translateY(1px); }
+.mbtn-name { font: 800 17px/1.1 var(--display); text-transform: uppercase; letter-spacing: .04em; color: var(--accent); white-space: nowrap; }
+.mbtn-sub { font: 500 11px var(--body); color: var(--muted); text-align: center; line-height: 1.2; }
+.mbtn.h-g .mbtn-sub { color: var(--g); } .mbtn.h-y .mbtn-sub { color: var(--y); } .mbtn.h-o .mbtn-sub { color: var(--o); } .mbtn.h-r .mbtn-sub { color: var(--r); }
+.cp.def .tbtn.on { border-color: var(--def); background: color-mix(in srgb, var(--def) 16%, var(--panel)); box-shadow: inset 0 0 0 1px var(--def); }
+.cp.def .tbtn.on .tbtn-sub { color: var(--def); }
+.cp.def .mbtn { border-color: color-mix(in srgb, var(--def) 55%, var(--line-2)); background: color-mix(in srgb, var(--def) 8%, var(--panel)); }
+.cp.def .mbtn-name { color: var(--def); }
+@media (max-width: 420px) { .tbtn-name { font-size: 13px; } .mbtn-name { font-size: 15px; } .tempo-k { display: none; } .tempo { grid-template-columns: repeat(3, minmax(0, 1fr)); } .clockrow.def .tempo { grid-template-columns: 1fr; } }
+
+/* ---------- the selected play's options: side, receiver, signals ---------- */
+.prow-wrap { display: grid; gap: 0; }
+.prow-wrap.sel .prow { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.sides, .passopts { display: grid; gap: 6px; padding: 8px 10px 10px; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 var(--r-sm) var(--r-sm); background: color-mix(in srgb, var(--panel-2) 70%, var(--panel)); }
+.sides { grid-template-columns: 1fr 1fr; }
+.sidebtn { border: 1px solid var(--line-2); background: var(--panel); border-radius: 8px; padding: 9px 8px; cursor: pointer; font: 700 14px var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); transition: background .16s, border-color .16s; }
+.sidebtn:hover { background: var(--panel-3); }
+.sidebtn.on { border-color: var(--run); background: color-mix(in srgb, var(--run) 18%, var(--panel)); color: var(--ink); box-shadow: inset 0 0 0 1px var(--run); }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rchip, .mchip { display: inline-grid; gap: 0; justify-items: start; border: 1px solid var(--line-2); background: var(--panel); border-radius: 8px; padding: 5px 9px; cursor: pointer; text-align: left; transition: background .16s, border-color .16s; }
+.rchip b { font: 700 13px/1.15 var(--display); letter-spacing: .03em; text-transform: uppercase; color: var(--ink); }
+.rchip span { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.rchip:hover, .mchip:hover { background: var(--panel-3); }
+.rchip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--panel)); box-shadow: inset 0 0 0 1px var(--accent); }
+.rchip.on span { color: var(--accent); }
+.rchip.edited:not(.on) { border-color: color-mix(in srgb, var(--pass) 60%, var(--line-2)); }
+.mchip { font: 600 13px var(--body); color: var(--ink-2); padding: 7px 10px; }
+.mchip.on { border-color: var(--pass); background: color-mix(in srgb, var(--pass) 18%, var(--panel)); color: var(--ink); box-shadow: inset 0 0 0 1px var(--pass); }
+
+/* defense list in two groups */
+.def-group-k { font: 600 11px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--def); padding: 6px 2px 0; }
+.def-group-k:first-child { padding-top: 0; }
+.mini.mp-def { background: #2c7246 !important; }
+
+/* ---------- weather ---------- */
+.wx-chip, .sb-wx { font: 600 12px var(--body); padding: 3px 8px; border-radius: 999px; white-space: nowrap; background: var(--panel-3); color: var(--ink); }
+.sb-wx { margin-left: 8px; font-size: 11px; background: #1b2a24; color: #dfe9e3; }
+.wx-snow { --wxc: #cfe6ff; } .wx-rain { --wxc: #7fb3ff; } .wx-wind { --wxc: #c7d3cc; }
+.wx-chip, .sb-wx { border: 1px solid color-mix(in srgb, var(--wxc, var(--line-2)) 55%, transparent); }
+.wx-word { font-weight: 600; color: var(--wxc, var(--ink)); }
+.field-wrap.wx-snow .field { filter: saturate(.55) brightness(1.18) contrast(.92); }
+.field-wrap.wx-rain .field { filter: saturate(.75) brightness(.82); }
+.field-wrap.wx-wind .field { filter: saturate(.85) brightness(.96); }
+.wx-snowfall, .wx-rainfall { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.wx-snowfall { background-image: radial-gradient(circle, rgba(255,255,255,.85) 0 1.2px, transparent 1.6px), radial-gradient(circle, rgba(255,255,255,.55) 0 1px, transparent 1.4px); background-size: 46px 46px, 71px 71px; background-position: 0 0, 23px 31px; animation: snowfall 9s linear infinite; opacity: .8; }
+.wx-rainfall { background-image: repeating-linear-gradient(100deg, transparent 0 11px, rgba(190, 215, 255, .18) 11px 12px); animation: rainfall .6s linear infinite; opacity: .7; }
+@keyframes snowfall { from { background-position: 0 0, 23px 31px; } to { background-position: 8px 46px, 15px 102px; } }
+@keyframes rainfall { from { background-position: 0 0; } to { background-position: -12px 60px; } }
+@media (prefers-reduced-motion: reduce) { .wx-snowfall, .wx-rainfall { animation: none; } }
+
+/* wide desktops: the whole clock row on one line */
+@media (min-width: 1280px) {
+  .clockrow { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .clockrow.def { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .clockrow .majors:empty { display: none; }
+  .clockrow:has(.majors:empty), .clockrow:not(:has(.majors)) { grid-template-columns: 1fr; }
+}
+.cp-sel-sub b { color: var(--accent); }
+.cp.def .cp-sel-sub b { color: var(--def); }
