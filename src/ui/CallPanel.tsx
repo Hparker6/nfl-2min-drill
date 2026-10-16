@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { CALL, LOOK_READ, LOOKS, POS_NAME, ROUTES, TEMPO } from '../engine/data';
-import { DEF_PLAYS, type DefCat } from '../engine/defense';
+import { DEF_PLAYS, famOf, type DefCat } from '../engine/defense';
+import { DESIGN, type FormationId } from '../engine/formation';
 import { WEATHER } from '../engine/sim';
 import { tendency } from '../game/describe';
 import type { Decision, Opt } from '../game/session';
 import { GRADE_INFO, type Grade } from '../game/grade';
-import type { PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
+import type { LookFam, PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
 import { MiniPlay } from './MiniPlay';
 
 /** What the play-caller changed about the selected call: the side, the receiver, the routes, the quarterback's action. */
@@ -64,6 +65,9 @@ const DEF_TABS: { id: DefCat; label: string; key: string; blurb: string }[] = [
   { id: 'blitz', label: 'Blitz', key: 'b', blurb: 'Blitz: send extra rushers. Sacks and hurried throws, but someone is left open.' },
   { id: 'goal', label: 'Goal Line', key: 'g', blurb: 'Goal line and run stop: load the box. Stops runs; play-action and the deep ball are the risk.' },
 ];
+/** Card labels: the offense's formation, and the front a defensive family lines up in. */
+const FORMATION_NAME: Record<FormationId, string> = { gun: 'Shotgun', trips: 'Gun Trips', empty: 'Gun Empty', single: 'Singleback', iform: 'I-Form', pistol: 'Pistol', heavy: 'Heavy', bunch: 'Gun Bunch', wildcat: 'Wildcat' };
+const DEF_FRONT: Record<LookFam, string> = { balanced: '4-3 Base', zone: 'Nickel', man: 'Nickel', blitz: 'Nickel', prevent: 'Dime', load: 'Bear', goal: 'Goal Line' };
 const defTabOf = (o: Opt): DefCat => (o.choice.look && o.choice.look !== 'soft' ? DEF_PLAYS[o.choice.look].cat : 'zone');
 
 /** Runs that have a side to pick: everything but a sneak. */
@@ -209,17 +213,16 @@ export function CallPanel(p: Props) {
       const wp = hints?.get(o.key);
       const sel = selected?.key === o.key;
       const L = LOOKS[o.choice.look!];
+      const fam = famOf(o.choice.look!);
       return (
-        <button key={o.key} role="option" aria-selected={sel} className={`prow fam-def${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
-          <MiniPlay look={o.choice.look} />
-          <span className="prow-txt">
-            <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
-            <span className="prow-sub">{o.sub}</span>
-            {sel && <span className="def-trade in-row"><span><b>Stops:</b> {L.stops}</span><span><b>Gives up:</b> {L.risk}</span></span>}
+        <button key={o.key} role="option" aria-selected={sel} className={`pcard2 fam-def${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
+          <span className="pc-art">
+            <MiniPlay look={o.choice.look} />
+            <span className="pc-form">{DEF_FRONT[fam]}</span>
+            <span className="pc-tag">{wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : <span className={`riskchip r${L.tilt}`}>{['', 'Safe', 'Trade-off', 'Gamble'][L.tilt]}</span>}</span>
           </span>
-          <span className="prow-side">
-            {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : <span className={`riskchip r${L.tilt}`}>{['', 'Safe', 'Trade-off', 'Gamble'][L.tilt]}</span>}
-          </span>
+          <span className="pc-name"><kbd>{i + 1}</kbd>{o.label}</span>
+          <span className="pc-sub">{o.sub}</span>
         </button>
       );
     };
@@ -244,7 +247,7 @@ export function CallPanel(p: Props) {
           })}
         </div>
         <p className="tab5-blurb">{DT.blurb}</p>
-        <div className="cp-list def-list" role="listbox" aria-label={`${DT.label} defenses`}>{list.map(row)}</div>
+        <div className="cp-list def-list cards" role="listbox" aria-label={`${DT.label} defenses`}>{list.map(row)}</div>
         {info && <div className="def-trade strip"><span><b>Stops:</b> {info.stops}</span><span><b>Gives up:</b> {info.risk}</span></div>}
         <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
           <div className="cp-sel">
@@ -304,41 +307,43 @@ export function CallPanel(p: Props) {
   const setSide = (side: 1 | -1) => onEdit({ ...edits, side });
   const toggleMod = (k: keyof PassMods) => onEdit({ ...edits, mods: { ...edits.mods, [k]: !edits.mods[k] } });
 
+  // the playbook as cards, Madden style: the play drawn big, its formation, its name
   const row = (o: Opt, i: number) => {
     const wp = hints?.get(o.key);
     const sel = selected?.key === o.key;
-    const run = sided(o.choice.play);
+    const f = o.choice.play ? DESIGN[o.choice.play]?.formation : undefined;
     return (
-      <div key={o.key} className={`prow-wrap${sel ? ' sel' : ''}`}>
-        <button role="option" aria-selected={sel} className={`prow fam-${o.group}${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget.parentElement ?? e.currentTarget); }}>
+      <button key={o.key} role="option" aria-selected={sel} className={`pcard2 fam-${o.group}${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={(e) => { onSelect(o); keepClear(e.currentTarget); }}>
+        <span className="pc-art">
           <MiniPlay play={o.choice.play} side={sel ? edits.side : undefined} routes={sel ? edits.routes : undefined} target={sel ? edits.target : undefined} mods={sel ? edits.mods : undefined} />
-          <span className="prow-txt">
-            <span className="prow-name"><kbd>{i + 1}</kbd>{o.label}</span>
-            <span className="prow-sub">{o.sub}</span>
-          </span>
-          <span className="prow-side">
-            {wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}
-          </span>
-        </button>
-        {sel && run && (
-          <div className="sides" role="radiogroup" aria-label="Which side">
-            <button role="radio" aria-checked={edits.side === 1} className={`sidebtn${edits.side === 1 ? ' on' : ''}`} onClick={() => setSide(1)} title="Toward the tight end: an extra blocker">Strong side →</button>
-            <button role="radio" aria-checked={edits.side === -1} className={`sidebtn${edits.side === -1 ? ' on' : ''}`} onClick={() => setSide(-1)} title="Away from the tight end: fewer blockers, fewer defenders">← Weak side</button>
-          </div>
-        )}
-        {sel && isPass && o.key === call?.id && (
-          <div className="passopts">
-            <div className="chips" role="group" aria-label="Adjustments">
-              <span className="chips-k">Signal</span>
-              {MODS.map((m) => (
-                <button key={m.k} className={`mchip${edits.mods[m.k] ? ' on' : ''}`} aria-pressed={!!edits.mods[m.k]} onClick={() => toggleMod(m.k)} title={m.tip}>{m.label}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+          {f && <span className="pc-form">{FORMATION_NAME[f] ?? f}</span>}
+          <span className="pc-tag">{wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}</span>
+        </span>
+        <span className="pc-name"><kbd>{i + 1}</kbd>{o.label}</span>
+        <span className="pc-sub">{o.sub}</span>
+      </button>
     );
   };
+  // the selected play's adjustments sit just above Snap, always in reach
+  const run = sided(selected?.choice.play);
+  const adjust = selected && (run || isPass) && (
+    <div className="cp-adjust">
+      {run && (
+        <div className="sides" role="radiogroup" aria-label="Which side">
+          <button role="radio" aria-checked={edits.side === 1} className={`sidebtn${edits.side === 1 ? ' on' : ''}`} onClick={() => setSide(1)} title="Toward the tight end: an extra blocker">Strong side →</button>
+          <button role="radio" aria-checked={edits.side === -1} className={`sidebtn${edits.side === -1 ? ' on' : ''}`} onClick={() => setSide(-1)} title="Away from the tight end: fewer blockers, fewer defenders">← Weak side</button>
+        </div>
+      )}
+      {isPass && (
+        <div className="chips" role="group" aria-label="Adjustments">
+          <span className="chips-k">Signal</span>
+          {MODS.map((m) => (
+            <button key={m.k} className={`mchip${edits.mods[m.k] ? ' on' : ''}`} aria-pressed={!!edits.mods[m.k]} onClick={() => toggleMod(m.k)} title={m.tip}>{m.label}</button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const specialRow = specials.length > 0 && (
     <div className={`cp-special${fourth ? ' urgent' : ''}`}>
@@ -397,9 +402,10 @@ export function CallPanel(p: Props) {
         })}
       </div>
       <p className="tab5-blurb">{T.blurb}</p>
-      <div className="cp-list" role="listbox" aria-label={`${T.label} calls`}>{list.map(row)}</div>
+      <div className="cp-list cards" role="listbox" aria-label={`${T.label} calls`}>{list.map(row)}</div>
       {!fourth && specialRow}
       <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
+        {adjust}
         <div className="cp-sel">
           {selected ? (
             <>

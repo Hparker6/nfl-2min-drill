@@ -922,3 +922,33 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 /* the wordmark never wraps; phones show the mark alone */
 .brand-name { white-space: nowrap; }
 @media (max-width: 640px) { .brand-name { display: none; } .meta-title { font-size: 20px; } }
+
+/* ---------- the playbook as cards (Madden style): play art, formation, name ---------- */
+.cp-list.cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pcard2 { --fc: var(--muted); position: relative; display: flex; flex-direction: column; min-width: 0; padding: 0; text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); overflow: hidden; transition: border-color .15s, box-shadow .15s, transform .12s; }
+.pcard2.fam-def { --fc: var(--def); }
+.pcard2:hover { border-color: var(--line-2); }
+.pcard2:active { transform: scale(.985); }
+.pcard2.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent), 0 8px 20px rgba(0, 0, 0, .3); }
+.cp.def .pcard2.sel { border-color: var(--def); box-shadow: 0 0 0 2px var(--def), 0 8px 20px rgba(0, 0, 0, .3); }
+.pc-art { position: relative; display: block; }
+.pc-art::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--fc); }
+.pcard2 .mini { width: 100%; height: auto; aspect-ratio: 53.3 / 30; border-radius: 0; }
+.pc-form { position: absolute; left: 6px; top: 6px; padding: 2px 6px; border-radius: 4px; background: rgba(8, 12, 10, .72); color: #e3eae5; font: 700 10px var(--body); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.pc-tag { position: absolute; right: 6px; top: 5px; }
+.pc-tag .riskchip { font-size: 10px; padding: 2px 7px; background: rgba(8, 12, 10, .72); }
+.pc-tag .opt-wp { padding: 1px 6px; border-radius: 4px; background: rgba(8, 12, 10, .78); font-size: 14px; }
+.pc-name { display: flex; align-items: baseline; gap: 6px; padding: 8px 10px 0; font: 800 18px/1.05 var(--display); text-transform: uppercase; letter-spacing: .02em; color: var(--ink); }
+.pc-name kbd { font-size: 10px; }
+.pc-sub { padding: 3px 10px 10px; font-size: 12px; line-height: 1.3; color: var(--muted); }
+.pcard2.sel .pc-name { color: var(--ink); }
+/* the selected play's adjustments, just above Snap */
+.cp-adjust { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cp-adjust .sides { margin: 0; }
+@media (max-width: 999px) { .pc-name { font-size: 16px; } .pc-sub { font-size: 11.5px; } }
+@media (max-width: 360px) { .cp-list.cards { grid-template-columns: 1fr; } }
+@media (max-width: 999px) {
+  .cp-adjust .chips-k { display: none; }
+  .cp-adjust .mchip, .cp-adjust .sidebtn { padding: 6px 11px; font-size: 13px; }
+  .cp-adjust { gap: 6px; }
+}
