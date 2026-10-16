@@ -34,3 +34,22 @@ Goal: rank first for "nfl 2 min drill", "nfl 2 minute drill game", "2min nfl dri
 
 - [ ] Search Console → Performance → Queries: which searches show the site and at what position.
 - [ ] Adjust the title/description in `index.html` toward the queries that get impressions but few clicks.
+
+## 6. Career mode (beta, live since 2026-10-16)
+
+Polish:
+- [ ] A "Your drive · Q2 1:48 · down 3" banner pinned on top of the play caller during a moment.
+- [ ] Scoring plays flash on the drive tracker's field strip.
+- [ ] Animated XP bar and level-up on the postgame screen.
+- [ ] Team logos (now: colored abbreviation chips).
+- [ ] A `/career/` page for search ("football career mode game, free in your browser") and a sitemap entry.
+
+Depth:
+- [ ] Backups on every roster: split carries (rushing leaders run ~2,700 yards; NFL ~1,900), injuries, a depth chart.
+- [ ] AI teams trading with each other (only your own trade request exists now).
+
+Money (needs an account on your side first):
+- [ ] A rewarded-ad network for "watch an ad to keep playing" (Google Ad Manager rewarded ads, or a game portal SDK
+      such as CrazyGames or Poki). Gate only after a player is hooked, a few weeks into a season.
+- [ ] A paid unlock (ad-free, more seasons).
+- [ ] Legal review before charging (NFL marks in the site name and copy).
