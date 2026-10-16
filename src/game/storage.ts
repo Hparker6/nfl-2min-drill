@@ -12,7 +12,7 @@ export interface Settings {
 
 export interface SpotResult {
   id: string;
-  mode: 'daily' | 'survivor' | 'practice';
+  mode: 'daily' | 'survivor' | 'practice' | 'career';
   date: string;
   teams: [string, string];
   win: boolean;

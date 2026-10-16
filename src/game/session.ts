@@ -5,7 +5,7 @@
  */
 import { CALLS, LOOKS, TEMPO } from '../engine/data';
 import {
-  advance, aiDefClock, aiDefLook, aiKick, aiOffClock, aiOffPlay, aiPat, aiST, clone, fgDist, fgProb, leadOf, lookOther, otProb, ytg,
+  advance, fullGamePace, aiDefClock, aiDefLook, aiKick, aiOffClock, aiOffPlay, aiPat, aiST, clone, fgDist, fgProb, leadOf, lookOther, otProb, ytg,
 } from '../engine/sim';
 import { hash, rng } from '../engine/rng';
 import { READ_ACCURACY } from '../engine/evaluate';
@@ -73,7 +73,7 @@ export class Session {
     }
   }
 
-  get over() { return this.s.stage === 'over'; }
+  get over() { return this.s.stage === 'over' || !!this.sc.until?.(this.s); }
 
   private rngFor(tag: string) { return rng(hash(this.sc.seed, this.s.k, tag)); }
 
@@ -85,6 +85,12 @@ export class Session {
   }
 
   private build(): Decision | null {
+    if (this.over) return null;
+    const d = this.buildAll();
+    return d && this.sc.control && !this.sc.control(this.s, d.step) ? null : d;
+  }
+
+  private buildAll(): Decision | null {
     const s = this.s;
     if (s.stage === 'over') return null;
     const aiR = this.rngFor('ai');
@@ -105,7 +111,7 @@ export class Session {
       if (s.off === 0) {
         if (!s.pendLook) {
           s.pendLook = aiDefLook(s, pre);
-          s.shownLook = pre() < READ_ACCURACY ? s.pendLook : lookOther(s.pendLook, pre, s.mix);
+          s.shownLook = pre() < (this.sc.readAcc ?? READ_ACCURACY) ? s.pendLook : lookOther(s.pendLook, pre, s.mix);
         }
         return this.playCall(aiR);
       }
@@ -155,10 +161,14 @@ export class Session {
 
   private offClock(aiR: () => number): Decision {
     const s = this.s;
-    const options: Opt[] = (Object.keys(TEMPO) as (keyof typeof TEMPO)[]).map((k) => ({ key: k, label: TEMPO[k].label, sub: TEMPO[k].sub, group: 'clock', choice: { offClock: k } }));
+    const options: Opt[] = (Object.keys(TEMPO) as (keyof typeof TEMPO)[]).map((k) => ({
+      key: k, label: TEMPO[k].label, group: 'clock', choice: { offClock: k },
+      // a full game's normal huddle uses more of the play clock (see fullGamePace)
+      sub: s.q != null && fullGamePace(k) ? `Normal pace: about ${TEMPO[k].secs + fullGamePace(k)} seconds` : TEMPO[k].sub,
+    }));
     if (s.to[0] > 0) {
       options.push({ key: 'timeout', label: 'Timeout', sub: `Stop it now (${s.to[0]} left)`, group: 'clock', choice: { offClock: 'timeout' } });
-      if (s.t <= 45 && s.t > 4 && fgDist(s) <= 60) options.push({ key: 'drain', label: 'Run it down', sub: 'Let it run to 0:03, then timeout', group: 'clock', choice: { offClock: 'drain' } });
+      if (s.t <= 45 && s.t > 4 && fgDist(s) <= 60 && (s.q == null || s.q === 2 || s.q >= 4)) options.push({ key: 'drain', label: 'Run it down', sub: 'Let it run to 0:03, then timeout', group: 'clock', choice: { offClock: 'drain' } });
     }
     if (s.down < 4) options.push({ key: 'spike', label: 'Spike it', sub: 'Stop the clock, lose a down', group: 'clock', choice: { offClock: 'spike' } });
     if (leadOf(s, 0) > 0) options.push({ key: 'kneel', label: 'Kneel', sub: 'Run the play clock, take a knee', group: 'clock', choice: { offClock: 'kneel' } });

@@ -105,7 +105,7 @@ describe('full games', () => {
   });
 
   it('leaves late-game spots alone: no period fields, the clock running out ends it', () => {
-    const s = { ...start(1), q: undefined, qLen: undefined, po: undefined, rec: undefined, t: 30, stage: 'pre' as const, off: 0 as const, running: true, warned: true, kicker: 0 as const };
+    const s = { ...start(1), q: undefined, qLen: undefined, po: undefined, rec: undefined, t: 30, stage: 'pre' as State['stage'], off: 0 as const, running: true, warned: true, kicker: 0 as const };
     for (let i = 0; i < 200 && s.stage !== 'over'; i++) advance(s, rng(i), null, []);
     expect(s.stage).toBe('over');
     expect(s.q).toBeUndefined();

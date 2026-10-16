@@ -77,7 +77,7 @@ export function Scoreboard({ s, teams, wp, trail }: Props) {
         <Team team={teams[0]} score={s.score[0]} tos={s.to[0]} ball={live && s.off === 0} you />
         <div className="sb-center">
           <div className={`sb-clock${s.running && live ? ' running' : ''}`}>{fmtClock(clock)}</div>
-          <div className="sb-q"><span className="sb-q-long">4th quarter{live && s.running ? ' · running' : live ? ' · stopped' : ''}</span><span className="sb-q-short">Q4</span>{s.weather && s.weather !== 'clear' ? <span className={`sb-wx wx-${s.weather}`} title={WEATHER[s.weather].blurb}>{WX_ICON[s.weather]}<span className="sb-wx-name"> {WEATHER[s.weather].name}</span></span> : null}</div>
+          <div className="sb-q"><span className="sb-q-long">{periodName(s.q)}{live && s.running ? ' · running' : live ? ' · stopped' : ''}</span><span className="sb-q-short">{periodShort(s.q)}</span>{s.weather && s.weather !== 'clear' ? <span className={`sb-wx wx-${s.weather}`} title={WEATHER[s.weather].blurb}>{WX_ICON[s.weather]}<span className="sb-wx-name"> {WEATHER[s.weather].name}</span></span> : null}</div>
         </div>
         <Team team={teams[1]} score={s.score[1]} tos={s.to[1]} ball={live && s.off === 1} you={false} right />
       </div>
@@ -96,6 +96,10 @@ export function Scoreboard({ s, teams, wp, trail }: Props) {
     </section>
   );
 }
+
+/** "4th quarter" (a late-game spot is always the fourth), "Overtime", "2nd OT". */
+export const periodName = (q?: number) => (q == null || q === 4 ? '4th quarter' : q < 4 ? `${['1st', '2nd', '3rd'][q - 1]} quarter` : q === 5 ? 'Overtime' : `OT ${q - 4}`);
+export const periodShort = (q?: number) => (q == null ? 'Q4' : q <= 4 ? `Q${q}` : q === 5 ? 'OT' : `OT${q - 4}`);
 
 export function Spark({ values, h = 26 }: { values: number[]; h?: number }) {
   const w = 100;

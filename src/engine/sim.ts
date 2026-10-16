@@ -450,7 +450,7 @@ export function applySnap(s: State, res: PlayResult): boolean {
  * Tuned against NFL season averages (see career/calibrate.test.ts).
  */
 export const fullGamePace = (oc: OffClock) => (oc === 'huddle' ? FULL_GAME_HUDDLE : 0);
-export const FULL_GAME_HUDDLE = 11;
+export const FULL_GAME_HUDDLE = 9;
 const FULL_GAME_INT = 0.8;
 
 /** Pre-snap runoff with the clock running. Returns true when the two-minute warning stopped it. */

@@ -32,7 +32,7 @@ function genAttrs(group: PosGroup, level: number, r: Rng): Partial<Record<Attr, 
   return out;
 }
 
-export type Mode = 'daily' | 'survivor' | 'practice';
+export type Mode = 'daily' | 'survivor' | 'practice' | 'career';
 
 export interface Scenario {
   id: string;
@@ -43,6 +43,12 @@ export interface Scenario {
   start: State;
   baseWp: number;              // how often the AI coach wins it from here
   kind?: DailyKind;            // the daily's situation type (rotates by day)
+  /** Career: part of a full game. The part ends when this says so (the drive is over, say). */
+  until?: (s: State) => boolean;
+  /** Career: which steps are the player's (a quarterback calls the offense; the AI runs his defense). */
+  /** Career: how often the pre-snap read of the defense is right (the Film Room ability raises it). */
+  readAcc?: number;
+  control?: (s: State, step: 'offClock' | 'defClock' | 'play' | 'look' | 'st' | 'pat' | 'kick') => boolean;
 }
 
 /** The situation types a daily rotates through, so no two days in a row feel alike. */

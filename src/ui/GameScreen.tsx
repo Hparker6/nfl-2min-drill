@@ -7,7 +7,7 @@ import type { Ev, Rcv, State } from '../engine/types';
 import { ballOn, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import { GradeJob } from '../game/grader';
-import { Session, type Decision, type Opt, type Pick } from '../game/session';
+import { Session, type Decision, type Opt, type Pick, type Record_ } from '../game/session';
 import { spotResult } from '../game/rating';
 import type { Settings, SpotResult } from '../game/storage';
 import { setContext, track } from '../game/analytics';
@@ -34,6 +34,8 @@ interface Props {
   onDone: (r: SpotResult) => void;
   onContinue: () => void;
   continueLabel: string;
+  /** Career: this screen plays one part of a full game (a drive). When it ends, hand the game back. */
+  segment?: { onEnd: (s: State, records: Record_[], log: Ev[]) => void; endLabel?: string };
 }
 
 /**
@@ -250,7 +252,10 @@ export function GameScreen(p: Props) {
     busyRef.current = true;
     try {
       for (let guard = 0; guard < 300; guard++) {
-        if (session.over) { finish(); return; }
+        if (session.over) {
+          if (p.segment) { p.segment.onEnd(clone(session.s), session.records, session.log.map((l) => l.ev)); return; }
+          finish(); return;
+        }
         const d = session.decision();
         if (d) { setLast(null); present(d); return; }
         setPhase('auto');
@@ -486,7 +491,7 @@ export function GameScreen(p: Props) {
       </section>
     );
   } else if (phase === 'result' && last) {
-    side = <ResultCard last={last} s={view} teams={T} onNext={next} onReplay={replay} replaying={replaying} over={session.over} />;
+    side = <ResultCard last={last} s={view} teams={T} onNext={next} onReplay={replay} replaying={replaying} over={session.over} overLabel={p.segment ? p.segment.endLabel ?? 'Continue' : undefined} />;
   } else if (phase === 'over' && result) {
     side = <SpotReview result={result} session={session} trail={trail} onContinue={p.onContinue} continueLabel={p.continueLabel}
       lastPlay={feed.find((l) => l.text && !/expires|runs out/.test(l.text))?.text} />;
@@ -534,9 +539,9 @@ export function GameScreen(p: Props) {
   );
 }
 
-interface RCProps { last: Last; s: State; teams: [import('../engine/types').TeamInfo, import('../engine/types').TeamInfo]; onNext: () => void; onReplay: () => void; replaying: boolean; over: boolean }
+interface RCProps { last: Last; s: State; teams: [import('../engine/types').TeamInfo, import('../engine/types').TeamInfo]; onNext: () => void; onReplay: () => void; replaying: boolean; over: boolean; overLabel?: string }
 
-function ResultCard({ last, s, teams, onNext, onReplay, replaying, over }: RCProps) {
+function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLabel }: RCProps) {
   const g = last.grade;
   const head = last.head;
   const others = last.lines.filter((l) => l !== head);
@@ -589,7 +594,7 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over }: RCPro
       )}
       <div className="res-actions">
         {canReplay && <button className="btn ghost replay" onClick={onReplay} disabled={replaying}>↺ Replay<kbd>R</kbd></button>}
-        <button className="btn next" onClick={onNext} disabled={(!g && !last.failed) || replaying}>{over ? 'See the final' : 'Next play'}<kbd>Enter</kbd></button>
+        <button className="btn next" onClick={onNext} disabled={(!g && !last.failed) || replaying}>{over ? overLabel ?? 'See the final' : 'Next play'}<kbd>Enter</kbd></button>
       </div>
     </section>
   );
