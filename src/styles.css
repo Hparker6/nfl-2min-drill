@@ -966,7 +966,8 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 @media (max-width: 420px) { .modes .beta { display: none; } }
 
 /* the optional ad slot (src/ui/AdSlot.tsx): below the page, apart from every control, and gone when unfilled */
-.ad-slot { width: 100%; max-width: 728px; margin: 24px auto 16px; min-width: 0; }
+.ad-slot { width: 100%; max-width: 728px; margin: 0 auto; min-width: 0; }
+.ad-slot:has(ins[data-ad-status="filled"]) { margin: 24px auto 16px; }
 .ad-slot .ad-k { display: none; margin-bottom: 4px; color: var(--muted); font: 600 10px var(--body); letter-spacing: .08em; text-transform: uppercase; }
 .ad-slot:has(ins[data-ad-status="filled"]) .ad-k { display: block; }
 .ad-slot ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; }
