@@ -7,7 +7,8 @@ import type { SpotResult } from './storage';
 import { track } from './analytics';
 import { rateSpots } from './rating';
 
-const site = () => (typeof location !== 'undefined' && location.origin && !location.origin.startsWith('file') ? location.origin + location.pathname : 'The 4th Call');
+// ?ref=share lets analytics count visits that came from a shared result (the canonical link keeps it out of search)
+const site = () => (typeof location !== 'undefined' && location.origin && !location.origin.startsWith('file') ? `${location.origin}${location.pathname}?ref=share` : 'The 4th Call');
 
 
 export function dailyShare(date: string, spots: SpotResult[], streakN: number, extra: { percentile?: number | null; coach?: string; rank?: { rank: number; count: number } | null } = {}): string {

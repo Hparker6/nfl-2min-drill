@@ -14,6 +14,7 @@ Goal: rank first for "nfl 2 min drill", "nfl 2 minute drill game", "2min nfl dri
 ## 2. Bing Webmaster Tools
 
 - [ ] https://www.bing.com/webmasters → "Import from Google Search Console" (covers Bing, DuckDuckGo, Yahoo).
+- [ ] After every deploy: `npm run indexnow` (pings Bing/DuckDuckGo/Yandex to recrawl right away).
 
 ## 3. Links to the site (the biggest ranking factor for a new site)
 

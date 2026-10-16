@@ -27,7 +27,7 @@ function siteMeta(site: string): Plugin {
         operatingSystem: 'Any',
         isAccessibleForFree: true,
         offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-        image: abs('og.png'),
+        image: abs('og.jpg'),
         ...(site && { url: `${site}/` }),
       },
     ],
@@ -36,7 +36,7 @@ function siteMeta(site: string): Plugin {
     name: 'site-meta',
     transformIndexHtml(html) {
       return html
-        .replace(/%OG_IMAGE%/g, abs('og.png'))
+        .replace(/%OG_IMAGE%/g, abs('og.jpg'))
         .replace('<!--CANONICAL-->', site ? `<link rel="canonical" href="${site}/" />` : '')
         .replace('<!--OG_URL-->', site ? `<meta property="og:url" content="${site}/" />` : '')
         .replace('<!--JSONLD-->', `<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>`);
