@@ -52,6 +52,10 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
   }, [byRating, teams]);
 
   useEffect(() => {
+    rRef.current?.setWeather(weather);
+  }, [weather, teams]);
+
+  useEffect(() => {
     if (rRef.current) rRef.current.onInspect = (side, pos) => setInspect(side && pos ? { side, pos } : null);
   }, [teams]);
 

@@ -112,6 +112,21 @@ describe('assignments, not a swarm', () => {
     expect(avg).toBeLessThan(3.2);
     expect(Math.max(...near)).toBeLessThanOrEqual(6);
   });
+  it('a runner who goes out of bounds is pushed out: a defender meets him at the sideline', () => {
+    let n = 0;
+    for (const call of [...RUNS, 'quick_out', 'slants', 'screen', 'dig', 'go']) for (let i = 0; i < SEEDS; i++) {
+      const { res, tl } = play(s0, call, DEF_CALLS[i % 7], 7000 + i);
+      if (!res.oob || res.td || res.turnover) continue;
+      const ev = tl.events.find((e) => e.kind === 'oob');
+      if (!ev) continue;
+      n++;
+      const ck = [...tl.carrier].reverse().find((c) => c.t <= ev.t)!.key;
+      const cp = at(tl.tracks[ck], ev.t);
+      const nearest = Math.min(...DEFK.map((k) => d(at(tl.tracks[k], ev.t), cp)));
+      expect([call, i, nearest < 2]).toEqual([call, i, true]);
+    }
+    expect(n).toBeGreaterThan(20);
+  });
   it('a long touchdown leaves the defense behind', () => {
     let n = 0;
     for (const call of ['go', 'deep_post', 'outside_zone', 'toss', 'pa_deep']) for (let i = 0; i < 300 && n < 25; i++) {

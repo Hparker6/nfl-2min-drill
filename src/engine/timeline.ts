@@ -598,7 +598,8 @@ function simulateAll(ag: Record<string, Agent>, c: SimCtx) {
   let cScript: ((t: number) => Pt) | null = c.carrierPath?.script ?? null;
   let tEnd = c.result.tEnd || 0;
   const res = c.res;
-  const wantTackle = !res.td && !res.oob && !(res.kind === 'pass' && !res.complete) && res.kind !== 'sack' && !res.defTd && !res.touchback && !res.intercepted;
+  // out of bounds is not a free step: the defender who can get there first meets him at the sideline and pushes him out
+  const wantTackle = !res.td && !(res.kind === 'pass' && !res.complete) && res.kind !== 'sack' && !res.defTd && !res.touchback && !res.intercepted;
 
   // completed pass / scramble: the carrier runs from the catch (or the escape) to the engine's spot
   if (c.carrierPath && !cScript) {
@@ -652,7 +653,7 @@ function simulateAll(ag: Record<string, Agent>, c: SimCtx) {
       const t0 = tt;
       ag[best].script = (u) => (u < t0 ? null : lerpP(from, contact, clip((u - t0) / Math.max(0.05, tEnd - t0), 0, 1)));
       c.result.tackler = best;
-      c.events.push({ t: tEnd, kind: res.fumble ? 'fumble' : 'tackle', who: best, at: endP });
+      if (!res.oob) c.events.push({ t: tEnd, kind: res.fumble ? 'fumble' : 'tackle', who: best, at: endP });
     }
 
     for (const k of keys) {

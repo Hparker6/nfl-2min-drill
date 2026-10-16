@@ -12,10 +12,10 @@
  */
 import { CALL, DEF_POS, OFF_POS, POS_LABEL, RECEIVERS, ROUTES } from '../engine/data';
 import { CX, DESIGN, W, defAlign, formation, type Pt } from '../engine/formation';
-import { hash } from '../engine/rng';
+import { hash, rng } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
-import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo, PassMods } from '../engine/types';
+import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo, PassMods, Weather } from '../engine/types';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -131,6 +131,15 @@ export class FieldRenderer {
     this.applyCam();
   }
 
+  private weather: Weather = 'clear';
+  /** Snow settles on the turf and rain leaves puddles; redraws the field when it changes. */
+  setWeather(w: Weather | undefined) {
+    const next = w ?? 'clear';
+    if (next === this.weather) return;
+    this.weather = next;
+    if (this.teams) this.drawField();
+  }
+
   setTeams(teams: [TeamInfo, TeamInfo]) {
     this.teams = teams;
     this.drawField();
@@ -150,6 +159,7 @@ export class FieldRenderer {
     };
     ez(0, T[1], true);
     ez(110, T[0], false);
+    this.drawGround(g);
     for (let u = 0; u <= 100; u += 5) this.el('line', { x1: 0, x2: W, y1: 110 - u, y2: 110 - u, class: u === 0 || u === 100 ? 'f-line f-goal' : 'f-line' }, g);
     for (let u = 1; u < 100; u++) {
       if (u % 5 === 0) continue;
@@ -165,6 +175,44 @@ export class FieldRenderer {
     }
     for (const y of [0.15, 119.85]) this.el('line', { x1: CX - 3.1, x2: CX + 3.1, y1: y, y2: y, class: 'f-post' }, g);
     this.el('rect', { x: 0, y: 0, width: W, height: 120, class: 'f-border' }, g);
+  }
+
+  /**
+   * The ground under the weather, between the turf and the lines (so yard lines, hashes and numbers always read).
+   * Snow: a light cover, drifts piled along the sidelines, soft patches that thin out between the hashes where the
+   * players have been. Rain: the turf a shade darker and a few puddles. The same game always draws the same ground.
+   */
+  private drawGround(g: SVGElement) {
+    const w = this.weather;
+    if (w !== 'snow' && w !== 'rain') return;
+    const T = this.teams!;
+    const r = rng(hash('ground', w, T[0].id, T[1].id));
+    const rnd = (a: number, b: number) => a + r() * (b - a);
+    if (w === 'snow') {
+      const f = this.el('filter', { id: 'f-snowblur', x: '-20%', y: '-20%', width: '140%', height: '140%' }, g);
+      this.el('feGaussianBlur', { stdDeviation: 0.7 }, f);
+      const s = this.el('g', { filter: 'url(#f-snowblur)', 'pointer-events': 'none' }, g);
+      this.el('rect', { x: 0, y: 0, width: W, height: 120, fill: '#ffffff', opacity: 0.1 }, s);
+      for (const x of [0, W - 2.6]) this.el('rect', { x, y: 0, width: 2.6, height: 120, fill: '#ffffff', opacity: 0.42 }, s);
+      for (let i = 0; i < 150; i++) {
+        // most of it outside the numbers and in the end zones; the middle of the field is trampled
+        const zone = r();
+        const x = zone < 0.45 ? (r() < 0.5 ? rnd(0, 10) : rnd(W - 10, W)) : zone < 0.8 ? (r() < 0.5 ? rnd(9, 22) : rnd(W - 22, W - 9)) : rnd(22, W - 22);
+        const y = r() < 0.2 ? (r() < 0.5 ? rnd(0, 10) : rnd(110, 120)) : rnd(10, 110);
+        const mid = x > 21 && x < W - 21;
+        this.el('ellipse', { cx: x.toFixed(2), cy: y.toFixed(2), rx: rnd(0.8, 3.4).toFixed(2), ry: rnd(0.4, 1.5).toFixed(2), fill: '#ffffff', opacity: (mid ? rnd(0.08, 0.16) : rnd(0.16, 0.34)).toFixed(2) }, s);
+      }
+    } else {
+      this.el('rect', { x: 0, y: 0, width: W, height: 120, fill: '#03110a', opacity: 0.12, 'pointer-events': 'none' }, g);
+      const n = 10 + Math.floor(r() * 4);
+      for (let i = 0; i < n; i++) {
+        const x = r() < 0.6 ? rnd(18, W - 18) : (r() < 0.5 ? rnd(2, 12) : rnd(W - 12, W - 2));
+        const y = rnd(8, 112), rx = rnd(1.4, 3.8), ry = rx * rnd(0.3, 0.5);
+        this.el('ellipse', { cx: x.toFixed(2), cy: y.toFixed(2), rx: rx.toFixed(2), ry: ry.toFixed(2), fill: '#163d2c', opacity: 0.6, stroke: '#bfe0d2', 'stroke-opacity': 0.22, 'stroke-width': 0.08, 'pointer-events': 'none' }, g);
+        // the sky in the water
+        this.el('ellipse', { cx: (x - rx * 0.25).toFixed(2), cy: (y - ry * 0.25).toFixed(2), rx: (rx * 0.45).toFixed(2), ry: (ry * 0.3).toFixed(2), fill: '#ffffff', opacity: 0.1, 'pointer-events': 'none' }, g);
+      }
+    }
   }
 
   // offense frame → field coordinates
@@ -513,6 +561,8 @@ export class FieldRenderer {
 
   private runTimeline(tl: Timeline, ev: Extract<Ev, { type: 'snap' }>, map: (p: Pt) => Pt, outcome: Outcome, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
     const res = ev.res;
+    // a kick or a try is set up from a between-plays (dimmed) picture: once the ball is live, everyone is at full strength
+    this.gPlayers.classList.remove('dim');
     this.gMarks.innerHTML = '';
     const los = map([CX, 0]);
     if (res.kind !== 'kickoff') this.el('line', { x1: 0, x2: W, y1: los[1], y2: los[1], class: 'f-los' }, this.gMarks);
