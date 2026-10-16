@@ -628,3 +628,16 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 /* the five categories keep their full names; they wrap to two lines when the panel is narrow */
 .tab5-name { white-space: normal; text-align: center; justify-content: center; line-height: 1.05; }
 @media (max-width: 999px) { .pcard { top: auto; bottom: 8px; right: 8px; width: 220px; } }
+
+/* ---------- names, numbers and on-field call-outs ---------- */
+.f-dot .f-lab { font: 700 .72px var(--display); letter-spacing: .02px; }
+.f-name { font: 600 .72px var(--body); text-anchor: middle; pointer-events: none; fill: #ffffff; paint-order: stroke; stroke: rgba(8, 12, 10, .75); stroke-width: .22; }
+.f-players.dim .f-name { opacity: 0; }
+@media (max-width: 999px) { .f-name { display: none; } }
+.fx-call { pointer-events: none; animation: callout var(--life, 1.6s) var(--ease) forwards; transform-box: fill-box; transform-origin: center; }
+.fx-call-box { fill: rgba(9, 13, 11, .9); stroke: rgba(255, 255, 255, .25); stroke-width: .08; }
+.fx-call.good .fx-call-box { fill: rgba(31, 122, 64, .95); }
+.fx-call.bad .fx-call-box { fill: rgba(176, 44, 36, .95); }
+.fx-call-text { font: 800 1.15px var(--display); letter-spacing: .05px; text-anchor: middle; fill: #fff; text-transform: uppercase; }
+@keyframes callout { 0% { opacity: 0; transform: translateY(1px) scale(.8); } 12% { opacity: 1; transform: translateY(0) scale(1.05); } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; } }
+.f-name-line { display: none; }

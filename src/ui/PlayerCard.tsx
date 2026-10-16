@@ -5,8 +5,8 @@ import type { TeamInfo } from '../engine/types';
 
 const SOURCE: Record<string, string> = {
   generated: 'Fictional player · generated game ratings',
-  stats: 'Game ratings derived from published stats',
-  estimated: 'Game ratings estimated',
+  stats: "Game ratings from this season's stats (nflverse)",
+  estimated: 'Game ratings estimated (no individual stats)',
 };
 
 export function PlayerCard({ team, pos }: { team: TeamInfo; pos: string }) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FRANCHISES } from '../engine/data';
+import { NFL_IDS, realTeam } from '../engine/nfl';
 import { customScenario, genScenario, type Scenario, type SpotParams } from '../engine/scenario';
 import { fmtClock } from '../game/describe';
 import type { Store } from '../game/storage';
@@ -11,7 +11,7 @@ interface Props {
 }
 
 const DEFAULT: SpotParams = {
-  you: 'PDX', them: 'AUS', side: 'off', t: 105, lead: -3, yl: 25, down: 1, dist: 10, to: [2, 2], running: false, home: 0,
+  you: 'ATL', them: 'CHI', side: 'off', t: 105, lead: -3, yl: 25, down: 1, dist: 10, to: [2, 2], running: false, home: 0,
 };
 
 export function Practice({ store, update }: Props) {
@@ -45,8 +45,8 @@ export function Practice({ store, update }: Props) {
       <div className="meta"><div className="meta-l"><h1 className="meta-title">Practice</h1><span className="meta-sub">Build any late-game spot and play it out. Not scored or saved.</span></div></div>
       <section className="summary builder">
         <div className="form">
-          <label>You<select value={p.you} onChange={(e) => set('you', e.target.value)}>{FRANCHISES.map((f) => <option key={f[0]} value={f[0]} disabled={f[0] === p.them}>{f[1]} {f[2]}</option>)}</select></label>
-          <label>Them<select value={p.them} onChange={(e) => set('them', e.target.value)}>{FRANCHISES.map((f) => <option key={f[0]} value={f[0]} disabled={f[0] === p.you}>{f[1]} {f[2]}</option>)}</select></label>
+          <label>You<select value={p.you} onChange={(e) => set('you', e.target.value)}>{NFL_IDS.map((id) => { const t = realTeam(id); return <option key={id} value={id} disabled={id === p.them}>{t.city} {t.name}</option>; })}</select></label>
+          <label>Them<select value={p.them} onChange={(e) => set('them', e.target.value)}>{NFL_IDS.map((id) => { const t = realTeam(id); return <option key={id} value={id} disabled={id === p.you}>{t.city} {t.name}</option>; })}</select></label>
           <label>Who has the ball
             <select value={p.side} onChange={(e) => set('side', e.target.value as 'off' | 'def')}>
               <option value="off">You (call the offense)</option>

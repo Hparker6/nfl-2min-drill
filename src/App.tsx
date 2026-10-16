@@ -88,7 +88,7 @@ export default function App() {
           <button onClick={() => setModal('help')}>How to play</button>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
         </nav>
-        <p>An independent fan game. Fictional teams and players; results come from a simplified simulation. Not affiliated with any league.</p>
+        <p>An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0); ratings and outcomes are this game's own estimates from a simplified simulation.</p>
       </footer>
       {modal === 'help' && <Help onClose={closeModal} />}
       {modal === 'stats' && <Stats store={store} onClose={closeModal} />}

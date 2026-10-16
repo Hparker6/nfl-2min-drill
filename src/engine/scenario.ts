@@ -8,6 +8,7 @@ import { evaluate } from './evaluate';
 import { clip, hash, pickWeighted, rng, type Rng } from './rng';
 import type { Player, Ratings, State, Team, TeamInfo } from './types';
 import { GROUP_ATTRS, SLOT_GROUP, units, type Attr, type PosGroup, type RosterMeta, type RosterPlayer } from './roster';
+import { NFL_IDS, hasRealTeam, realTeam } from './nfl';
 
 /** The current rosters are fictional: every name, number and rating below is generated. */
 export const FICTIONAL_ROSTER: RosterMeta = { sourceName: 'Generated for fictional teams (The 4th Call)' };
@@ -54,7 +55,9 @@ export function dayNumber(date: string): number {
 
 const rnd = (r: Rng, lo: number, hi: number) => lo + Math.floor(r() * (hi - lo + 1));
 
+/** A real team when the id is one (the season's rosters), otherwise a generated fictional one (tests, old saves). */
 export function makeTeam(id: string, seed: string): TeamInfo {
+  if (hasRealTeam(id)) return realTeam(id);
   const f = FRANCHISES.find((x) => x[0] === id) || FRANCHISES[0];
   const r = rng(hash('team', id, seed));
   const off = rnd(r, 72, 92), def = rnd(r, 72, 92);
@@ -130,7 +133,7 @@ function quickWp(s: State, seed: number): number {
 
 export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 'def'; hard?: number } = {}): Scenario {
   const r = rng(hash('spot', seedStr));
-  const ids = FRANCHISES.map((f) => f[0]);
+  const ids = NFL_IDS.length ? NFL_IDS : FRANCHISES.map((f) => f[0]);
   const a = ids[Math.floor(r() * ids.length)];
   let b = ids[Math.floor(r() * ids.length)];
   while (b === a) b = ids[Math.floor(r() * ids.length)];

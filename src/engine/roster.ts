@@ -59,7 +59,8 @@ export const SLOTS = Object.keys(SLOT_GROUP);
 /** Jersey numbers each position group may wear (current league numbering rules, simplified). */
 export const NUMBER_RANGES: Record<PosGroup, [number, number][]> = {
   QB: [[0, 19]], RB: [[0, 49], [80, 89]], WR: [[0, 49], [80, 89]], TE: [[0, 49], [80, 89]], OL: [[50, 79]],
-  DL: [[0, 59], [90, 99]], LB: [[0, 59], [90, 99]], CB: [[0, 49]], S: [[0, 49]], K: [[0, 49], [90, 99]], P: [[0, 49], [90, 99]],
+  // edge rushers are listed as ends or outside linebackers, so the front seven shares one range
+  DL: [[0, 79], [90, 99]], LB: [[0, 79], [90, 99]], CB: [[0, 49]], S: [[0, 49]], K: [[0, 49], [90, 99]], P: [[0, 49], [90, 99]],
 };
 
 export type RatingSource = 'generated' | 'stats' | 'estimated';

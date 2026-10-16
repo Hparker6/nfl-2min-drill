@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { NFL_SEASON } from '../engine/nfl';
 import { ARCHETYPES } from '../engine/data';
 import { SPOTS_PER_DAY, utcDate } from '../engine/scenario';
 import { GRADE_INFO, type GradeKey } from '../game/grade';
@@ -59,7 +60,7 @@ export function Help({ onClose }: { onClose: () => void }) {
         <li><b>Survivor:</b> random spots back to back. Win to keep going; one loss ends the run.</li>
         <li><b>Practice:</b> build any spot and play it out with Coach mode, which shows the win chance of every option before you call it.</li>
       </ul>
-      <p className="muted small">Teams, players and situations are fictional. Outcomes come from a simplified football simulation built for this game. Win chances and grades are that simulation's estimates, not official evaluations or real-world probabilities.</p>
+      <p className="muted small">Real rosters (nflverse, season {NFL_SEASON}); made-up situations. Player ratings are this game's estimates from season statistics. Outcomes come from a simplified football simulation; win chances and grades are its estimates, not official evaluations or real-world probabilities.</p>
     </Modal>
   );
 }
@@ -67,7 +68,9 @@ export function Help({ onClose }: { onClose: () => void }) {
 export function About({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="About & privacy" onClose={onClose}>
-      <p><b>The 4th Call</b> is an independent fan game about late-game play-calling. Teams, players and situations are made up.</p>
+      <p><b>The 4th Call</b> is an independent fan game about late-game play-calling. The teams and players are real; the game situations are made up.</p>
+      <h3>Where the data comes from</h3>
+      <p>Rosters (names, jersey numbers, positions) and season statistics come from <b>nflverse</b> (nflverse-data, CC-BY 4.0), season {NFL_SEASON}. Every player's 0–100 ratings are computed by this game from those statistics (the formula is in the open build script); linemen, kickers and low-snap players are marked <i>estimated</i>. They are game ratings, not official measurements and not any other game's ratings.</p>
       <h3>About the grades</h3>
       <p>Plays are resolved by a simplified football simulation written for this game. Win chances and grades are that simulation's estimates: useful for comparing your options, but not official evaluations, real coaching grades or real-world probabilities.</p>
       <h3>Your data</h3>
@@ -77,7 +80,7 @@ export function About({ onClose }: { onClose: () => void }) {
         <li>Fonts are loaded from Google Fonts. If the site owner turns on Google Analytics, anonymous gameplay events are sent to it (for example, that a game started or a result was shared), never names or contact details.</li>
       </ul>
       <h3>No affiliation</h3>
-      <p>Not affiliated with, endorsed by or connected to any professional or college league, team or players' association.</p>
+      <p>Not affiliated with, endorsed by or connected to the NFL, any of its teams, or the NFL Players Association. Team and player names are used to identify real teams and players; no logos or marks are used.</p>
     </Modal>
   );
 }

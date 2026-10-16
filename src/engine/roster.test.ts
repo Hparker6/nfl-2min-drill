@@ -138,3 +138,25 @@ describe('players move plays', () => {
     expect(m.comp).toBeCloseTo((80 - 80) * 0.006 + (80 - 90) * 0.004);
   });
 });
+
+describe('the real-team roster set', () => {
+  it('has all 32 teams and every roster passes validation', async () => {
+    const { NFL_IDS, validateAll, realTeam, NFL_SEASON } = await import('./nfl');
+    expect(NFL_IDS.length).toBe(32);
+    expect(validateAll()).toEqual([]);
+    expect(NFL_SEASON).toMatch(/^\d{4}$/);
+    const atl = realTeam('ATL');
+    expect(atl.players.RB.name).toBeTruthy();
+    expect(atl.players.RB.number).toBeGreaterThanOrEqual(0);
+    expect(atl.rat.units).toBeTruthy();
+  });
+  it('a top back rates and moves above an average one', async () => {
+    const { realTeam, NFL_IDS } = await import('./nfl');
+    const backs = NFL_IDS.map((id) => realTeam(id).players.RB);
+    const sorted = [...backs].sort((a, b) => b.rating - a.rating);
+    const best = sorted[0], median = sorted[Math.floor(sorted.length / 2)];
+    expect(best.rating).toBeGreaterThan(median.rating + 8);
+    expect(best.attrs!.speed!).toBeGreaterThan(median.attrs!.speed!);
+    console.log(`top backs: ${sorted.slice(0, 5).map((b) => `${b.name} ${b.rating}`).join(', ')} | median ${median.name} ${median.rating}`);
+  });
+});

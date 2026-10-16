@@ -25,3 +25,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea
+
+# downloaded source data (rebuild with scripts/build-rosters.mjs)
+data-cache

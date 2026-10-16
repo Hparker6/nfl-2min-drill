@@ -330,11 +330,11 @@ export function choreograph(inp: ChoreoInput): Timeline {
     // ---- coverage
     const man = look === 'man' || look === 'blitz' || look === 'balanced' || look === 'load' || look === 'goal';
     const coverOf: Record<string, Rcv | null> = { 'd:CB1': 'WR1', 'd:CB2': 'WR2', 'd:LB1': look === 'blitz' ? null : 'WR3', 'd:LB3': look === 'blitz' ? null : 'TE', 'd:LB2': 'RB', 'd:S2': look === 'man' ? 'WR3' : null };
-    const sepTarget = res.complete ? clip(1.3 + ((units.o?.rcv[tgt]?.sep ?? 80) - (units.d?.cov[tgt]?.coverage ?? 80)) * 0.04 + r() * 0.9, 1.0, 4) : res.intercepted ? 0 : clip(0.5 + r() * 0.6, 0.4, 1.1);
+    const sepTarget = res.complete ? clip(1.3 + ((units.o?.rcv[tgt]?.sep ?? 80) - (units.d?.cov[tgt]?.coverage ?? 80)) * 0.04 + r() * 0.9, 1.0, 3.2) : res.intercepted ? 0 : clip(0.5 + r() * 0.6, 0.4, 1.1);
     const landmarks: Record<string, Pt> = look === 'prevent' || look === 'soft'
       ? { 'd:CB1': [8, 15], 'd:CB2': [W - 8, 15], 'd:S1': [CX - 9, 22], 'd:S2': [CX + 9, 22], 'd:LB1': [CX - 7, 9], 'd:LB2': [CX, 10], 'd:LB3': [CX + 7, 9] }
       : { 'd:CB1': [7, 12], 'd:CB2': [W - 7, 12], 'd:S1': [CX - 10, 16], 'd:S2': [CX + 10, 16], 'd:LB1': [CX - 7, 7], 'd:LB2': [CX, 8], 'd:LB3': [CX + 7, 7] };
-    const recvPos = (rk: Rcv, t: number): Pt => ag['o:' + rk].keys.length ? (() => { const ks = ag['o:' + rk].keys; const i = Math.max(0, Math.min(ks.length - 1, Math.round(t / 0.1))); return [ks[i][1], ks[i][2]] as Pt; })() : P('o:' + rk);
+    const recvPos = (rk: Rcv, t: number): Pt => ag['o:' + rk].keys.length ? (() => { const ks = ag['o:' + rk].keys; const i = Math.max(0, Math.min(ks.length - 1, Math.round(t / DT))); return [ks[i][1], ks[i][2]] as Pt; })() : P('o:' + rk);
     for (const key of [...DEF.map((k) => 'd:' + k)]) {
       if (rushers.includes(key)) continue;
       const rk = coverOf[key];
@@ -342,7 +342,7 @@ export function choreograph(inp: ChoreoInput): Timeline {
       const lead = rk === tgt ? sepTarget : 1.3;
       if (rk && (man || !landmarks[key])) {
         // man: trail his receiver, inside and a step deep, a reaction behind
-        const lagT = clip(a.prof.react * 0.5 + (rk === tgt ? lead : 1) / Math.max(5, ag['o:' + rk].prof.vmax), 0.12, 0.5);
+        const lagT = clip(a.prof.react * 0.5 + (rk === tgt ? lead : 1) / Math.max(5, ag['o:' + rk].prof.vmax), 0.12, 0.4);
         a.goal = (t) => {
           const q = recvPos(rk, Math.max(0, t - lagT));
           return [q[0] + (q[0] < CX ? 0.6 : -0.6), q[1] + 0.8];
@@ -435,10 +435,10 @@ export function choreograph(inp: ChoreoInput): Timeline {
 
     simulateAll(ag, { yt, throwT: sack ? 99 : throwT, catchT: sack ? 99 : catchT, sackT, isPass: true, look, carrierPath, res, r, events, result, qbKey: 'o:QB', sacker, rushers, gain });
     // the ball: snap to the passer, the throw (with height), then with whoever has it
-    buildBall(ball, ag, carrier, { snapTo: thrower === 'o:WR2' ? 'o:QB' : 'o:QB', throwT: sack ? undefined : throwT, catchT: sack ? undefined : catchT, catchPt, complete: !!res.complete, intercepted: !!res.intercepted, depth, end: result.tEnd, lateral: qbA === 'lateral' ? { t: 0.55, to: 'o:WR2' } : undefined, start: start['o:C'] });
-    if (qbA === 'lateral') carrier.push({ t: 0.55, key: 'o:WR2' });
     carrier.push({ t: 0.12, key: 'o:QB' });
+    if (qbA === 'lateral') carrier.push({ t: 0.55, key: 'o:WR2' });
     carrier.sort((a, b) => a.t - b.t);
+    buildBall(ball, ag, carrier, { snapTo: 'o:QB', throwT: sack ? undefined : throwT, catchT: sack ? undefined : catchT, catchPt, complete: !!res.complete, intercepted: !!res.intercepted, depth, end: result.tEnd, lateral: qbA === 'lateral' ? { t: 0.55, to: 'o:WR2' } : undefined, start: start['o:C'] });
     const decisive = sack ? sackT : res.complete || scramble ? result.tEnd : catchT;
     return finish(ag, ball, events, carrier, result, decisive, { throwT: sack ? undefined : throwT, catchT: sack ? undefined : catchT, pressureT });
   }
@@ -462,10 +462,10 @@ export function choreograph(inp: ChoreoInput): Timeline {
     path = d.qb === 'sneak' ? [qb0, fin] : [qb0, [CX + side * 1.2, -4.2], [CX + side * 6, -2], fin];   // option keep: around the end
     tGet = 0.12;
   } else if (ck === 'o:WR2') {
-    // end-around: the receiver comes back behind the line, takes it from the back, runs the other way
+    // end-around: the receiver is in motion at the snap, takes it behind the back and runs the other way
     const w0 = P('o:WR2');
-    path = [w0, [CX + 2, -4.8], [CX - 4, -4.6], [holeX, -1], fin];
-    tGet = 1.0;
+    path = [w0, [CX + 3, -4.2], [CX - 4, -3.8], [holeX, -0.5], fin];
+    tGet = 0.9;
   } else if (d.qb === 'toss') {
     path = [rb0, [CX + side * 4, -6], [CX + side * 8.5, -3.5], [holeX, -0.5], fin];
     tGet = 0.45;
@@ -478,18 +478,20 @@ export function choreograph(inp: ChoreoInput): Timeline {
     path = d.qb === 'draw' ? [rb0, [rb0[0], -6.2], mesh, hole, fin] : [rb0, mesh, hole, fin];
   }
   const cProf = ag[ck].prof;
-  // ratings set the pace: the carrier runs at his speed (a draw waits for the rush to clear first)
+  // ratings set the pace: the carrier runs at his speed (a draw waits for the rush to clear first; the end-around
+  // receiver is already at speed from his motion)
   const waitT = d.qb === 'draw' ? 0.85 : 0;
+  const warm = ck === 'o:WR2' ? 1.2 : 0;
   const runPath = path;
-  let tEnd = waitT + timeTo(polyLen(runPath), cProf);
+  let tEnd = waitT + timeTo(polyLen(runPath) + travel(warm, cProf), cProf) - warm;
   void tEnd;
   // a run stopped short: drop the part of the path he never reaches (the hole, when he is hit before it)
   if (res.yards <= 0 && !res.td && !res.oob) {
     const cut = runPath.findIndex((q, i) => i > 0 && q[1] >= res.yards - 0.01);
     if (cut > 0) runPath.splice(cut, runPath.length - cut, fin);
-    tEnd = waitT + timeTo(polyLen(runPath), cProf);
+    tEnd = waitT + timeTo(polyLen(runPath) + travel(warm, cProf), cProf) - warm;
   }
-  const carrierScript = runner(runPath, waitT, cProf, 0, 1, true);
+  const carrierScript = runner(runPath, waitT, cProf, warm, 1, true);
   // the handoff: the quarterback opens to the back and gives it (or fakes and carries)
   if (ck !== 'o:QB') {
     const qbTo: Pt = d.qb === 'draw' ? [CX, -6.8] : d.qb === 'toss' ? [CX + side * 0.8, -2.6] : mesh;
@@ -601,7 +603,8 @@ function simulateAll(ag: Record<string, Agent>, c: SimCtx) {
   const endFor = () => tEnd;
   const hardEnd = Math.max(tEnd || 0, c.isPass ? Math.min(c.catchT + 1.2, 6) : 2, c.sackT ? c.sackT + 0.4 : 0) + 0.6;
 
-  for (let t = 0; t <= hardEnd + 1e-9; t += DT) {
+  // the tackle can extend the play after this starts, so the bound follows tEnd
+  for (let t = 0; t <= Math.max(hardEnd, tEnd + 0.6) + 1e-9; t += DT) {
     const tt = Math.round(t * 1000) / 1000;
     // the tackle: once the runner is a runner, the defender who can reach his end spot first takes it
     if (!tackleSet && wantTackle && c.carrierPath && tt >= breakT) {
@@ -649,14 +652,15 @@ function simulateAll(ag: Record<string, Agent>, c: SimCtx) {
         const cp = ag[carrierKey].p;
         g = [cp[0], cp[1] + 0.8];
         cap = c.rushers.includes(k) || FRONT.includes(k.slice(2)) ? 0.7 : 1;
-        stop = 2.6;
-      } else if (isDef && c.isPass && tt >= c.throwT + a.prof.react && tt < breakT && !res.complete) {
-        // ball in the air: break on the catch point
+        const rank = defense.filter((o) => o !== k && dist(ag[o].p, cp) < dist(a.p, cp)).length;
+        stop = rank < 3 ? 2.8 : 4.6;
+      } else if (isDef && c.isPass && tt >= c.throwT + a.prof.react && tt < breakT && !c.rushers.includes(k)) {
+        // ball in the air: the two defenders nearest the throw break on it; everyone else finishes his assignment
         const ev = c.events.find((e) => e.kind === 'catch' || e.kind === 'incomplete' || e.kind === 'int');
-        if (ev?.at) { g = ev.at; stop = 1.2; cap = 1; }
-      } else if (isDef && c.isPass && tt >= c.throwT + a.prof.react && res.complete && tt < breakT) {
-        const ev = c.events.find((e) => e.kind === 'catch');
-        if (ev?.at) { g = ev.at; stop = 1.4; }
+        if (ev?.at) {
+          const rank = defense.filter((o) => o !== k && !c.rushers.includes(o) && dist(ag[o].p, ev.at!) < dist(a.p, ev.at!)).length;
+          if (rank < 2) { g = ev.at; stop = res.complete ? 1.6 : 1.1; cap = 1; }
+        }
       }
       if (!g) { a.v = Math.max(0, a.v - (a.prof.vmax / a.prof.tau) * DT * 1.5); record(a, tt); continue; }
       const to = sub(g, a.p);
@@ -681,6 +685,11 @@ function simulateAll(ag: Record<string, Agent>, c: SimCtx) {
     }
     // a body's width apart: nobody stands on anybody
     separate(ag, keys, c, tt, tEnd);
+    if (c.isPass && tt < c.throwT) for (const k of defense) {
+      if (k === c.sacker) continue;
+      const a = ag[k], q = ag[c.qbKey].p, dq = dist(a.p, q);
+      if (dq < 2.1) { a.p = add(q, mul(unit(sub(a.p, q)), 2.1)); const kk = a.keys[a.keys.length - 1]; if (kk && kk[0] === tt) { kk[1] = a.p[0]; kk[2] = a.p[1]; } }
+    }
   }
   c.result.tEnd = tEnd || c.result.tEnd;
   if (wantTackle && !tackleSet && c.carrierPath) c.result.tEnd = tEnd;
@@ -714,8 +723,7 @@ function separate(ag: Record<string, Agent>, keys: string[], c: SimCtx, t: numbe
 
 function record(a: Agent, t: number) {
   const last = a.keys[a.keys.length - 1];
-  // keyframes every 0.1 s (the renderer interpolates)
-  if (!last || t - last[0] >= 0.0999 || t === 0) a.keys.push([t, a.p[0], a.p[1]]);
+  if (!last || t - last[0] >= DT - 1e-6 || t === 0) a.keys.push([t, a.p[0], a.p[1]]);
 }
 
 function trackAt(a: Agent, t: number): Pt {
@@ -753,9 +761,12 @@ function buildBall(ball: BallKey[], ag: Record<string, Agent>, carrier: Timeline
       continue;
     }
     const k = t < 0.12 ? 'o:C' : holder(t);
-    const p = k === 'o:C' ? lerpP(o.start, trackAt(ag[o.snapTo], 0.12), t / 0.12) : trackAt(ag[k], t);
+    const p = k === 'o:C' ? lerpP(o.start, trackAt(ag[o.snapTo], 0.12), clip(t / 0.12, 0, 1)) : trackAt(ag[k], t);
     ball.push({ t, x: p[0], dy: p[1], h: 0 });
   }
+  // the last sample sits exactly where the play ended
+  const kEnd = holder(end), pEnd = trackAt(ag[kEnd], end);
+  if (!(o.catchT != null && !o.complete && !o.intercepted)) ball.push({ t: end, x: pEnd[0], dy: pEnd[1], h: 0 });
 }
 
 function finish(ag: Record<string, Agent>, ball: BallKey[], events: TEvent[], carrier: Timeline['carrier'], result: { tEnd: number; tackler: string }, decisive: number, extra: { throwT?: number; catchT?: number; pressureT?: number }): Timeline {
