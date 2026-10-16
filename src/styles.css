@@ -790,15 +790,10 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .wx-snow { --wxc: #cfe6ff; } .wx-rain { --wxc: #7fb3ff; } .wx-wind { --wxc: #c7d3cc; }
 .wx-chip, .sb-wx { border: 1px solid color-mix(in srgb, var(--wxc, var(--line-2)) 55%, transparent); }
 .wx-word { font-weight: 600; color: var(--wxc, var(--ink)); }
-.field-wrap.wx-snow .field { filter: saturate(.55) brightness(1.18) contrast(.92); }
-.field-wrap.wx-rain .field { filter: saturate(.75) brightness(.82); }
-.field-wrap.wx-wind .field { filter: saturate(.85) brightness(.96); }
-.wx-snowfall, .wx-rainfall { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
-.wx-snowfall { background-image: radial-gradient(circle, rgba(255,255,255,.85) 0 1.2px, transparent 1.6px), radial-gradient(circle, rgba(255,255,255,.55) 0 1px, transparent 1.4px); background-size: 46px 46px, 71px 71px; background-position: 0 0, 23px 31px; animation: snowfall 9s linear infinite; opacity: .8; }
-.wx-rainfall { background-image: repeating-linear-gradient(100deg, transparent 0 11px, rgba(190, 215, 255, .18) 11px 12px); animation: rainfall .6s linear infinite; opacity: .7; }
-@keyframes snowfall { from { background-position: 0 0, 23px 31px; } to { background-position: 8px 46px, 15px 102px; } }
-@keyframes rainfall { from { background-position: 0 0; } to { background-position: -12px 60px; } }
-@media (prefers-reduced-motion: reduce) { .wx-snowfall, .wx-rainfall { animation: none; } }
+/* weather is drawn as particles on a canvas over the field (WeatherLayer); the field itself keeps its color */
+.field-wrap.wx-snow .field { filter: saturate(.8) brightness(1.06); }
+.field-wrap.wx-rain .field { filter: saturate(.9) brightness(.94); }
+.wx-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 
 /* wide desktops: the whole clock row on one line */
 /* the clock row: tempo on one line, the big buttons on one line under it, every cell the same size */

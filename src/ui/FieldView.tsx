@@ -3,6 +3,7 @@ import { FieldRenderer, type Outcome, type Preview } from './field';
 import { useState } from 'react';
 import type { Ev, Rcv, State, TeamInfo, Weather } from '../engine/types';
 import { PlayerCard } from './PlayerCard';
+import { WeatherLayer } from './WeatherLayer';
 
 export interface FieldHandle {
   setup(s: State, pv?: Preview, instant?: boolean): void;
@@ -63,8 +64,7 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
 
   return (
     <div className={`field-wrap wx-${weather ?? 'clear'}`} ref={wrapRef}>
-      {weather === 'snow' && <div className="wx-snowfall" aria-hidden />}
-      {weather === 'rain' && <div className="wx-rainfall" aria-hidden />}
+      <WeatherLayer weather={weather} />
       <svg ref={svgRef} className="field" role="img" aria-label="Field: your end zone at the bottom, theirs at the top" />
       {banner && (
         <div key={banner.id} className={`ribbon tone-${banner.tone}`} role="status">
