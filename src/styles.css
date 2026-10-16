@@ -839,3 +839,58 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
   .cp .read { font-size: 13px; padding: 5px 9px; }
   .cp { gap: 10px; }
 }
+
+/* ---------- phones, refined: a one-line scoreboard, a bigger field, a quiet panel ---------- */
+.sb-q-short, .tab5-short { display: none; }
+@media (max-width: 999px) {
+  /* field: more of the screen, names back on (they scale with the markers; linemen stay unnamed) */
+  .stage { height: clamp(240px, 40svh, 420px); }
+  .f-name { display: block; font-size: .62px; }
+  .f-name-line { display: none; }
+  .legend { display: none; }
+  .fchip { top: 8px; left: 8px; padding: 4px 9px; font-size: 12px; }
+  /* panel: the scoreboard carries down and distance and the weather; the tabs say what they hold */
+  .cp-h-dd { display: none; }
+  .cp-head h2 { font: 700 13px var(--body); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .cp-head { gap: 6px; }
+  .cp-flags { display: none; }
+  .cp .read { background: none; border: 0; padding: 0; font-size: 14px; gap: 6px; }
+  .cp .read b { font: 700 12px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-right: 4px; }
+  .cp .read svg { display: none; }
+  .read.tend { display: block; }
+  .tab5-long { display: none; }
+  .tab5-short { display: inline; }
+  .tab5 { padding: 9px 2px 7px; }
+  .tab5-name { font-size: 18px; }
+  .tab5-n { font-size: 10px; }
+  .side > section { padding: 12px; }
+}
+@media (max-width: 640px) {
+  /* the scoreboard in one line: chip and timeouts, score | clock | score, chip and timeouts */
+  .sb-team { display: grid; grid-template-columns: auto auto 1fr; grid-template-rows: auto auto; column-gap: 6px; row-gap: 5px; align-items: center; padding: 7px 10px 6px; }
+  .sb-team.right { grid-template-columns: 1fr auto; }
+  .sb-id { display: contents; }
+  .sb-chip { display: inline-grid; grid-row: 1; grid-column: 1; min-width: 42px; height: 26px; font-size: 15px; padding: 0 5px; }
+  .sb-names { grid-row: 1; grid-column: 2; }
+  .sb-team.right .sb-names { display: none; }
+  .sb-team.right .sb-chip { grid-column: 2; justify-self: end; }
+  .sb-nick { display: none; }
+  .sb-city { font: 700 10px var(--body); letter-spacing: .1em; text-transform: uppercase; color: #93a39a; }
+  .sb-to { grid-row: 2; grid-column: 1 / span 2; }
+  .sb-team.right .sb-to { grid-column: 2; justify-self: end; }
+  .sb-to i { width: 11px; height: 4px; }
+  .sb-score { grid-row: 1 / span 2; grid-column: 3; justify-self: end; font-size: 36px; min-width: 0; }
+  .sb-team.right .sb-score { grid-column: 1; justify-self: start; }
+  .sb-ball { top: auto; bottom: 6px; width: 11px; height: 7px; }
+  .sb-team:not(.right) .sb-ball { right: auto; left: 60px; }
+  .sb-team.right .sb-ball { left: auto; right: 60px; }
+  .sb-center { padding: 4px 10px; min-width: 78px; }
+  .sb-clock { font-size: 30px; }
+  .sb-q { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em; margin-top: 0; }
+  .sb-q-long, .sb-wx-name { display: none; }
+  .sb-q-short { display: inline; }
+  .sb-wx { padding: 0; margin-left: 0; background: none; border: 0; font-size: 12px; }
+  .sb-bar { padding: 5px 10px; gap: 10px; }
+  .sb-dd { font-size: 17px; }
+  .f-name-tight { display: none; }
+}

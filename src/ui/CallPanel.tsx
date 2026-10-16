@@ -38,12 +38,12 @@ interface Props {
 /** The playbook in five tabs, so no list runs long. Passing is split by depth. */
 type Tab = 'run' | 'short' | 'deep' | 'rpo' | 'trick';
 const SHORT = new Set(['quick_out', 'slants', 'screen', 'mesh', 'boot']);
-const TABS: { id: Tab; label: string; key: string; fam: string; blurb: string }[] = [
-  { id: 'run', label: 'Run', key: 'r', fam: 'run', blurb: 'Runs: hand it off. The clock keeps moving unless he gets out of bounds.' },
-  { id: 'short', label: 'Short Pass', key: 's', fam: 'pass', blurb: 'Short passes: quick, high-percentage throws.' },
-  { id: 'deep', label: 'Deep Pass', key: 'd', fam: 'pass', blurb: 'Deep passes: chunk plays downfield, with more sacks and interceptions.' },
-  { id: 'rpo', label: 'RPO', key: 'o', fam: 'rpo', blurb: 'Run-pass option: the quarterback reads the defense after the snap.' },
-  { id: 'trick', label: 'Trick', key: 't', fam: 'trick', blurb: 'Misdirection. Big upside, big risk.' },
+const TABS: { id: Tab; label: string; short: string; key: string; fam: string; blurb: string }[] = [
+  { id: 'run', label: 'Run', short: 'Run', key: 'r', fam: 'run', blurb: 'Runs: hand it off. The clock keeps moving unless he gets out of bounds.' },
+  { id: 'short', label: 'Short Pass', short: 'Short', key: 's', fam: 'pass', blurb: 'Short passes: quick, high-percentage throws.' },
+  { id: 'deep', label: 'Deep Pass', short: 'Deep', key: 'd', fam: 'pass', blurb: 'Deep passes: chunk plays downfield, with more sacks and interceptions.' },
+  { id: 'rpo', label: 'RPO', short: 'RPO', key: 'o', fam: 'rpo', blurb: 'Run-pass option: the quarterback reads the defense after the snap.' },
+  { id: 'trick', label: 'Trick', short: 'Trick', key: 't', fam: 'trick', blurb: 'Misdirection. Big upside, big risk.' },
 ];
 const tabOf = (o: Opt): Tab | null => (o.group === 'pass' ? (SHORT.has(o.key) ? 'short' : 'deep') : o.group === 'run' || o.group === 'rpo' || o.group === 'trick' ? o.group : null);
 // decisions that cost something you cannot get back: marked so they are not tapped by accident
@@ -93,6 +93,13 @@ function Prev({ prev }: { prev: Props['prev'] }) {
       <span>{GRADE_INFO[g.g].word}: <b>{prev.label}</b>{g.lost >= 0.05 && g.g !== 'g' ? ` · better was ${g.bestLabel} (+${g.lost.toFixed(1)})` : ''}</span>
     </div>
   );
+}
+
+/** A decision's title, with its down-and-distance lead marked so phones can drop it (the scoreboard shows it). */
+function Title({ text }: { text: string }) {
+  const i = text.indexOf(': ');
+  if (i < 0 || /^4th/.test(text)) return <h2>{text}</h2>;
+  return <h2><span className="cp-h-dd">{text.slice(0, i)}: </span>{text.slice(i + 2)}</h2>;
 }
 
 function WeatherChip({ s }: { s: State }) {
@@ -221,7 +228,7 @@ export function CallPanel(p: Props) {
         <Prev prev={prev} />
         <header className="cp-head">
           <div className="cp-flags"><span className="def-flag">Defense · your call</span><WeatherChip s={s} /></div>
-          <h2>{dec.title}</h2>
+          <Title text={dec.title} />
           <div className="read tend"><b>Their offense:</b> {tendency(s)}</div>
         </header>
         {clockRow}
@@ -262,7 +269,7 @@ export function CallPanel(p: Props) {
         <Prev prev={prev} />
         <header className="cp-head">
           <div className="cp-flags"><WeatherChip s={s} /></div>
-          <h2>{dec.title}</h2>
+          <Title text={dec.title} />
           {dec.step === 'offClock' && <p className="cp-note">The clock is still running. How fast do you get to the next snap?</p>}
           {dec.step === 'defClock' && <p className="cp-note">They are letting the clock run.</p>}
         </header>
@@ -368,7 +375,7 @@ export function CallPanel(p: Props) {
       <Prev prev={prev} />
       <header className="cp-head">
         <div className="cp-flags"><span className="off-flag">Your call</span><WeatherChip s={s} /></div>
-        <h2>{dec.title}</h2>
+        <Title text={dec.title} />
         {s.shownLook && (
           <div className="read" title="Your pre-snap read is right about 7 times in 10">
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
@@ -383,7 +390,7 @@ export function CallPanel(p: Props) {
           const n = dec.options.filter((o) => tabOf(o) === t.id).length;
           return (
             <button key={t.id} role="tab" aria-selected={tab === t.id} className={`tab5 fam-${t.fam}${tab === t.id ? ' on' : ''}`} onClick={() => setTab(t.id)} title={t.blurb}>
-              <span className="tab5-name"><i />{t.label}</span>
+              <span className="tab5-name"><i /><span className="tab5-long">{t.label}</span><span className="tab5-short">{t.short}</span></span>
               <span className="tab5-n">{n} play{n === 1 ? '' : 's'}</span>
             </button>
           );

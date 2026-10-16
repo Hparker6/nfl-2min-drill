@@ -43,6 +43,7 @@ export interface Preview {
 /** What the play came to, fired when it happens on the field (not after the hold). */
 export type Outcome = 'tackle' | 'catch' | 'drop' | 'pick' | 'td' | 'oob' | 'sack' | 'kick' | 'none';
 
+const LINE_KEYS = new Set(['LT', 'LG', 'C', 'RG', 'RT', 'EDGE1', 'DL1', 'DL2', 'EDGE2']);
 interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement; mk: SVGElement }
 
 export class FieldRenderer {
@@ -97,15 +98,21 @@ export class FieldRenderer {
     return e as SVGElement;
   }
 
+  /** Linemen stand a yard apart, so they grow less than everyone else. */
+  private scaleMarker(d: Dot, key: string) {
+    const k = LINE_KEYS.has(key.slice(2)) ? Math.min(this.mkScale, 1.3) : this.mkScale;
+    if (k === 1) d.mk.removeAttribute('transform'); else d.mk.setAttribute('transform', `scale(${k})`);
+  }
+
   /** The element's size changed: show as many yards as its shape allows. */
   resize(w: number, h: number) {
     if (w <= 0 || h <= 0) return;
     this.viewH = Math.max(26, Math.min(80, (W * h) / w));
-    // about 10 pixels a yard is where a marker's number reads; narrower fields draw markers up to half again larger
-    const k = Math.round(Math.min(1.5, Math.max(1, 10 / (w / W))) * 100) / 100;
+    // about 12 pixels a yard is where a marker's number and name read; narrower fields draw markers larger
+    const k = Math.round(Math.min(1.7, Math.max(1, 12 / (w / W))) * 100) / 100;
     if (k !== this.mkScale) {
       this.mkScale = k;
-      this.dots.forEach((d) => (k === 1 ? d.mk.removeAttribute('transform') : d.mk.setAttribute('transform', `scale(${k})`)));
+      this.dots.forEach((d, key) => this.scaleMarker(d, key));
     }
     if (this.s) {
       const dir = this.s.off === 0 ? 1 : -1;
@@ -180,7 +187,10 @@ export class FieldRenderer {
         lab.textContent = POS_LABEL[pos];
         // linemen stand a yard apart: their names would overlap, so they go by number only
         const crowded = ['LT', 'LG', 'C', 'RG', 'RT', 'EDGE1', 'DL1', 'DL2', 'EDGE2'].includes(pos);
-        const name = this.el('text', { y: 2.05, class: crowded ? 'f-name f-name-line' : 'f-name' }, g) as SVGTextElement;
+        // the backfield, the tight end and the linebackers stand close to others: on a phone only the wide receivers and
+        // the secondary are named
+        const tight = ['QB', 'RB', 'TE', 'LB1', 'LB2', 'LB3'].includes(pos);
+        const name = this.el('text', { y: 2.05, class: crowded ? 'f-name f-name-line' : tight ? 'f-name f-name-tight' : 'f-name' }, mk) as SVGTextElement;
         // details: hover with a mouse, keyboard focus, or press and hold on a touch screen. A tap only retargets, so
         // cycling a receiver's routes never puts a card over the field.
         const show = () => this.onInspect?.(side, pos);
@@ -209,7 +219,7 @@ export class FieldRenderer {
         }
         this.el('title', {}, g).textContent = pos;
         this.dots.set(`${side}:${pos}`, { g, body, ring, lab, name, mk });
-        if (this.mkScale !== 1) mk.setAttribute('transform', `scale(${this.mkScale})`);
+        this.scaleMarker(this.dots.get(`${side}:${pos}`)!, `${side}:${pos}`);
       }
     }
   }
@@ -385,8 +395,11 @@ export class FieldRenderer {
         line(ps, isT ? 'f-route tgt' : 'f-route');
         if (isT) {
           const end = map(ps[ps.length - 1]);
-          const g = this.el('g', { transform: `translate(${end[0].toFixed(2)} ${(end[1] + (s.off === 0 ? -1.9 : 1.9)).toFixed(2)})` }, this.gRoutes);
           const label = ROUTES[rt].name;
+          // the tag stays on the field when the route ends at the sideline
+          const half = label.length * 0.42 + 0.9;
+          const tx = Math.min(W - half, Math.max(half, end[0]));
+          const g = this.el('g', { transform: `translate(${tx.toFixed(2)} ${(end[1] + (s.off === 0 ? -1.9 : 1.9)).toFixed(2)})` }, this.gRoutes);
           this.el('rect', { x: -label.length * 0.42 - 0.6, y: -0.85, width: label.length * 0.84 + 1.2, height: 1.7, rx: 0.4, class: 'f-rtag' }, g);
           this.el('text', { y: 0.42, class: 'f-rlab' }, g).textContent = label;
         }

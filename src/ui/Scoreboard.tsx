@@ -77,7 +77,7 @@ export function Scoreboard({ s, teams, wp, trail }: Props) {
         <Team team={teams[0]} score={s.score[0]} tos={s.to[0]} ball={live && s.off === 0} you />
         <div className="sb-center">
           <div className={`sb-clock${s.running && live ? ' running' : ''}`}>{fmtClock(clock)}</div>
-          <div className="sb-q">4th quarter{live && s.running ? ' · running' : live ? ' · stopped' : ''}{s.weather && s.weather !== 'clear' ? <span className={`sb-wx wx-${s.weather}`} title={WEATHER[s.weather].blurb}>{WX_ICON[s.weather]} {WEATHER[s.weather].name}</span> : null}</div>
+          <div className="sb-q"><span className="sb-q-long">4th quarter{live && s.running ? ' · running' : live ? ' · stopped' : ''}</span><span className="sb-q-short">Q4</span>{s.weather && s.weather !== 'clear' ? <span className={`sb-wx wx-${s.weather}`} title={WEATHER[s.weather].blurb}>{WX_ICON[s.weather]}<span className="sb-wx-name"> {WEATHER[s.weather].name}</span></span> : null}</div>
         </div>
         <Team team={teams[1]} score={s.score[1]} tos={s.to[1]} ball={live && s.off === 1} you={false} right />
       </div>
