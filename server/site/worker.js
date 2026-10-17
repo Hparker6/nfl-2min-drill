@@ -120,8 +120,11 @@ async function api(request, env, url) {
 }
 
 // ---------------------------------------------------------------- pages ---
-// /leaderboard/ and /stats/ are drawn here, from the live scores, so search engines index real names and numbers
-// (fresh every day) without running the game's JavaScript.
+// /leaderboard/ and /stats/ are drawn here, from the live scores, as plain HTML. Both start as noindex, follow: while
+// they hold only a handful of scores (and user-submitted names) they are thin, so search engines follow their links but
+// leave them out of results. Once a page has enough real history to be useful, set it to true here and add it back to
+// PAGES (the sitemap) in vite.config.ts.
+const INDEXABLE = { '/leaderboard/': false, '/stats/': false };
 
 const SITE = 'https://nfl-2min-drill.com';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -146,6 +149,7 @@ function page({ path, title, description, h1, body, jsonld, eyebrow }) {
 <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${esc(title)}</title>
 <meta name="description" content="${esc(description)}" />
+<meta name="robots" content="${INDEXABLE[path] ? 'index, follow' : 'noindex, follow'}" />
 <link rel="canonical" href="${SITE}${path}" />
 <meta name="theme-color" content="#0a0e0c" />
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" /><link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -162,7 +166,7 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(
      crossorigin="anonymous"></script>
 </head><body>
 <header class="top"><div class="top-in">
-<a class="brand" href="/"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="18" height="18"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="currentColor"/></g></svg></span><span>The <em>4th</em> Call</span></a>
+<a class="brand" href="/" aria-label="The 4th Call home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="18" height="18"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="currentColor"/></g></svg></span><span>The <em>4th</em> Call</span></a>
 <nav class="nav" aria-label="Site">${nav}<a class="play" href="/">Play</a></nav>
 </div></header>
 <main>${eyebrow ? `<p class="eyebrow">${eyebrow}</p>` : ''}<h1>${h1}</h1>${body}</main>
@@ -215,7 +219,7 @@ async function leaderboardPage(env) {
     ? `${boardTable(y.best.slice(0, 3), false)}<p class="note">${y.count.toLocaleString('en-US')} played Daily #${dayNumber(yesterday)} (${esc(shortDay(yesterday))}), average ${y.average}.</p>`
     : '<p class="empty">No scores yesterday.</p>';
   const body = `
-<p class="lede">Everyone plays the same NFL two-minute drill spot today. These are the best play-callers so far, scored on the game's Performance rating (0–100): every call graded against every option.</p>
+<p class="lede">Everyone plays the same two-minute drill spot today. These are the best play-callers so far, scored on the game's Performance rating (0–100): every call graded against every option.</p>
 <div class="cta"><a class="btn primary" href="/">Play today's game</a><a class="btn" href="/how-to-play/#grades">How it's scored</a></div>
 <p class="next">New Daily in <b>${untilNext()}</b> · midnight UTC</p>
 <div class="stats three">
@@ -232,8 +236,8 @@ ${yest}
 <p class="muted small" style="margin-top:22px">Every Daily's numbers are on the <a href="/stats/">stats page</a>.</p>`;
   return page({
     path: '/leaderboard/', eyebrow: `<i></i>Live · Daily #${dayNumber(today)} · ${esc(fmtDay(today))}`,
-    title: `Leaderboard: Daily #${dayNumber(today)} | The 4th Call, NFL 2-Minute Drill Game`,
-    description: `Today's best play-callers in The 4th Call, the free NFL 2-minute drill game. ${t.count ? `${t.count} played Daily #${dayNumber(today)}, top score ${t.best[0].score}.` : `Daily #${dayNumber(today)} is open.`} Play the same game and post your score.`,
+    title: 'Daily Leaderboard | The 4th Call',
+    description: `Today's best play-callers in The 4th Call, the free 2-minute drill football game. ${t.count ? `${t.count} played Daily #${dayNumber(today)}, top score ${t.best[0].score}.` : `Daily #${dayNumber(today)} is open.`} Play the same game and post your score.`,
     h1: 'Daily <em>leaderboard</em>', body, jsonld: { '@context': 'https://schema.org', '@graph': [breadcrumb('Leaderboard', '/leaderboard/')] },
   });
 }
@@ -249,7 +253,7 @@ async function statsPage(env) {
     ? `<div class="panel"><table><thead><tr><th>Day</th><th class="num hide-sm">Daily</th><th class="num">Played</th><th class="num">Avg</th><th class="num">Best</th><th>Top coach</th></tr></thead><tbody>${rows}</tbody></table></div>`
     : '<p class="empty">No Dailies scored yet. Play today and yours is the first.</p>';
   const body = `
-<p class="lede">Every day, everyone plays the same NFL two-minute drill game. Here is how the play-callers did: how many played each Daily, the average Performance score and the best of the day.</p>
+<p class="lede">Every day, everyone plays the same two-minute drill game. Here is how the play-callers did: how many played each Daily, the average Performance score and the best of the day.</p>
 <div class="cta"><a class="btn primary" href="/">Play today's game</a><a class="btn" href="/leaderboard/">Today's board</a></div>
 <div class="stats">
   <div class="stat"><b>${total.toLocaleString('en-US')}</b><span>games scored</span></div>
@@ -266,8 +270,8 @@ ${table}
 <p>A score is the game's Performance rating: 55% Decisions (how much win chance your calls gave up against the best option each time) and 45% Result (a win scores 75–100, a loss 0–25). See <a href="/how-to-play/#grades">how calls are graded</a>.</p>`;
   return page({
     path: '/stats/', eyebrow: 'Every Daily, all time',
-    title: 'Stats: Every Daily Game | The 4th Call, NFL 2-Minute Drill Game',
-    description: 'Results from every Daily of The 4th Call, the free NFL 2-minute drill game: games scored, players per day, average scores and the best play-callers.',
+    title: 'Stats for Every Daily Game | The 4th Call',
+    description: 'Results from every Daily of The 4th Call, the free 2-minute drill football game: games scored, players per day, average scores and the best play-callers.',
     h1: 'Everyone\'s <em>stats</em>', body, jsonld: { '@context': 'https://schema.org', '@graph': [breadcrumb('Stats', '/stats/')] },
   });
 }

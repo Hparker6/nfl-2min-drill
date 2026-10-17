@@ -1,7 +1,8 @@
 /** Words for the game: clock, field position, situations and the play-by-play. */
-import { CALL, ROUTES } from '../engine/data';
-import { fgDist, leadOf, ytg } from '../engine/sim';
-import type { Ev, State, Team, TeamInfo } from '../engine/types';
+import { CALL, LOOKS, ROUTES } from '../engine/data';
+import { aiHailMary, aiOffWeights, fgDist, leadOf, resolveSnap, ytg } from '../engine/sim';
+import { hash, rng } from '../engine/rng';
+import type { Ev, Look, State, Team, TeamInfo } from '../engine/types';
 
 export const fmtClock = (t: number) => {
   const s = Math.max(0, Math.ceil(t - 1e-6));
@@ -40,17 +41,89 @@ export function situation(s: State, teams: [TeamInfo, TeamInfo]): string {
   return `${score} with ${fmtClock(s.t)} left. ${ball}. ${tos}.`;
 }
 
-/** The offense's likely intentions, read from the situation (the AI's call is never revealed). */
-export function tendency(s: State): string {
+/** The pass plays in the playbook's Short Pass tab; every other pass is in Deep Pass. */
+export const SHORT_PASSES = new Set(['quick_out', 'slants', 'screen', 'mesh', 'boot']);
+const SIDELINE = new Set(['quick_out', 'comeback', 'deep_corner', 'go']);
+
+export interface Scouting { run: number; short: number; deep: number; note: string }
+
+/**
+ * A scouting report on the offense: how often it runs, throws short and throws deep from here, straight from the AI
+ * offense's own weights (aiOffWeights), plus its strongest habit. Never the play it has picked for this snap.
+ */
+export function scouting(s: State): Scouting {
+  if (aiHailMary(s)) return { run: 0, short: 0, deep: 1, note: 'Seconds left and far out: expect a Hail Mary.' };
+  const w = aiOffWeights(s);
+  let run = 0, short = 0, deep = 0, side = 0, total = 0;
+  for (const [k, v] of Object.entries(w)) {
+    if (!v) continue;
+    total += v;
+    const c = CALL[k];
+    if (!c || c.kind === 'run') run += v;
+    else if (c.kind === 'rpo') { run += v / 2; short += v / 2; }
+    else if (SHORT_PASSES.has(k)) short += v;
+    else deep += v;
+    if (SIDELINE.has(k)) side += v;
+  }
+  const n = total || 1;
   const l = leadOf(s, s.off), yt = ytg(s);
-  if (yt <= 5) return 'Inside your 5: expect a run, a quick throw or a fade.';
-  if (l > 0) return 'They lead: expect runs to keep the clock moving.';
-  if (s.down >= 3 && s.dist >= 7) return `${ord(s.down)} and long: expect a pass past the sticks.`;
-  if (s.dist <= 2) return 'Short yardage: expect a run or a quick throw.';
-  if (l < 0 && s.t <= 300) return 'They trail with the clock running down: expect passes, especially toward the sidelines.';
-  if (l === 0 && s.t <= 120) return 'Tied late: they want field goal range without wasting time.';
-  return 'Balanced situation: they could run or throw.';
+  const note = yt <= 5 ? 'At the goal line: runs, sneaks and quick throws.'
+    : s.dist <= 2 && run / n >= 0.45 ? 'Short yardage: a run is likely.'
+    : l > 0 && run / n >= 0.55 ? 'They lead: runs to keep the clock moving.'
+    : side / n >= 0.38 ? 'They need the clock: outs and comebacks to the sideline are favorites.'
+    : yt <= 20 ? 'Close to the end zone: fewer deep shots, more slants and fades.'
+    : 'No strong habit here: they could run or throw.';
+  return { run: run / n, short: short / n, deep: deep / n, note };
 }
+
+/** One line for the defense panel: the mix (rounded to 5%) and the habit. */
+export function tendency(s: State): string {
+  const sc = scouting(s);
+  if (sc.deep === 1 && sc.run === 0 && sc.short === 0) return sc.note;
+  // to the nearest 5%, adding up to 100
+  const run = Math.round(sc.run * 20) * 5, short = Math.min(100 - run, Math.round(sc.short * 20) * 5), deep = 100 - run - short;
+  return `Run ${run}% · short pass ${short}% · deep pass ${deep}%. ${sc.note}`;
+}
+
+export type DefFit = 'good' | 'bad' | 'even';
+export interface DefVerdict { fit: DefFit; text: string }
+
+/** The offense's expected value of a snap (as the defense test harness scores it): points, first downs, yards. */
+function snapValue(s: State, play: string, look: Look, n: number): number {
+  let v = 0;
+  for (let i = 0; i < n; i++) {
+    const res = resolveSnap(s, play, look, rng(hash('verdict', i)));
+    v += res.td ? 7 : res.turnover ? -5 : res.yards >= s.dist ? 1.5 + res.yards * 0.1 : res.yards * 0.12 - (res.kind === 'sack' ? 0.5 : 0);
+  }
+  return v / n;
+}
+
+/**
+ * Why the defense worked or didn't, after a snap you called on defense: your call against the play they actually
+ * ran, compared with the base defense (Cover 3) against the same play, over the same few hundred simulated snaps.
+ * The grade says whether the call was right before the snap; this says how it matched the play that came.
+ * `pre` is the state the call was made from.
+ */
+export function defenseVerdict(pre: State, ev: Ev): DefVerdict | null {
+  if (ev.type !== 'snap' || ev.off !== 1 || !ev.res.look) return null;
+  const play = ev.res.call, look = ev.res.look;
+  const c = CALL[play];
+  if (!c) return null;   // kneel-downs, spikes and kicks: nothing to read
+  const L = LOOKS[look];
+  const playName = c.name;
+  const won = !ev.res.turnover && (ev.res.td || ev.res.yards >= pre.dist);
+  if (look === 'balanced') return { fit: 'even', text: `Cover 3 vs their ${playName}. The base defense takes nothing away and gives nothing up.` };
+  const edge = snapValue(pre, play, 'balanced', VERDICT_N) - snapValue(pre, play, look, VERDICT_N);
+  const fit: DefFit = edge > VERDICT_EDGE ? 'good' : edge < -VERDICT_EDGE ? 'bad' : 'even';
+  const tail = fit === 'good' && won ? ' They made the play anyway.' : fit === 'bad' && !won ? ' You got away with it.' : '';
+  const text = fit === 'good' ? `Good fit. ${L.label} vs their ${playName}. Built for it: ${lc(L.stops)}.${tail}`
+    : fit === 'bad' ? `Wrong look. ${L.label} vs their ${playName}. Its weak spot: ${lc(L.risk)}.${tail}`
+    : `Even matchup. ${L.label} vs their ${playName}: neither side had the edge.`;
+  return { fit, text };
+}
+export const VERDICT_N = 300;
+export const VERDICT_EDGE = 0.1;
+const lc = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 export function headline(s: State): string {
   const l = leadOf(s, 0);

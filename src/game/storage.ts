@@ -8,6 +8,8 @@ export interface Settings {
   hints: boolean;        // practice: show win chance on every option before you call it
   nickname?: string;     // the name shown on the daily leaderboard
   plainDots?: boolean;   // field markers in team colors instead of colored by rating
+  sound?: boolean;       // sound effects (on unless set to false)
+  music?: boolean;       // the light background music (on unless set to false)
 }
 
 export interface SpotResult {

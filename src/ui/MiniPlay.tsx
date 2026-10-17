@@ -80,10 +80,11 @@ export function MiniPlay({ play, look, side, routes, target, mods, className }: 
       <svg className={`${cls} mp-def look-${L}`} viewBox={VB} aria-hidden>
         <Turf />
         {zones.map((k) => <circle key={k} cx={da[k][0]} cy={Y(da[k][1]) - 1.2} r={L === 'prevent' ? 6 : 4.6} className="mp-zone" />)}
-        {[...OL, 'QB', 'RB', 'TE', 'WR1', 'WR2', 'WR3'].map((k) => <circle key={k} cx={fm[k][0]} cy={Y(fm[k][1])} r="0.95" className="mp-ghost" />)}
+        {[...OL, 'QB', 'RB', 'TE', 'WR1', 'WR2', 'WR3'].map((k) => <circle key={k} cx={fm[k][0]} cy={Y(fm[k][1])} r="1.15" className="mp-ghost" />)}
         {manPairs.map(([d, o]) => <line key={d} x1={da[d][0]} y1={Y(da[d][1])} x2={fm[o][0]} y2={Y(fm[o][1]) - 1.3} className="mp-man" />)}
         {rushers.map((k) => { const pts: Pt[] = [da[k], [qb[0] + (da[k][0] - CX) * 0.25, qb[1] + 1.2]]; return <g key={k}><path d={path(pts)} className="mp-rush" /><path d={head(pts, 1.4)} className="mp-rush" /></g>; })}
-        {DEF.map((k) => <rect key={k} x={da[k][0] - 1.05} y={Y(da[k][1]) - 1.05} width="2.1" height="2.1" transform={`rotate(45 ${da[k][0]} ${Y(da[k][1])})`} className={`mp-d${rushers.includes(k) ? ' rush' : ''}`} />)}
+        {/* defenders drawn larger than the offense's ghosts: the call is the subject of the card */}
+        {DEF.map((k) => <rect key={k} x={da[k][0] - 1.4} y={Y(da[k][1]) - 1.4} width="2.8" height="2.8" transform={`rotate(45 ${da[k][0]} ${Y(da[k][1])})`} className={`mp-d${rushers.includes(k) ? ' rush' : ''}`} />)}
       </svg>
     );
   }

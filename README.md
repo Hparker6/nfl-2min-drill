@@ -54,20 +54,25 @@ The build is a static site in `dist/` with relative asset paths and hash-based n
 
 ## Search (SEO)
 
-The title, description and the text that crawlers read (the pre-render fallback in `index.html` and the "A free
-2-minute drill football game" blurb in the footer) target searches like "nfl 2 min drill", "2 minute drill game" and
-"football play-calling game". The domain (nfl-2min-drill.com) matches the same phrase. `vite.config.ts` adds JSON-LD (`WebSite` + `VideoGame`), `robots.txt` and `sitemap.xml` at build
-time from `VITE_SITE_URL`. After deploying:
+The title, description and crawlable text (the pre-render fallback in `index.html` and the footer blurb in
+`src/App.tsx`) describe the game in generic terms: a free football strategy and play-calling game built around the
+two-minute drill. They deliberately don't lead with "NFL": the game is an independent fan game, and "NFL" is the
+league's trademark (and "NFL 2 Minute Drill" is also the name of Sega's arcade game). Keep the no-affiliation disclaimer
+(footer, About, fallback text) in place.
 
-1. Add the site in [Google Search Console](https://search.google.com/search-console) (a Domain property, verified by
-   DNS), submit `https://your-domain.com/sitemap.xml`, and use URL Inspection → Request indexing on the home page.
-2. Do the same in [Bing Webmaster Tools](https://www.bing.com/webmasters) (it can import from Search Console).
-3. Get linked: the GitHub repo's website field, and posts where football fans are (subreddits, Discords, X). A new
-   site with no inbound links ranks for very little, whatever its tags say.
+`vite.config.ts` adds JSON-LD (`WebSite` + `VideoGame`), `robots.txt` and `sitemap.xml` at build time from
+`VITE_SITE_URL`. The sitemap lists only the indexable pages: `/` and `/how-to-play/`. The Worker's `/leaderboard/` and
+`/stats/` pages are `noindex, follow` while they are thin; to index them later, flip `INDEXABLE` in
+`server/site/worker.js` and add them back to `PAGES` in `vite.config.ts`. After deploying:
 
-The page uses "NFL" in its title and copy; keep the no-affiliation disclaimer (footer, About, fallback text) in place.
-"NFL" is the league's trademark and "NFL 2 Minute Drill" is also the name of Sega's arcade game. Open search tasks
-are in [TODO.md](TODO.md).
+1. In [Google Search Console](https://search.google.com/search-console), submit `https://your-domain.com/sitemap.xml`
+   and use URL Inspection → Request indexing on the home page.
+2. Do the same in [Bing Webmaster Tools](https://www.bing.com/webmasters) (it can import from Search Console), and run
+   `npm run indexnow` after a deploy.
+3. Get linked from places where players are (see `marketing/`). A new site with no inbound links ranks for very little,
+   whatever its tags say.
+
+The launch checklist is `marketing/LAUNCH_CHECKLIST.md`. Open search tasks are in [TODO.md](TODO.md).
 
 ## Project layout
 

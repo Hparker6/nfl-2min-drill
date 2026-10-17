@@ -154,6 +154,8 @@ export function SettingsModal({ store, update, onClose }: { store: Store; update
           </select>
         </label>
         <label className="check"><input type="checkbox" checked={st.hints} onChange={(e) => set('hints', e.target.checked)} /> Coach mode in Practice (show win chances before you call)</label>
+        <label className="check"><input type="checkbox" checked={st.sound !== false} onChange={(e) => set('sound', e.target.checked)} /> Sound effects</label>
+        <label className="check"><input type="checkbox" checked={st.music !== false} onChange={(e) => set('music', e.target.checked)} /> Background music</label>
         <label className="check"><input type="checkbox" checked={!st.plainDots} onChange={(e) => set('plainDots', !e.target.checked)} /> Color players by rating (red to green)</label>
       </div>
       <button className="btn danger" onClick={reset}>Erase my data</button>

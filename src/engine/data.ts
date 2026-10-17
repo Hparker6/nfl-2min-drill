@@ -176,6 +176,30 @@ export const LOOKS: Record<Look, { label: string; sub: string; stops: string; ri
   runblitz: { label: 'Run Blitz', sub: 'The box shoots its gaps at the snap', stops: 'Runs at the line, before they start', risk: 'Screens and play-action behind it; a missed gap goes far', tilt: 3 },
   soft: { label: 'Prevent', sub: 'Everyone deep; keep it in front', stops: 'Deep shots and long touchdowns', risk: 'Short completions, runs and the clock', tilt: 2 },
 };
+/** When each defensive call is at its best, in a few words for the play card. */
+export const LOOK_USE: Record<Look, string> = {
+  balanced: 'No clear read on them: a safe call on any down',
+  zone: 'They need yards but you can rally and tackle',
+  cover4: 'They need a big play down the field',
+  tampa2: 'They keep attacking the middle',
+  prevent: 'Seconds left and you lead: no touchdown over the top',
+  man: 'They live on short, easy throws',
+  twoman: 'An obvious passing down',
+  press: 'They want quick throws to stop the clock',
+  robber: 'They keep crossing the middle',
+  blitz: 'They need a long drop to get the yards',
+  firezone: 'They lean on hot routes and screens',
+  mike: 'An inside run or a long drop is coming',
+  cblitz: 'They run or screen toward one side',
+  sblitz: 'A run or play-action is coming',
+  goal: 'The last few yards, or a yard or two to go',
+  glblitz: 'A short-yardage run or a sneak',
+  glman: 'At the goal line against play-action and fades',
+  load: 'They are running to burn the clock',
+  runblitz: 'A run is coming and you want a loss',
+  soft: 'Seconds left and you lead: no touchdown over the top',
+};
+
 export const LOOK_READ: Record<Look, string> = {
   balanced: 'Base front, two deep safeties: nothing given away',
   blitz: 'Linebackers creeping up: blitz showing',

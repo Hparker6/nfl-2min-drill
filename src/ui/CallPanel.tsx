@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { CALL, LOOK_READ, LOOKS, POS_NAME, ROUTES, TEMPO } from '../engine/data';
+import { CALL, LOOK_READ, LOOK_USE, LOOKS, POS_NAME, ROUTES, TEMPO } from '../engine/data';
 import { DEF_PLAYS, famOf, type DefCat } from '../engine/defense';
 import { DESIGN, type FormationId } from '../engine/formation';
 import { WEATHER } from '../engine/sim';
-import { tendency } from '../game/describe';
+import { SHORT_PASSES as SHORT, tendency } from '../game/describe';
 import type { Decision, Opt } from '../game/session';
 import { GRADE_INFO, type Grade } from '../game/grade';
-import type { LookFam, PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
+import type { Look, LookFam, PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
 import { MiniPlay } from './MiniPlay';
 
 /** What the play-caller changed about the selected call: the side, the receiver, the routes, the quarterback's action. */
@@ -38,7 +38,6 @@ interface Props {
 
 /** The playbook in five tabs, so no list runs long. Passing is split by depth. */
 type Tab = 'run' | 'short' | 'deep' | 'rpo' | 'trick';
-const SHORT = new Set(['quick_out', 'slants', 'screen', 'mesh', 'boot']);
 const TABS: { id: Tab; label: string; short: string; key: string; fam: string; blurb: string }[] = [
   { id: 'run', label: 'Run', short: 'Run', key: 'r', fam: 'run', blurb: 'Runs: hand it off. The clock keeps moving unless he gets out of bounds.' },
   { id: 'short', label: 'Short Pass', short: 'Short', key: 's', fam: 'pass', blurb: 'Short passes: quick, high-percentage throws.' },
@@ -104,6 +103,18 @@ function Title({ text }: { text: string }) {
   const i = text.indexOf(': ');
   if (i < 0 || /^4th/.test(text)) return <h2>{text}</h2>;
   return <h2><span className="cp-h-dd">{text.slice(0, i)}: </span>{text.slice(i + 2)}</h2>;
+}
+
+/** A defensive call's trade-off: what it stops, what it gives up, and when it is at its best. */
+function Trade({ look, cls }: { look: Look; cls: string }) {
+  const L = LOOKS[look];
+  return (
+    <span className={`def-trade ${cls}`}>
+      <span><b>Stops:</b> {L.stops}</span>
+      <span><b>Gives up:</b> {L.risk}</span>
+      <span><b>Use when:</b> {LOOK_USE[look]}</span>
+    </span>
+  );
 }
 
 function WeatherChip({ s }: { s: State }) {
@@ -223,6 +234,7 @@ export function CallPanel(p: Props) {
           </span>
           <span className="pc-name"><kbd>{i + 1}</kbd>{o.label}</span>
           <span className="pc-sub">{o.sub}</span>
+          {sel && <Trade look={o.choice.look!} cls="in-row" />}
         </button>
       );
     };
@@ -232,7 +244,7 @@ export function CallPanel(p: Props) {
         <header className="cp-head">
           <div className="cp-flags"><span className="def-flag">Defense · your call</span><WeatherChip s={s} /></div>
           <Title text={dec.title} />
-          <div className="read tend"><b>Their offense:</b> {tendency(s)}</div>
+          <div className="read tend"><b>Scouting:</b> {tendency(s)}</div>
         </header>
         {clockRow}
         <div className="tabs5 deftabs" role="tablist" aria-label="Kinds of defense">
@@ -248,7 +260,7 @@ export function CallPanel(p: Props) {
         </div>
         <p className="tab5-blurb">{DT.blurb}</p>
         <div className="cp-list def-list cards" role="listbox" aria-label={`${DT.label} defenses`}>{list.map(row)}</div>
-        {info && <div className="def-trade strip"><span><b>Stops:</b> {info.stops}</span><span><b>Gives up:</b> {info.risk}</span></div>}
+        {look && <Trade look={look} cls="strip" />}
         <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
           <div className="cp-sel">
             {info ? (

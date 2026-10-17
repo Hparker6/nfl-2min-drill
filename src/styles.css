@@ -719,12 +719,12 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .mp-fake { fill: none; stroke: rgba(255, 233, 168, .7); stroke-width: .7; stroke-dasharray: 1 1; }
 .mp-post { fill: none; stroke: var(--accent); stroke-width: .9; }
 .mp-arc { fill: none; stroke: #fff; stroke-width: .8; stroke-dasharray: 1.6 1; }
-.mp-d { fill: #e6ecf7; stroke: #16304a; stroke-width: .3; }
+.mp-d { fill: #e6ecf7; stroke: #16304a; stroke-width: .35; }
 .mp-d.rush { fill: #ff6a6a; }
-.mp-ghost { fill: rgba(255, 255, 255, .22); }
-.mp-zone { fill: rgba(45, 212, 191, .16); stroke: rgba(45, 212, 191, .55); stroke-width: .35; }
+.mp-ghost { fill: rgba(255, 255, 255, .34); }
+.mp-zone { fill: rgba(45, 212, 191, .2); stroke: rgba(45, 212, 191, .75); stroke-width: .4; }
 .mp-man { stroke: rgba(45, 212, 191, .75); stroke-width: .45; stroke-dasharray: .8 .6; }
-.mp-rush { fill: none; stroke: #ff6a6a; stroke-width: .8; stroke-linecap: round; stroke-linejoin: round; }
+.mp-rush { fill: none; stroke: #ff6a6a; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
 .prow .mini, .prow .mini.mp { width: 84px; height: 48px; }
 .prow { grid-template-columns: 84px minmax(0, 1fr) auto; }
 @media (max-width: 999px) { .prow { grid-template-columns: 72px minmax(0, 1fr) auto; } .prow .mini, .prow .mini.mp { width: 72px; height: 42px; } }
@@ -971,3 +971,63 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .ad-slot .ad-k { display: none; margin-bottom: 4px; color: var(--muted); font: 600 10px var(--body); letter-spacing: .08em; text-transform: uppercase; }
 .ad-slot:has(ins[data-ad-status="filled"]) .ad-k { display: block; }
 .ad-slot ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; }
+
+/* ---------- defense: why the call worked or didn't, and clearer cards ---------- */
+.res-def { margin: 0; padding: 8px 10px; border-radius: var(--r-sm); font-size: 14px; line-height: 1.35; color: var(--ink-2); background: var(--panel-2); border-left: 3px solid var(--muted); }
+.res-def-k { display: block; margin-bottom: 2px; font: 700 11px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.res-def.fit-good { border-left-color: var(--good); } .res-def.fit-good .res-def-k { color: var(--good); }
+.res-def.fit-bad { border-left-color: var(--bad); } .res-def.fit-bad .res-def-k { color: var(--bad); }
+/* the selected card: a check on the art, a tinted card, and the ring it already had */
+.pcard2.sel .pc-art::before { content: '✓'; position: absolute; right: 6px; bottom: 9px; z-index: 1; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 800 14px/1 var(--body); }
+.cp.def .pcard2.sel { background: color-mix(in srgb, var(--def) 10%, var(--panel-2)); }
+.cp.def .pcard2.sel .pc-art::before { background: var(--def); color: #06110d; }
+.pcard2:focus-visible { outline: 3px solid var(--los); outline-offset: 2px; }
+.pcard2 .def-trade.in-row { padding: 0 10px 10px; }
+.def-trade.strip { gap: 2px; }
+
+/* ---------- big moments on the field: turnovers, touchdowns, the final whistle (ui/Impact.tsx) ---------- */
+.impact { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; border-radius: inherit; }
+.impact::before { content: ''; position: absolute; inset: 0; opacity: 0; }
+.impact-giveaway::before { background: radial-gradient(ellipse at center, transparent 30%, rgba(236, 90, 80, .55) 100%); animation: fx-flash 1s ease-out; }
+.impact-tdAgainst::before { background: radial-gradient(ellipse at center, transparent 40%, rgba(236, 90, 80, .4) 100%); animation: fx-flash .9s ease-out; }
+.impact-takeaway::before { background: radial-gradient(ellipse at center, rgba(45, 212, 191, .28), transparent 70%); animation: fx-flash 1.2s ease-out; }
+.impact-tdFor::before { background: radial-gradient(ellipse at center, rgba(245, 197, 24, .32), transparent 70%); animation: fx-flash 1.4s ease-out; }
+.impact-win::before { background: radial-gradient(ellipse at center, rgba(245, 197, 24, .3), rgba(8, 12, 10, .35) 80%); animation: fx-hold 3.4s ease-out forwards; }
+.impact-loss::before { background: rgba(8, 12, 10, .45); backdrop-filter: grayscale(.9) brightness(.85); -webkit-backdrop-filter: grayscale(.9) brightness(.85); animation: fx-hold 3s ease-out forwards; }
+@keyframes fx-flash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes fx-hold { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+.confetti { position: absolute; inset: 0; }
+.confetti i { position: absolute; top: -12px; height: 10px; border-radius: 2px; opacity: 0; animation: fx-fall 1.6s cubic-bezier(.25, .6, .4, 1) forwards; }
+.impact-win .confetti i { animation-duration: 2.6s; }
+@keyframes fx-fall {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--drift, 0px), 105cqh) rotate(var(--spin, 360deg)); }
+}
+.impact { container-type: size; }
+
+.stamp { position: absolute; left: 50%; top: 50%; z-index: 3; display: flex; flex-direction: column; align-items: center; padding: 12px 30px 14px; border-radius: 12px; background: rgba(8, 12, 10, .88); transform: translate(-50%, -50%); animation: fx-stamp 3.2s var(--ease) forwards; }
+.stamp b { font: 800 clamp(34px, 8cqw, 64px)/1 var(--display); text-transform: uppercase; letter-spacing: .04em; color: #fff; }
+.stamp span { margin-top: 4px; font: 600 13px var(--body); letter-spacing: .1em; text-transform: uppercase; color: #c9d3cc; }
+.stamp.win { border: 2px solid var(--accent); } .stamp.win b { color: var(--accent); }
+.stamp.loss { border: 2px solid #5d6e64; }
+@keyframes fx-stamp {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.6); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(.96); }
+  18% { transform: translate(-50%, -50%) scale(1); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
+
+.stage.fx-shake { animation: fx-shake .45s cubic-bezier(.36, .07, .19, .97); }
+@keyframes fx-shake {
+  10%, 90% { transform: translate(-2px, 0); } 20%, 80% { transform: translate(4px, 1px); }
+  30%, 50%, 70% { transform: translate(-7px, -1px); } 40%, 60% { transform: translate(7px, 1px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage.fx-shake { animation: none; }
+  .confetti { display: none; }
+  .stamp { animation: fx-hold 3s ease-out forwards; transform: translate(-50%, -50%); }
+}

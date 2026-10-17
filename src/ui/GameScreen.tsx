@@ -4,7 +4,7 @@ import { DESIGN } from '../engine/formation';
 import { WEATHER, clone } from '../engine/sim';
 import { utcDate, type Scenario } from '../engine/scenario';
 import type { Ev, Rcv, State } from '../engine/types';
-import { ballOn, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
+import { ballOn, defenseVerdict, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import { GradeJob } from '../game/grader';
 import { Session, type Decision, type Opt, type Pick, type Record_ } from '../game/session';
@@ -18,6 +18,9 @@ import { Scoreboard } from './Scoreboard';
 import { SpotReview } from './Review';
 import type { Preview } from './field';
 import { gameOnScreen } from './AdSlot';
+import { audio } from '../game/audio';
+import { cueFor, finalCue, type ImpactKind } from '../game/fx';
+import { Impact } from './Impact';
 
 interface Props {
   sc: Scenario;
@@ -49,7 +52,7 @@ interface Props {
  */
 type Phase = 'brief' | 'deciding' | 'snapping' | 'auto' | 'result' | 'over';
 interface FeedLine { id: number; t: number; text: string; tone: string }
-interface Last { evs: Ev[]; lines: Told[]; head: Told | null; grade: Grade | null; failed?: boolean; label: string }
+interface Last { evs: Ev[]; lines: Told[]; head: Told | null; grade: Grade | null; failed?: boolean; label: string; pre?: State }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 let uid = 0;
@@ -99,6 +102,8 @@ export function GameScreen(p: Props) {
   const [snapping, setSnapping] = useState<Opt | null>(null);
   const [replaying, setReplaying] = useState(false);
   const [result, setResult] = useState<SpotResult | null>(null);
+  const [impact, setImpact] = useState<{ id: number; kind: ImpactKind } | null>(null);
+  const liveRef = useRef(false);            // the player took part in this game on this screen (not just reopened a finished one)
 
   const shownAt = useRef(Date.now());       // when the current decision went on the board
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -109,6 +114,19 @@ export function GameScreen(p: Props) {
     if (phase === 'brief') track('brief_shown', { mode: sc.mode, kind: sc.kind ?? null });
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
   const speed = settings.speed === 'instant' || reduced ? 0 : settings.speed === 'fast' ? 1.6 : 1;
+
+  /** A big moment on the field: the overlay, and a shake for the ones that hurt (not under reduced motion). */
+  const fire = useCallback((kind: ImpactKind) => {
+    setImpact({ id: ++uid, kind });
+    const el = stageRef.current;
+    if (el && kind === 'giveaway' && !reduced) { el.classList.remove('fx-shake'); void el.offsetWidth; el.classList.add('fx-shake'); }
+  }, [reduced]);
+  /** The sound of a moment, and its impact on the field (replays get the sound only). */
+  const react = useCallback((ev: Ev, withImpact = true) => {
+    const c = cueFor(ev);
+    if (c.sound) audio.play(c.sound);
+    if (withImpact && c.impact) fire(c.impact);
+  }, [fire]);
 
   const preview = useCallback((d: Decision | null, o: Opt | null, e: Edits): Preview => {
     const s = session.s;
@@ -176,6 +194,7 @@ export function GameScreen(p: Props) {
         setBanner(null);
         await field.current?.play(ev, speed, () => {
           if (told.banner) setBanner({ id: ++uid, text: told.banner, tone: told.tone });
+          react(ev);
           setView(clone(session.s));
           if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         });
@@ -185,6 +204,7 @@ export function GameScreen(p: Props) {
         setBanner(null);
         const land = () => {
           if (told.banner) setBanner({ id: ++uid, text: told.banner, tone: told.tone });
+          react(ev);
           setView(clone(session.s));
           if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         };
@@ -193,6 +213,7 @@ export function GameScreen(p: Props) {
       } else {
         if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         setView(clone(session.s));
+        react(ev);
         if (told.banner) {
           setBanner({ id: ++uid, text: told.banner, tone: told.tone });
           if (speed) await sleep(1300 / speed);
@@ -201,7 +222,7 @@ export function GameScreen(p: Props) {
     }
     setView(clone(session.s));
     // the field keeps the final frame; the players move to the next spot when the next call is set up
-  }, [sc, session, speed]);
+  }, [sc, session, speed, react]);
 
   const finish = useCallback(() => {
     const r = session.result();
@@ -213,12 +234,17 @@ export function GameScreen(p: Props) {
     setTrail((t) => [...t, r.win ? 1 : 0]);
     setDec(null);
     setPhase('over');
+    if (liveRef.current && !doneRef.current) {
+      const c = finalCue(r.win);
+      if (c.sound) audio.play(c.sound);
+      if (c.impact) fire(c.impact);
+    }
     if (!doneRef.current) {
       doneRef.current = true;
       onDone(res);
       track('spot_complete', { mode: sc.mode, win: r.win, calls: recs.length });
     }
-  }, [sc, session, onDone]);
+  }, [sc, session, onDone, fire]);
 
   const present = useCallback((d: Decision) => {
     setDec(d);
@@ -279,6 +305,7 @@ export function GameScreen(p: Props) {
   const start = () => {
     if (busyRef.current) return;
     p.onStart?.();
+    liveRef.current = true;
     track('game_start', { mode: sc.mode, resumed: false });
     setPhase('auto');
     proceed();
@@ -347,6 +374,7 @@ export function GameScreen(p: Props) {
     let job = jobRef.current;
     if (!d || !job || busyRef.current || phase !== 'deciding') return;   // one transition per decision
     busyRef.current = true;
+    liveRef.current = true;
     let o = withEdits(opt);
     const combined = isClock && opt.group !== 'clock';
     if (combined) {
@@ -384,6 +412,7 @@ export function GameScreen(p: Props) {
     setPhase('snapping');
     const recIdx = session.records.length;
     const dStep = d.step;
+    const pre = dStep === 'look' ? d.state : undefined;   // for the defense verdict on the result card
     const gp = job.grade(o);
     const evs = session.choose(o);
     onPicks(session.picks);
@@ -410,16 +439,17 @@ export function GameScreen(p: Props) {
       await animate(evs);
       const lines = evs.map((e) => tell(e, sc.teams)).filter((l) => l.text);
       const head = [...lines].reverse().find((l) => l.banner) ?? lines[lines.length - 1] ?? null;
-      setLast({ evs, lines, head, grade: null, label: o.label });
+      setLast({ evs, lines, head, grade: null, label: o.label, pre });
       setPhase('result');
       try {
         const g = await gp;
         settle(g);
-        setLast({ evs, lines, head, grade: g, label: o.label });
+        if (g.g === 'g') audio.play('gradeGood'); else if (g.g === 'r') audio.play('gradeBad');
+        setLast({ evs, lines, head, grade: g, label: o.label, pre });
         track('result_shown', { mode: sc.mode, grade: g.g, lost: Math.round(g.lost * 10) / 10, grade_secs: Math.round((Date.now() - gradedAt) / 1000) });
       } catch {
         // the play stands; only its grade is missing. Never leave the player stuck.
-        setLast({ evs, lines, head, grade: null, failed: true, label: o.label });
+        setLast({ evs, lines, head, grade: null, failed: true, label: o.label, pre });
         track('grade_failed', { mode: sc.mode, step: dStep, call: o.key });
       }
     } finally {
@@ -439,7 +469,7 @@ export function GameScreen(p: Props) {
     field.current?.setup(before(session.s, ev), { look: ev.res.look });
     await sleep(500);
     const told = tell(ev, sc.teams);
-    await field.current?.play(ev, Math.max(0.5, speed * 0.55), () => told.banner && setBanner({ id: ++uid, text: told.banner, tone: told.tone }));
+    await field.current?.play(ev, Math.max(0.5, speed * 0.55), () => { if (told.banner) setBanner({ id: ++uid, text: told.banner, tone: told.tone }); react(ev, false); });
     staleRef.current = true;
     setReplaying(false);
     busyRef.current = false;
@@ -516,6 +546,7 @@ export function GameScreen(p: Props) {
         <div className="stage" ref={stageRef}>
           <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
+            {impact && <Impact key={impact.id} kind={impact.kind} onDone={() => setImpact((x) => (x?.id === impact.id ? null : x))} />}
             <div className="legend" aria-hidden>
               <span><i className="lg-o" />Offense: {T[view.off].name}</span>
               <span><i className="lg-d" />Defense: {T[view.off === 0 ? 1 : 0].name}</span>
@@ -547,6 +578,11 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLab
   const others = last.lines.filter((l) => l !== head);
   const canReplay = last.evs.some((e) => e.type === 'snap');
   const live = s.stage === 'pre' || s.stage === 'call';
+  // on defense: how your call matched the play they ran (computed once per result)
+  const verdict = useMemo(() => {
+    const snap = last.evs.find((e) => e.type === 'snap');
+    return last.pre && snap ? defenseVerdict(last.pre, snap) : null;
+  }, [last.pre, last.evs]);
   return (
     <section className="result" aria-live="polite">
       {head && (
@@ -556,6 +592,7 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLab
         </div>
       )}
       {others.map((l, i) => <p key={i} className={`res-more tone-${l.tone}`}>{l.text}</p>)}
+      {verdict && <p className={`res-def fit-${verdict.fit}`}><span className="res-def-k">Your defense</span> {verdict.text}</p>}
       <div className="res-now">
         <span className="k">Now</span>
         <span>{live ? <><b>{downDist(s)}</b> · {s.off === 0 ? 'your' : 'their'} ball on {ballOn(s.yl, s.off, teams)}</> : s.stage === 'pat' ? <b>Try after the touchdown</b> : s.stage === 'kick' ? <b>Kickoff</b> : <b>Game over</b>}</span>

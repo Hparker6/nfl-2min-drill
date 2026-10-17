@@ -1,0 +1,43 @@
+<!-- Source of marketing/assets/end-card.png (1080 x 1920, 9:16), the last 2-2.5 s of every short video.
+     Re-render: open in Chrome at a 1080 x 1920 viewport and screenshot, or run headless Chrome:
+     chrome --headless=new --hide-scrollbars --window-size=1080,1920 --screenshot=end-card.png end-card.html
+     Text stays inside the platforms' safe zone (out of the top 10% and bottom 20%, middle 80% wide). -->
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>End card</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800&family=Barlow:wght@500;600&display=block" rel="stylesheet">
+<style>
+  :root { --bg: #0a0e0c; --accent: #f5c518; --ink: #edf2ee; --ink2: #c9d3cc; --muted: #8b9b91; --field: #1f6b3a; }
+  html, body { margin: 0; width: 1080px; height: 1920px; background: var(--bg); overflow: hidden; }
+  body { position: relative; font-family: Barlow, sans-serif; color: var(--ink); }
+  /* faint yard lines, so the card reads as a football field without any league marks */
+  .lines { position: absolute; inset: 0; background:
+    repeating-linear-gradient(180deg, transparent 0 158px, rgba(237,242,238,.06) 158px 162px),
+    radial-gradient(ellipse at 50% 46%, rgba(31,107,58,.55), rgba(10,14,12,0) 62%); }
+  .wrap { position: absolute; left: 108px; right: 108px; top: 250px; text-align: center; }
+  .mark { width: 132px; height: 132px; margin: 0 auto; border-radius: 30px; background: var(--accent); display: grid; place-items: center; }
+  .kicker { margin-top: 56px; font: 700 44px 'Barlow Condensed'; letter-spacing: .2em; text-transform: uppercase; color: var(--accent); }
+  h1 { margin: 10px 0 0; font: 800 236px/.84 'Barlow Condensed'; text-transform: uppercase; }
+  h1 .y { color: var(--accent); }
+  .tag { margin-top: 56px; font: 600 54px/1.25 Barlow; color: var(--ink2); }
+  .tag b { color: var(--ink); }
+  .cta { display: inline-block; margin-top: 76px; padding: 30px 64px; border-radius: 22px; background: var(--accent); color: #1b1600; font: 800 72px/1 'Barlow Condensed'; letter-spacing: .06em; text-transform: uppercase; }
+  .url { margin-top: 44px; font: 700 58px/1 'Barlow Condensed'; letter-spacing: .04em; color: var(--ink); }
+  .fine { margin-top: 40px; font: 500 30px/1.35 Barlow; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="lines"></div>
+  <div class="wrap">
+    <div class="mark"><svg viewBox="0 0 64 64" width="92" height="92"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="#0a0e0c"/><path d="M24 32h16M27.5 28.5v7M32 28.5v7M36.5 28.5v7" stroke="#f5c518" stroke-width="2.8" stroke-linecap="round"/></g></svg></div>
+    <div class="kicker">Late-game play-calling</div>
+    <h1>The <span class="y">4th</span><br>Call</h1>
+    <div class="tag"><b>Call the plays. Run the clock.</b><br>Every call graded.</div>
+    <div class="cta">Link in bio</div>
+    <div class="url">nfl-2min-drill.com</div>
+    <div class="fine">Free in your browser · No sign-up<br>Independent fan game. Not affiliated with the NFL.</div>
+  </div>
+</body>
+</html>

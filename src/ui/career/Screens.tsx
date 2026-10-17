@@ -11,6 +11,10 @@ import { POS_LABEL } from '../../engine/data';
 import type { TeamInfo } from '../../engine/types';
 import { download, shareCard, toBlob } from '../../game/shareImage';
 import { careerCard } from '../../career/card';
+import { audio } from '../../game/audio';
+
+/** Career games whose result has already been played (so a re-render or a revisit is quiet). */
+const heard = new Set<string>();
 import { StatLine, TeamTag } from './Hub';
 import type { Commit } from './Career';
 
@@ -62,8 +66,15 @@ export function Postgame({ c, gameId, onContinue }: { c: Career; gameId: string;
   const g = gameOf(c, gameId);
   const teams = useMemo(() => liveTeams(c, g), [gameId]);   // eslint-disable-line react-hooks/exhaustive-deps
   const L = c.last!;
+  const won = !!box && box.final[0] > box.final[1];
+  useEffect(() => {
+    const key = `${c.you.pid}:${c.season?.year ?? ''}:${gameId}`;
+    if (!box || heard.has(key)) return;
+    heard.add(key);
+    audio.play(won ? 'win' : 'loss');
+  }, [gameId]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!box) return null;
-  const win = box.final[0] > box.final[1];
+  const win = won;
   const line = box.players[c.you.pid] ?? {};
   const college = gameId === 'college';
   return (

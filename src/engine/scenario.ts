@@ -3,7 +3,7 @@
  * everyone gets the same three; Survivor spots by run and game number. A generated spot is only kept if it is
  * still in doubt (the AI coaches win it between 8% and 88% of the time), so no spot is decided before the first call.
  */
-import { DEF_POS, FIRST, FRANCHISES, LAST, OFF_POS } from './data';
+import { DEF_POS, FIRST, FRANCHISES, LAST, OFF_POS, TEMPO } from './data';
 import { evaluate } from './evaluate';
 import { clip, hash, pickWeighted, rng, type Rng } from './rng';
 import type { Player, Ratings, State, Team, TeamInfo, Weather } from './types';
@@ -65,6 +65,71 @@ export const DAILY_KINDS: Record<DailyKind, { name: string; tagline: string }> =
 };
 
 export const SPOTS_PER_DAY = 1;
+
+/**
+ * Fair dailies, from FAIR_FROM on. Every standard daily starts with at least DAILY_MIN_SECONDS on the clock, each kind
+ * draws its clock from FAIR_CLOCK (typical comebacks sit around 90-120 seconds), and a spot is only kept when
+ * checkSpot finds nothing wrong with it and the simulated coach wins it between 10% and 85% of the time. Earlier
+ * dailies are generated exactly as before, so a game saved on one of them still replays.
+ * The date must be later than the deploy that ships this, so nobody's in-progress daily changes under them.
+ */
+export const FAIR_FROM = '2026-10-19';
+export const DAILY_MIN_SECONDS = 60;
+export const FAIR_CLOCK: Record<DailyKind, [number, number]> = {
+  drill: [90, 130],       // down 1-3: a field goal ties or wins
+  hole: [140, 220],       // down 4-8: needs a touchdown, so more time
+  tied: [80, 120],
+  closeout: [100, 180],   // you lead with the ball
+  stand: [60, 130],       // they have the ball
+  goalline: [60, 90],     // inside their 10: four downs and room to use them (was 22-50 s)
+  fourthdown: [75, 120],
+};
+export const FAIR_WP: [number, number] = [0.1, 0.85];
+function fairDaily(seedStr: string): boolean {
+  const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return !!m && m[1] >= FAIR_FROM;
+}
+
+/**
+ * Seconds a hurry-up drive needs to get the points the offense is missing: into field-goal range (its 35, a 52-yard
+ * try) when a field goal ties or wins, to the end zone otherwise. A rough model of the game's own clock rules: about
+ * 9 yards and 6 seconds a snap; a first down does not stop the clock; half the snaps stop it on their own
+ * (incompletions, out of bounds in the last two minutes), and so does each timeout and the two-minute warning; every
+ * other snap costs a no-huddle's 13 seconds of running clock. Null when the offense already leads.
+ */
+export function drivePace(s: State): number | null {
+  const need = s.score[1 - s.off] - s.score[s.off];
+  if (need < 0) return null;
+  const target = need <= 3 ? 65 : 100;
+  const yards = Math.max(0, target - s.yl);
+  const plays = Math.max(1, Math.ceil(yards / 9));
+  const stops = s.to[s.off] + (!s.warned && s.t > 120 ? 1 : 0) + Math.floor(plays / 2);
+  return plays * 6 + Math.max(0, plays - 1 - stops) * TEMPO.nohuddle.secs;
+}
+
+/**
+ * What is wrong with a starting spot, as short reasons (empty: nothing). Always: a legal, consistent game state.
+ * For a standard daily also: at least a minute on the clock, one possession either way, and, when you have the ball
+ * and need points, enough clock for a realistic drive (drivePace).
+ */
+export function checkSpot(s: State, opts: { daily?: boolean } = {}): string[] {
+  const bad: string[] = [];
+  if (!(s.down >= 1 && s.down <= 4)) bad.push(`down ${s.down}`);
+  if (!(s.yl >= 1 && s.yl <= 99)) bad.push(`yard line ${s.yl}`);
+  if (!(s.dist >= 1 && s.dist <= 100 - s.yl)) bad.push(`distance ${s.dist} at the ${s.yl}`);
+  if (s.to.some((n) => !(Number.isInteger(n) && n >= 0 && n <= 3))) bad.push(`timeouts ${s.to.join('/')}`);
+  if (s.score.some((n) => !(Number.isInteger(n) && n >= 0))) bad.push(`score ${s.score.join('-')}`);
+  if (!(s.t > 0 && s.t <= 900)) bad.push(`clock ${s.t}`);
+  if (s.stage !== 'pre') bad.push(`stage ${s.stage}`);
+  if (s.warned !== (s.t <= 120)) bad.push('two-minute warning flag does not match the clock');
+  if (opts.daily) {
+    if (s.t < DAILY_MIN_SECONDS) bad.push(`only ${s.t} s on the clock`);
+    if (Math.abs(s.score[0] - s.score[1]) > 8) bad.push('more than one score apart');
+    const pace = s.off === 0 ? drivePace(s) : null;
+    if (pace != null && pace > s.t) bad.push(`the drive needs about ${pace} s, the clock has ${s.t}`);
+  }
+  return bad;
+}
 
 export function utcDate(d = new Date()): string {
   return d.toISOString().slice(0, 10);
@@ -168,8 +233,10 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
   const hard = opts.hard ?? 0;   // survivor ramps this up: deeper holes, less time
   const weather = pickWeighted<Weather>(r, WEATHER_ODDS);
 
+  const fair = !!K && fairDaily(seedStr);
   let best: { s: State; wp: number; p: SpotParams } | null = null;
-  for (let tries = 0; tries < 14; tries++) {
+  let last: SpotParams | null = null;
+  for (let tries = 0; tries < (fair ? 40 : 14); tries++) {
     const side = K ? (K === 'stand' ? 'def' : 'off') : opts.side ?? (r() < 0.72 ? 'off' : 'def');
     const band = pickWeighted(r, { short: 0.3 + hard * 0.1, mid: 0.4, long: 0.3 - hard * 0.1 });
     let t = band === 'short' ? rnd(r, 28, 75) : band === 'mid' ? rnd(r, 76, 140) : rnd(r, 141, 270);
@@ -189,19 +256,46 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     if (K === 'stand') { lead = rnd(r, 1, 7); t = rnd(r, 60, 150); yl = rnd(r, 40, 70); }
     if (K === 'goalline') { lead = -rnd(r, 1, 6); t = rnd(r, 22, 50); yl = rnd(r, 88, 95); dist = Math.min(10, 100 - yl); }
     if (K === 'fourthdown') { lead = -rnd(r, 1, 3); t = rnd(r, 70, 140); yl = rnd(r, 50, 68); down = 4; dist = rnd(r, 1, 6); }
+    if (fair) {
+      // the kind's fair clock, and drives that start at their own 20 or better
+      t = rnd(r, FAIR_CLOCK[K][0], FAIR_CLOCK[K][1]);
+      if (K === 'drill' || K === 'hole' || K === 'tied') yl = rnd(r, 20, 45);
+    }
     const toPick = () => Number(pickWeighted(r, { 0: 0.18, 1: 0.3, 2: 0.3, 3: 0.22 }));
     const p: SpotParams = {
       you: a, them: b, side, t, lead, yl, down, dist, to: [toPick(), toPick()],
       running: r() < 0.5, home: r() < 0.5 ? 0 : 1, weather,
     };
+    last = p;
     const s = stateFrom(p, teams);
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
+    if (fair && checkSpot(s, { daily: true }).length) continue;   // never keep a spot that breaks the rules
     const wp = quickWp(s, hash(seedStr, tries));
-    if (wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
+    if (fair ? wp >= FAIR_WP[0] && wp <= FAIR_WP[1] : wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
     if (!best || Math.abs(wp - 0.4) < Math.abs(best.wp - 0.4)) best = { s, wp, p };
   }
+  if (fair && (!best || best.wp < FAIR_WP[0] || best.wp > FAIR_WP[1])) best = repairDaily(best?.p ?? last!, teams, seedStr, best);
   return { id: seedStr, seed: hash(seedStr), mode, teams, home: best!.p.home, start: best!.s, baseWp: best!.wp, kind: K };
+}
+
+/**
+ * The last resort for a fair daily when no try passed: give the side that needs points more room (a timeout and
+ * more clock) until the spot passes the rules and is in doubt. Deterministic, so everyone still gets the same game.
+ */
+function repairDaily(p0: SpotParams, teams: [TeamInfo, TeamInfo], seedStr: string, prev: { s: State; wp: number; p: SpotParams } | null) {
+  let best = prev && !checkSpot(prev.s, { daily: true }).length ? prev : null;
+  for (let step = 0; step < 8; step++) {
+    const p: SpotParams = { ...p0, to: [Math.max(p0.to[0], 1), p0.to[1]], t: Math.min(240, Math.max(p0.t, DAILY_MIN_SECONDS) + step * 15) };
+    const s = stateFrom(p, teams);
+    if (aiMix(seedStr)) s.mix = true;
+    if (defAmp(seedStr)) s.dx = DEF_AMP;
+    if (checkSpot(s, { daily: true }).length) continue;
+    const wp = quickWp(s, hash(seedStr, 'repair', step));
+    if (wp >= FAIR_WP[0] && wp <= FAIR_WP[1]) return { s, wp, p };
+    if (!best || Math.abs(wp - 0.4) < Math.abs(best.wp - 0.4)) best = { s, wp, p };
+  }
+  return best!;
 }
 
 /** The day's kind: a seven-day rotation shuffled per week, so consecutive days never repeat a type. */

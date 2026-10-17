@@ -4,6 +4,23 @@ import { WEATHER } from '../engine/sim';
 import type { State, TeamInfo } from '../engine/types';
 const WX_ICON: Record<string, string> = { rain: '🌧', snow: '❄', wind: '💨' };
 
+/** WCAG relative luminance of a #rgb or #rrggbb color (null if it isn't one). */
+function lum(hex: string): number | null {
+  const m = hex.trim().match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+  if (!m) return null;
+  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  const ch = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
+}
+const ratio = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+/** The team's second color on its chip when it reads (4.5:1), otherwise white or near-black, whichever reads better. */
+export function chipInk(bg: string, fg: string): string {
+  const b = lum(bg), f = lum(fg);
+  if (b == null) return fg;
+  if (f != null && ratio(b, f) >= 4.5) return fg;
+  return ratio(b, 1) >= ratio(b, lum('#0a0e0c')!) ? '#ffffff' : '#0a0e0c';
+}
+
 interface Props {
   s: State;
   teams: [TeamInfo, TeamInfo];
@@ -50,7 +67,7 @@ function Team({ team, score, tos, ball, you, right }: { team: TeamInfo; score: n
   return (
     <div className={`sb-team${right ? ' right' : ''}${ball ? ' has-ball' : ''}`} style={{ ['--tc' as string]: team.color }}>
       <div className="sb-id">
-        <span className="sb-chip" style={{ background: team.color, color: team.color2 }}>{team.id}</span>
+        <span className="sb-chip" style={{ background: team.color, color: chipInk(team.color, team.color2) }}>{team.id}</span>
         <div className="sb-names">
           <span className="sb-nick">{team.name}</span>
           <span className="sb-city">{you ? 'You' : team.city}</span>
@@ -60,7 +77,7 @@ function Team({ team, score, tos, ball, you, right }: { team: TeamInfo; score: n
         {[0, 1, 2].map((i) => <i key={i} className={i < tos ? 'on' : ''} />)}
       </div>
       <div key={bump} className={`sb-score${bump ? ' bump' : ''}`}>{score}</div>
-      {ball && <span className="sb-ball" aria-label="has the ball" />}
+      {ball && <span className="sb-ball" role="img" aria-label="has the ball" />}
     </div>
   );
 }

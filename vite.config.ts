@@ -3,9 +3,11 @@ import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const NAME = 'The 4th Call';
-// the site's pages for the sitemap: the game, the guide (static, public/how-to-play/) and the pages the Worker draws
-const PAGES: [string, string][] = [['/', 'daily'], ['/how-to-play/', 'weekly'], ['/leaderboard/', 'daily'], ['/stats/', 'daily']];
-const ABOUT = 'A free NFL 2-minute drill play-calling game. Run the 2-minute drill at the end of a close game: call every play, manage the clock, and see each call graded against every option you had. New game every day.';
+// the site's indexable pages for the sitemap: the game and the guide (static, public/how-to-play/). The Worker's
+// /leaderboard/ and /stats/ pages are noindex while thin (INDEXABLE in server/site/worker.js) and so stay out of the
+// sitemap; add them back here when that flag turns on.
+const PAGES: [string, string][] = [['/', 'daily'], ['/how-to-play/', 'weekly']];
+const ABOUT = 'A free American football strategy game. Run the two-minute drill at the end of a close game: call every play, manage the clock, and see each call graded against every option you had. New game every day.';
 
 /**
  * Social previews, the canonical link, structured data and the sitemap need absolute URLs. Set VITE_SITE_URL
@@ -17,11 +19,11 @@ function siteMeta(site: string): Plugin {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
-      { '@type': 'WebSite', name: NAME, alternateName: ['NFL 2-Min Drill', 'NFL 2-Minute Drill Game', '4th Call'], ...(site && { url: `${site}/` }) },
+      { '@type': 'WebSite', name: NAME, alternateName: ['4th Call'], ...(site && { url: `${site}/` }) },
       {
         '@type': ['VideoGame', 'WebApplication'],
         name: NAME,
-        alternateName: ['NFL 2-Minute Drill Game', 'NFL 2 Min Drill', '2-Minute Drill Football Play-Calling Game'],
+        alternateName: ['4th Call', '2-Minute Drill Football Play-Calling Game'],
         description: ABOUT,
         genre: ['Sports', 'Strategy'],
         gamePlatform: 'Web browser',

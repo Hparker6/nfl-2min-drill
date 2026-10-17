@@ -665,7 +665,7 @@ export function aiDefClock(s: State, r: Rng): DefClock {
 }
 
 export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
-  const o = s.off, d = leadOf(s, o), t = s.t, yt = ytg(s), fd = fgDist(s);
+  const o = s.off, d = leadOf(s, o), t = s.t, fd = fgDist(s);
   const fgWins = d >= -3 && d <= 0;
   const E = early(s);
   if (E && !normalOnly) { const x = earlySpecial(s, r); if (x) return x; }
@@ -679,7 +679,23 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
       if (!must && !shortGo) return 'punt';
     }
   }
-  if (!E && t <= 8 && yt >= 25 && !(fd <= 60 && fgWins)) return 'hail';
+  if (aiHailMary(s)) return 'hail';
+  return pickWeighted(r, aiOffWeights(s));
+}
+
+/** The AI offense throws a Hail Mary: seconds left, far out, and a field goal won't do. */
+export function aiHailMary(s: State): boolean {
+  const d = leadOf(s, s.off), fd = fgDist(s);
+  return !early(s) && s.t <= 8 && ytg(s) >= 25 && !(fd <= 60 && d >= -3 && d <= 0);
+}
+
+/**
+ * How the AI offense weighs its scrimmage plays in this situation (its kicks, punts, kneel-downs and Hail Marys are
+ * decided first, in aiOffPlay). Shared with the defense's scouting hint, so the hint describes what the AI really does.
+ */
+export function aiOffWeights(s: State): Record<string, number> {
+  const o = s.off, d = leadOf(s, o), t = s.t, yt = ytg(s);
+  const E = early(s);
   const w: Record<string, number> = {};
   const add = (k: string, v: number) => (w[k] = (w[k] || 0) + v);
   const hurry = E ? halfEnd(s) : d < 0 ? t <= 300 : d === 0 ? t <= 150 : false;
@@ -703,7 +719,7 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
     add('deep_corner', 1.2); add('slants', 1.2); add('mesh', 1); add('boot', 0.8);
     w.go = (w.go || 0) * 0.3; w.deep_post = (w.deep_post || 0) * 0.4; w.pa_deep = (w.pa_deep || 0) * 0.3;
   }
-  return pickWeighted(r, w);
+  return w;
 }
 
 /** Kicks, punts and fourth downs before the fourth quarter, and the end of the first half. */

@@ -1,0 +1,46 @@
+/**
+ * What a moment in the game sounds and looks like. Pure: an event in, a sound and an impact out, from your side of
+ * the ball (team 0 is you). The audio engine (audio.ts) and the field overlay (ui/Impact.tsx) do the rest.
+ */
+import type { Ev } from '../engine/types';
+
+export type Sound =
+  | 'whistle' | 'hit' | 'chime' | 'cheer' | 'groan'
+  | 'turnoverBad' | 'turnoverGood' | 'tdFor' | 'tdAgainst'
+  | 'win' | 'loss' | 'gradeGood' | 'gradeBad';
+
+/** Big moments get a visual on the field. Turnovers you commit shake it; the final gets a stamp. */
+export type ImpactKind = 'giveaway' | 'takeaway' | 'tdFor' | 'tdAgainst' | 'win' | 'loss';
+
+export interface Cue { sound: Sound | null; impact: ImpactKind | null }
+const none: Cue = { sound: null, impact: null };
+
+export function cueFor(ev: Ev): Cue {
+  if (ev.type === 'snap') {
+    const r = ev.res, mine = ev.off === 0;
+    if (r.kind === 'kneel' || r.kind === 'spike') return none;
+    // an interception or a fumble (a pick six included): the ball changes hands in the run of play
+    if (r.intercepted || r.fumble) return mine ? { sound: 'turnoverBad', impact: 'giveaway' } : { sound: 'turnoverGood', impact: 'takeaway' };
+    if (r.td) return mine ? { sound: 'tdFor', impact: 'tdFor' } : { sound: 'tdAgainst', impact: 'tdAgainst' };
+    if (r.defTd) return mine ? { sound: 'tdAgainst', impact: 'tdAgainst' } : { sound: 'tdFor', impact: 'tdFor' };
+    if (r.safety) return mine ? { sound: 'groan', impact: null } : { sound: 'cheer', impact: null };
+    // a stop on fourth down (turnover on downs)
+    if (r.turnover) return mine ? { sound: 'groan', impact: null } : { sound: 'cheer', impact: null };
+    if (r.kind === 'fg') return r.good ? { sound: mine ? 'cheer' : 'groan', impact: null } : { sound: mine ? 'groan' : 'cheer', impact: null };
+    if (r.kind === 'punt') return { sound: 'whistle', impact: null };
+    if (r.kind === 'sack') return { sound: 'hit', impact: null };
+    if (ev.first) return { sound: 'chime', impact: null };
+    return { sound: 'whistle', impact: null };
+  }
+  if (ev.type === 'kick') {
+    if (ev.td) return ev.recover === 0 ? { sound: 'tdFor', impact: 'tdFor' } : { sound: 'tdAgainst', impact: 'tdAgainst' };
+    if (ev.kind === 'onside') return ev.recover === ev.kicker ? { sound: ev.kicker === 0 ? 'cheer' : 'groan', impact: null } : { sound: 'whistle', impact: null };
+    return { sound: 'whistle', impact: null };
+  }
+  if (ev.type === 'pat') return ev.good ? { sound: ev.off === 0 ? 'chime' : null, impact: null } : { sound: ev.off === 0 ? 'groan' : 'cheer', impact: null };
+  if (ev.type === 'timeout' || ev.type === 'warning') return { sound: 'whistle', impact: null };
+  return none;
+}
+
+/** The end of a game, from your side. */
+export const finalCue = (win: boolean): Cue => (win ? { sound: 'win', impact: 'win' } : { sound: 'loss', impact: 'loss' });
