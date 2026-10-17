@@ -3,18 +3,22 @@
  * player thinks. After the pick, the leading options, the player's pick and the AI coach's pick get a second,
  * larger pass (N2 more games) so the grade is not decided by simulation noise.
  */
-import { addStat, evaluate, type OptStat } from '../engine/evaluate';
+import { addPairs, addStat, evaluate, evaluatePaired, pairSe, type OptStat, type PairStat } from '../engine/evaluate';
 import { hash } from '../engine/rng';
 import type { Choice, State } from '../engine/types';
-import { makeGrade, type Grade } from './grade';
+import { makeGrade, nearEdge, type Grade } from './grade';
 import type { Decision, Opt } from './session';
 
 export const N1 = 1000;
 export const N2 = 4000;
+/** More paired simulations for the pick and the best option when the grade sits near a boundary. */
+export const N3 = 12000;
 const REFINE_TOP = 4;
 
-interface Job { id: number; s: State; choices: Choice[]; n: number; seed: number; from: number }
-interface Pending { resolve: (st: OptStat[]) => void; job: Job; w: Worker }
+interface Job { id: number; s: State; choices: Choice[]; n: number; seed: number; from: number; paired?: boolean }
+interface Result { stats: OptStat[]; pairs?: PairStat }
+interface Pending { resolve: (r: Result) => void; job: Job; w: Worker }
+const onMain = (j: Job): Result => (j.paired ? evaluatePaired(j.s, j.choices, j.n, j.seed, j.from) : { stats: evaluate(j.s, j.choices, j.n, j.seed, j.from) });
 
 export class Pool {
   private workers: Worker[] = [];
@@ -27,9 +31,9 @@ export class Pool {
     try {
       for (let i = 0; i < size; i++) {
         const w = new Worker(new URL('../engine/worker.ts', import.meta.url), { type: 'module' });
-        w.onmessage = (e: MessageEvent<{ id: number; stats: OptStat[] }>) => {
+        w.onmessage = (e: MessageEvent<{ id: number; stats: OptStat[]; pairs?: PairStat }>) => {
           const p = this.pending.get(e.data.id);
-          if (p) { this.pending.delete(e.data.id); p.resolve(e.data.stats); }
+          if (p) { this.pending.delete(e.data.id); p.resolve({ stats: e.data.stats, pairs: e.data.pairs }); }
         };
         // a worker that fails (load error, crash) must not leave a grade waiting forever: its jobs finish here
         w.onerror = (e) => { e.preventDefault?.(); this.retire(w); };
@@ -40,9 +44,9 @@ export class Pool {
     }
   }
 
-  private call(w: Worker, s: State, choices: Choice[], n: number, seed: number, from: number): Promise<OptStat[]> {
+  private call(w: Worker, s: State, choices: Choice[], n: number, seed: number, from: number, paired = false): Promise<Result> {
     const id = ++this.seq;
-    const job: Job = { id, s, choices, n, seed, from };
+    const job: Job = { id, s, choices, n, seed, from, paired };
     return new Promise((resolve) => {
       this.pending.set(id, { resolve, job, w });
       try { w.postMessage(job); } catch { this.retire(w); }
@@ -56,7 +60,7 @@ export class Pool {
     for (const [id, p] of [...this.pending]) {
       if (p.w !== w) continue;
       this.pending.delete(id);
-      setTimeout(() => p.resolve(evaluate(p.job.s, p.job.choices, p.job.n, p.job.seed, p.job.from)), 0);
+      setTimeout(() => p.resolve(onMain(p.job)), 0);
     }
   }
 
@@ -68,10 +72,31 @@ export class Pool {
     }
     const W = this.workers.length;
     const parts = this.workers.map((_, w) => choices.map((_, i) => i).filter((i) => i % W === w));
-    const res = await Promise.all(parts.map((idx, w) => (idx.length ? this.call(this.workers[w], s, idx.map((i) => choices[i]), n, seed, from) : Promise.resolve([]))));
+    const res = await Promise.all(parts.map((idx, w) => (idx.length ? this.call(this.workers[w], s, idx.map((i) => choices[i]), n, seed, from).then((x) => x.stats) : Promise.resolve([]))));
     const out: OptStat[] = new Array(choices.length);
     parts.forEach((idx, w) => idx.forEach((i, j) => (out[i] = res[w][j])));
     return out;
+  }
+
+  /**
+   * Every choice over the same simulations, measuring paired differences. Split by simulation range (not by choice) so
+   * each worker sees every pair; the totals are the same simulations a by-choice split would run.
+   */
+  async runPaired(s: State, choices: Choice[], n: number, seed: number, from = 0): Promise<Result & { pairs: PairStat }> {
+    if (!this.workers.length) {
+      await new Promise((r) => setTimeout(r, 0));
+      return evaluatePaired(s, choices, n, seed, from);
+    }
+    const W = this.workers.length, chunk = Math.ceil(n / W);
+    const res = await Promise.all(this.workers.map((w, i) => {
+      const a = from + i * chunk, m = Math.max(0, Math.min(chunk, from + n - a));
+      return m ? this.call(w, s, choices, m, seed, a, true) : Promise.resolve(null);
+    }));
+    const parts = res.filter((x): x is Result => !!x && !!x.pairs);
+    return {
+      stats: choices.map((_, j) => parts.map((p) => p.stats[j]).reduce(addStat)),
+      pairs: parts.map((p) => p.pairs!).reduce(addPairs),
+    };
   }
 }
 
@@ -116,13 +141,28 @@ export class GradeJob {
     if (this.stats.has(this.dec.aiKey)) keys.add(this.dec.aiKey);
     const list = [...keys];
     const choices = list.map((k) => this.dec.options.find((o) => o.key === k)!.choice);
+    // a custom call (edited routes, a side, a signal) is compared over the same refine simulations too
+    if (custom) choices.push(opt.choice);
     const pool = getPool();
     const [more, mineCustom] = await Promise.all([
-      pool.run(this.dec.state, choices, N2, this.seed, N1),
+      pool.runPaired(this.dec.state, choices, N2, this.seed, N1),
       custom ? pool.run(this.dec.state, [opt.choice], N1 + N2, this.seed, 0) : Promise.resolve(null),
     ]);
-    list.forEach((k, i) => this.stats.set(k, addStat(this.stats.get(k)!, more[i])));
+    list.forEach((k, i) => this.stats.set(k, addStat(this.stats.get(k)!, more.stats[i])));
     const mineStat = custom ? mineCustom![0] : this.stats.get(opt.key)!;
-    return makeGrade(this.dec, opt, mineStat, this.stats);
+    const mineIdx = custom ? list.length : list.indexOf(opt.key);
+    // the noise in "best minus mine", in points: measured over the refine simulations, scaled to all of them
+    const seVs = (bestKey: string) => { const b = list.indexOf(bestKey); return b < 0 || mineIdx < 0 ? 0 : pairSe(more.pairs, b, mineIdx, N1 + N2); };
+    const minN = (N1 + N2) * 0.9;
+    const g = makeGrade(this.dec, opt, mineStat, this.stats, seVs, minN);
+    if (g.bestKey === opt.key || !nearEdge(g.lost, g.se ?? 0)) return g;
+    // close to a grade boundary: settle it with more simulations of just the two calls being compared
+    const bestChoice = this.dec.options.find((o) => o.key === g.bestKey)!.choice;
+    const ext = await pool.runPaired(this.dec.state, [bestChoice, opt.choice], N3, this.seed, N1 + N2);
+    const stats = new Map(this.stats);
+    stats.set(g.bestKey, addStat(stats.get(g.bestKey)!, ext.stats[0]));
+    const mine2 = addStat(mineStat, ext.stats[1]);
+    if (!custom) stats.set(opt.key, mine2);
+    return makeGrade(this.dec, opt, mine2, stats, () => pairSe(ext.pairs, 0, 1, N1 + N2 + N3), minN);
   }
 }

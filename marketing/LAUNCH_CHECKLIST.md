@@ -13,11 +13,11 @@ variables with `$env:VITE_SITE_URL='https://nfl-2min-drill.com'` on its own line
 
 ```bash
 VITE_SITE_URL=https://nfl-2min-drill.com npm run build   # type-check + production build into dist/
-npm test                                                  # 17 files, 161 tests at last run
+npm test                                                  # 20 files, 183 tests at last run
 node --check server/site/worker.js                        # the Worker parses
 ```
 
-Pass: the build ends with `✓ built in …`, the tests report `161 passed`, and `node --check` prints nothing.
+Pass: the build ends with `✓ built in …`, the tests report `183 passed`, and `node --check` prints nothing.
 
 ### A2. Review the diff
 

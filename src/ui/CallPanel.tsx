@@ -29,6 +29,7 @@ interface Props {
   hints: Map<string, number> | null;        // practice: win chance per option
   clockHints: Map<string, number> | null;
   prev: { label: string; g: Grade } | null; // the last complete decision, graded
+  autoTempo?: string;                       // the tempo the game picked for you (marked Auto, with the reason)
   onClock: (o: Opt) => void;                // pick a tempo (or let it run): part of this snap
   onMajor: (o: Opt) => void;                // timeout, spike, kneel, run it down: the whole decision, one tap
   onSelect: (o: Opt) => void;
@@ -127,7 +128,16 @@ function WeatherChip({ s }: { s: State }) {
  * The clock row: on offense the tempo (part of the snap) plus Timeout / Spike / Kneel (complete on their own); on
  * defense, Let it run (part of the call) or Timeout.
  */
-function ClockRow({ clock, clockSel, hints, s, onClock, onMajor }: { clock: Decision; clockSel: Opt | null; hints: Map<string, number> | null; s: State; onClock: (o: Opt) => void; onMajor: (o: Opt) => void }) {
+/** Why the game picked this tempo for you. */
+function autoWhy(key: string, s: State): string {
+  const l = s.score[0] - s.score[1];
+  if (key === 'milk') return 'you lead: burn the clock';
+  if (key === 'nohuddle') return l < 0 ? 'you trail: save the clock' : 'under two minutes: save the clock';
+  if (key === 'let') return 'save your timeouts';
+  return 'normal pace';
+}
+
+function ClockRow({ clock, clockSel, hints, s, onClock, onMajor, auto }: { clock: Decision; clockSel: Opt | null; hints: Map<string, number> | null; s: State; onClock: (o: Opt) => void; onMajor: (o: Opt) => void; auto?: string }) {
   const best = bestOf(hints);
   const tempos = clock.options.filter((o) => TEMPO_KEYS.has(o.key));
   const majors = clock.options.filter((o) => !TEMPO_KEYS.has(o.key));
@@ -142,12 +152,13 @@ function ClockRow({ clock, clockSel, hints, s, onClock, onMajor }: { clock: Deci
           const secs = o.key in TEMPO ? TEMPO[o.key as keyof typeof TEMPO].secs : null;
           return (
             <button key={o.key} role="radio" aria-checked={sel} className={`tbtn${sel ? ' on' : ''} ${hintClass(wp, best)}`} onClick={() => onClock(o)} title={o.sub}>
-              <span className="tbtn-name">{TEMPO_NAME[o.key] ?? o.label}</span>
+              <span className="tbtn-name">{TEMPO_NAME[o.key] ?? o.label}{auto === o.key && <em className="tbtn-auto">Auto</em>}</span>
               <span className="tbtn-sub">{wp != null ? `${(wp * 100).toFixed(1)}%` : secs != null ? `about ${Math.min(secs, s.t)} s` : o.key === 'let' ? 'Save your timeouts' : o.sub}</span>
             </button>
           );
         })}
       </div>
+      {off && auto && clockSel?.key === auto && <p className="tempo-why">Tempo set for you: <b>{TEMPO_NAME[auto]}</b>, {autoWhy(auto, s)}.</p>}
       {majors.length > 0 && (
         <div className="majors">
           {majors.map((o) => {
@@ -212,7 +223,7 @@ export function CallPanel(p: Props) {
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const clockRow = clock && <ClockRow clock={clock} clockSel={clockSel} hints={p.clockHints} s={s} onClock={p.onClock} onMajor={p.onMajor} />;
+  const clockRow = clock && <ClockRow clock={clock} clockSel={clockSel} hints={p.clockHints} s={s} onClock={p.onClock} onMajor={p.onMajor} auto={p.autoTempo} />;
   const clockNote = needClock ? (clock!.step === 'offClock' ? 'Pick a tempo, then the play.' : 'Timeout, or let it run?') : null;
   const snapLabel = (word: string) => (needClock ? (clock!.step === 'offClock' ? 'Pick a tempo' : 'Clock first') : word);
 

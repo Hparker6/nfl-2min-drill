@@ -9,11 +9,10 @@ import { CONF_NAME, DIV_NAME, FINAL_NAME, LEAGUE_NAME, teamById, teamInfo } from
 import { tradeTargets, signWith } from '../../career/offseason';
 import { race } from '../../career/awards';
 import { gameWeather, leaders, REG_WEEKS, WEEK_NAME, statValue } from '../../career/season';
-import { picture, seeds } from '../../career/standings';
+import { picture, seeds, standings } from '../../career/standings';
 import type { CTeam, Game, StandingRow } from '../../career/types';
 import { WEATHER } from '../../engine/sim';
 import { POS_LABEL } from '../../engine/data';
-import { SLOTS } from '../../engine/roster';
 import { PlayButtons, type Commit } from './Career';
 
 type Tab = 'home' | 'schedule' | 'standings' | 'leaders' | 'team' | 'player' | 'playoffs';
@@ -21,10 +20,11 @@ type Tab = 'home' | 'schedule' | 'standings' | 'leaders' | 'team' | 'player' | '
 interface Props {
   c: Career; commit: Commit;
   onPlay: (m: 'moments' | 'full' | 'sim') => void; onBye: () => void; onRetire: () => void; onExport: () => void;
+  initialTab?: 'home' | 'player';
 }
 
-export function Hub({ c, commit, onPlay, onBye, onRetire, onExport }: Props) {
-  const [tab, setTab] = useState<Tab>('home');
+export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, initialTab }: Props) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'home');
   const [settings, setSettings] = useState(false);
   const me = youPlayer(c);
   const team = teamById(c.league, me.team!);
@@ -153,9 +153,30 @@ function NextGame({ c, g, pic, onPlay }: { c: Career; g: Game; pic: Record<strin
         <span className="cr-at">{g.home === me.team ? 'vs' : '@'}</span>
         <TeamBlock t={opp} r={pic[opp.id]} ovr={oi.rat} />
       </div>
+      <Storylines c={c} g={g} mine={mine} opp={opp} pic={pic} />
       <PlayButtons onPlay={onPlay} />
     </>
   );
+}
+
+/** What's at stake this week, in a few short lines: the kind of game, the streaks, the matchup, the record. */
+function Storylines({ c, g, mine, opp, pic }: { c: Career; g: Game; mine: CTeam; opp: CTeam; pic: Record<string, StandingRow> }) {
+  const lines: string[] = [];
+  const streak = (t: CTeam) => {
+    const s = pic[t.id]?.streak ?? '';
+    const n = Number(s.slice(1));
+    return n >= 2 ? (s[0] === 'W' ? `${t.city} has won ${n} straight` : `${t.city} has lost ${n} straight`) : null;
+  };
+  if (g.kind !== 'reg') lines.push(g.kind === 'final' ? 'Win and you are champions' : 'Playoffs: lose and go home');
+  else if (mine.conf === opp.conf && mine.div === opp.div) lines.push('Division game: it counts twice in the standings');
+  for (const t of [opp, mine]) { const s = streak(t); if (s) lines.push(s); }
+  const defRank = [...c.league.teams].map((t) => ({ id: t.id, d: teamInfo(c.league, t).rat.def })).sort((a, b) => b.d - a.d).findIndex((x) => x.id === opp.id) + 1;
+  if (defRank <= 6) lines.push(`${opp.city}'s defense ranks ${ordinal(defRank)} in the league`);
+  else if (defRank >= 27) lines.push(`${opp.city}'s defense ranks ${ordinal(defRank)}: a chance to put up numbers`);
+  const r = pic[mine.id];
+  if (g.kind === 'reg' && r) lines.push(`A win makes it ${r.w + 1}-${r.l}${r.t ? `-${r.t}` : ''}`);
+  if (!lines.length) return null;
+  return <ul className="cr-story">{lines.slice(0, 3).map((l) => <li key={l}>{l}</li>)}</ul>;
 }
 
 function TeamBlock({ t, r, ovr }: { t: CTeam; r?: StandingRow; ovr: { ovr: number; off: number; def: number } }) {
@@ -240,44 +261,64 @@ export function StatLine({ l }: { l: Line }) {
   );
 }
 
+/** A game, the way a scores app lists it: both teams, the score (winner bright), the status. */
+function GameRow({ c, g, mark }: { c: Career; g: Game; mark?: boolean }) {
+  const a = teamById(c.league, g.away), h = teamById(c.league, g.home);
+  const done = !!g.score;
+  const aw = done && g.score![1] > g.score![0], hw = done && g.score![0] > g.score![1];
+  return (
+    <div className={`lg-game${mark ? ' you' : ''}`}>
+      {([[a, g.score?.[1], aw], [h, g.score?.[0], hw]] as const).map(([t, pts, w], i) => (
+        <div key={i} className={`lg-side${done && !w ? ' dim' : ''}`} style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+          <i className="lg-chip">{t.id}</i><span>{t.city}</span><b>{done ? pts : ''}</b>
+        </div>
+      ))}
+      <span className="lg-status">{done ? `Final${g.ot ? ' · OT' : ''}` : 'Upcoming'}</span>
+    </div>
+  );
+}
+
 function Schedule({ c }: { c: Career }) {
   const me = youPlayer(c);
-  const [week, setWeek] = useState(Math.min(c.season.week, 22));
+  const maxWeek = Math.max(...c.season.games.map((g) => g.week));
+  const [week, setWeek] = useState(Math.min(c.season.week, maxWeek));
   const games = c.season.games.filter((g) => g.week === week);
   const mine = yourGames(c);
+  const pic = useMemo(() => standings(c.league.teams, c.season.games), [c.season.games]);
+  const weeks = [...Array.from({ length: REG_WEEKS }, (_, i) => i + 1), ...mine.filter((g) => g.kind !== 'reg').map((g) => g.week)];
   return (
-    <div className="cr-grid">
+    <div className="cr-grid lg-two">
       <section className="cr-card">
         <h3>Your schedule</h3>
-        <table className="cr-t cr-sched"><tbody>
-          {Array.from({ length: REG_WEEKS }, (_, i) => i + 1).map((w) => {
+        <ol className="lg-sched">
+          {weeks.map((w) => {
             const g = mine.find((x) => x.week === w);
-            if (!g) return <tr key={w} className="muted"><td>{w}</td><td colSpan={2}>Bye</td></tr>;
+            if (!g) return <li key={w} className="bye"><span className="lg-wk">{w}</span><span className="muted">Bye week</span></li>;
             const home = g.home === me.team, opp = teamById(c.league, home ? g.away : g.home);
             const us = g.score ? (home ? g.score[0] : g.score[1]) : null, them = g.score ? (home ? g.score[1] : g.score[0]) : null;
             const res = us == null ? '' : us > them! ? 'W' : us < them! ? 'L' : 'T';
-            return <tr key={w} className={w === c.season.week ? 'now' : ''}><td>{w}</td><td>{home ? 'vs' : '@'} <TeamTag t={opp} /></td><td className={`num res-${res}`}>{us == null ? '' : `${res} ${us}-${them}${g.ot ? ' OT' : ''}`}</td></tr>;
+            const r = pic[opp.id];
+            return (
+              <li key={w} className={w === c.season.week ? 'now' : ''} style={{ ['--tc' as string]: opp.color, ['--tc2' as string]: opp.color2 }}>
+                <span className="lg-wk">{g.kind === 'reg' ? w : WEEK_NAME(w).replace(' round', '')}</span>
+                <span className="lg-at">{home ? 'vs' : '@'}</span>
+                <i className="lg-chip">{opp.id}</i>
+                <span className="lg-opp"><b>{opp.city}</b><small>{opp.name} · {r ? `${r.w}-${r.l}${r.t ? `-${r.t}` : ''}` : '0-0'}</small></span>
+                {res ? <span className={`lg-res r-${res}`}>{res} {us}-{them}{g.ot ? ' OT' : ''}</span> : w === c.season.week ? <span className="lg-res next">This week</span> : <span className="lg-res muted">—</span>}
+              </li>
+            );
           })}
-          {mine.filter((g) => g.kind !== 'reg').map((g) => {
-            const home = g.home === me.team, opp = teamById(c.league, home ? g.away : g.home);
-            const us = g.score ? (home ? g.score[0] : g.score[1]) : null, them = g.score ? (home ? g.score[1] : g.score[0]) : null;
-            return <tr key={g.id}><td>{WEEK_NAME(g.week)}</td><td>{home ? 'vs' : '@'} <TeamTag t={opp} /></td><td className="num">{us == null ? '' : `${us > them! ? 'W' : 'L'} ${us}-${them}`}</td></tr>;
-          })}
-        </tbody></table>
+        </ol>
       </section>
       <section className="cr-card">
-        <h3>Around the league</h3>
-        <label className="cr-field"><span className="k">Week</span>
-          <select value={week} onChange={(e) => setWeek(Number(e.target.value))}>
-            {Array.from({ length: 22 }, (_, i) => i + 1).filter((w) => w <= REG_WEEKS || c.season.games.some((g) => g.week === w)).map((w) => <option key={w} value={w}>{WEEK_NAME(w)}</option>)}
-          </select>
-        </label>
-        <table className="cr-t"><tbody>
-          {games.map((g) => {
-            const a = teamById(c.league, g.away), h = teamById(c.league, g.home);
-            return <tr key={g.id} className={g.home === me.team || g.away === me.team ? 'you' : ''}><td><TeamTag t={a} /></td><td className="num">{g.score ? g.score[1] : ''}</td><td className="muted">@</td><td><TeamTag t={h} /></td><td className="num">{g.score ? g.score[0] : ''}{g.ot ? ' OT' : ''}</td></tr>;
-          })}
-        </tbody></table>
+        <div className="lg-weekbar">
+          <button className="btn ghost small" disabled={week <= 1} onClick={() => setWeek(week - 1)} aria-label="Previous week">‹</button>
+          <h3>{WEEK_NAME(week)}</h3>
+          <button className="btn ghost small" disabled={week >= maxWeek} onClick={() => setWeek(week + 1)} aria-label="Next week">›</button>
+        </div>
+        <div className="lg-board">
+          {games.length ? games.map((g) => <GameRow key={g.id} c={c} g={g} mark={g.home === me.team || g.away === me.team} />) : <p className="muted">No games this week yet.</p>}
+        </div>
       </section>
     </div>
   );
@@ -293,27 +334,32 @@ function Standings({ c, pic }: { c: Career; pic: Record<string, StandingRow> }) 
         <button className={view === 'conf' ? 'on' : ''} onClick={() => setView('conf')}>Playoff picture</button>
       </div>
       {view === 'div' ? (
-        <div className="cr-grid">
-          {([0, 1] as const).flatMap((conf) => ([0, 1, 2, 3] as const).map((div) => {
-            const ts = c.league.teams.filter((t) => t.conf === conf && t.div === div).sort((a, b) => (pic[b.id]?.pct ?? 0) - (pic[a.id]?.pct ?? 0) || (pic[a.id]?.seed ?? 99) - (pic[b.id]?.seed ?? 99));
-            return (
-              <section key={`${conf}${div}`} className="cr-card">
-                <h3>{CONF_NAME[conf]} {DIV_NAME[div]}</h3>
-                <StandTable c={c} rows={ts} pic={pic} you={me.team!} />
-              </section>
-            );
-          }))}
+        <div className="lg-divs">
+          {([0, 1] as const).map((conf) => (
+            <div key={conf} className="cr-stack">
+              <h2 className="lg-conf">{CONF_NAME[conf]} Conference</h2>
+              {([0, 1, 2, 3] as const).map((div) => {
+                const ts = c.league.teams.filter((t) => t.conf === conf && t.div === div).sort((a, b) => (pic[b.id]?.pct ?? 0) - (pic[a.id]?.pct ?? 0) || (pic[a.id]?.seed ?? 99) - (pic[b.id]?.seed ?? 99));
+                return (
+                  <section key={div} className="cr-card lg-tablecard">
+                    <h3>{DIV_NAME[div]}</h3>
+                    <StandTable c={c} rows={ts} pic={pic} you={me.team!} />
+                  </section>
+                );
+              })}
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="cr-grid">
+        <div className="lg-divs">
           {([0, 1] as const).map((conf) => {
             const sd = seeds(c.league.teams, c.season.games, conf, c.seed);
             const rest = c.league.teams.filter((t) => t.conf === conf && !sd.includes(t.id)).sort((a, b) => (pic[b.id]?.pct ?? 0) - (pic[a.id]?.pct ?? 0));
             return (
-              <section key={conf} className="cr-card">
+              <section key={conf} className="cr-card lg-tablecard">
                 <h3>{CONF_NAME[conf]} Conference</h3>
                 <StandTable c={c} rows={sd.map((id) => teamById(c.league, id))} pic={pic} you={me.team!} seeded />
-                <h4 className="k">In the hunt</h4>
+                <div className="lg-cut">In the hunt</div>
                 <StandTable c={c} rows={rest} pic={pic} you={me.team!} />
               </section>
             );
@@ -325,20 +371,24 @@ function Standings({ c, pic }: { c: Career; pic: Record<string, StandingRow> }) 
   );
 }
 
+const pctOf = (r?: StandingRow) => (r && r.w + r.l + r.t ? (r.pct >= 1 ? '1.000' : r.pct.toFixed(3).replace(/^0/, '')) : '.000');
+
 function StandTable({ rows, pic, you, seeded }: { c: Career; rows: CTeam[]; pic: Record<string, StandingRow>; you: string; seeded?: boolean }) {
   return (
-    <table className="cr-t">
-      <thead><tr>{seeded && <th>#</th>}<th>Team</th><th className="num">W-L</th><th className="num hide-sm">Div</th><th className="num hide-sm">PF</th><th className="num hide-sm">PA</th><th className="num">Strk</th></tr></thead>
+    <table className="lg-t">
+      <thead><tr>{seeded && <th className="num">#</th>}<th>Team</th><th className="num">W-L</th><th className="num">PCT</th><th className="num hide-sm">Div</th><th className="num hide-sm">PF</th><th className="num hide-sm">PA</th><th className="num">Diff</th><th className="num">Strk</th></tr></thead>
       <tbody>
-        {rows.map((t, i) => { const r = pic[t.id]; return (
-          <tr key={t.id} className={t.id === you ? 'you' : ''}>
-            {seeded && <td className="num">{i + 1}</td>}
-            <td><TeamTag t={t} />{r?.clinch ? <sup className="cr-cl">{r.clinch}</sup> : null}</td>
-            <td className="num">{rec(r)}</td>
-            <td className="num hide-sm">{r ? `${r.divW}-${r.divL}` : ''}</td>
+        {rows.map((t, i) => { const r = pic[t.id]; const diff = (r?.pf ?? 0) - (r?.pa ?? 0); return (
+          <tr key={t.id} className={t.id === you ? 'you' : ''} style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+            {seeded && <td className="num"><span className="lg-seed">{i + 1}</span></td>}
+            <td><span className="lg-team"><i className="lg-chip">{t.id}</i><span>{t.city}</span>{r?.clinch ? <em className={`lg-cl c-${r.clinch}`}>{r.clinch}</em> : null}</span></td>
+            <td className="num"><b>{rec(r)}</b></td>
+            <td className="num muted">{pctOf(r)}</td>
+            <td className="num hide-sm muted">{r ? `${r.divW}-${r.divL}` : '0-0'}</td>
             <td className="num hide-sm">{r?.pf ?? 0}</td>
             <td className="num hide-sm">{r?.pa ?? 0}</td>
-            <td className="num">{r?.streak ?? ''}</td>
+            <td className={`num ${diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''}`}>{diff > 0 ? `+${diff}` : diff}</td>
+            <td className={`num ${r?.streak?.startsWith('W') ? 'pos' : r?.streak?.startsWith('L') ? 'neg' : ''}`}>{r?.streak || '—'}</td>
           </tr>
         ); })}
       </tbody>
@@ -347,72 +397,154 @@ function StandTable({ rows, pic, you, seeded }: { c: Career; rows: CTeam[]; pic:
 }
 
 const LEADER_CATS: [string, string, (l: Line) => string][] = [
-  ['py', 'Passing yards', (l) => `${l.pc ?? 0}/${l.pa ?? 0}, ${l.ptd ?? 0} TD`],
-  ['ptd', 'Passing TD', (l) => `${l.py ?? 0} yds, ${l.pint ?? 0} INT`],
-  ['rating', 'Passer rating', (l) => `${l.py ?? 0} yds`],
-  ['ry', 'Rushing yards', (l) => `${l.ra ?? 0} car, ${l.rtd ?? 0} TD`],
-  ['rcy', 'Receiving yards', (l) => `${l.rec ?? 0} rec, ${l.rctd ?? 0} TD`],
-  ['rec', 'Receptions', (l) => `${l.rcy ?? 0} yds`],
+  ['py', 'Passing yards', (l) => `${l.pc ?? 0}/${l.pa ?? 0} · ${l.ptd ?? 0} TD`],
+  ['ptd', 'Passing TD', (l) => `${(l.py ?? 0).toLocaleString('en-US')} yds · ${l.pint ?? 0} INT`],
+  ['rating', 'Passer rating', (l) => `${(l.py ?? 0).toLocaleString('en-US')} yds`],
+  ['ry', 'Rushing yards', (l) => `${l.ra ?? 0} car · ${l.rtd ?? 0} TD`],
+  ['rcy', 'Receiving yards', (l) => `${l.rec ?? 0} rec · ${l.rctd ?? 0} TD`],
+  ['rec', 'Receptions', (l) => `${(l.rcy ?? 0).toLocaleString('en-US')} yds`],
   ['tk', 'Tackles', (l) => `${l.tfl ?? 0} TFL`],
   ['sck', 'Sacks', (l) => `${l.tk ?? 0} tackles`],
   ['int', 'Interceptions', (l) => `${l.pd ?? 0} passes defended`],
 ];
 
+/** League leaders, the way a stats app shows them: a card per stat with its leader up top, and a full list on tap. */
 function Leaders({ c }: { c: Career }) {
-  const [cat, setCat] = useState('py');
-  const C = LEADER_CATS.find((x) => x[0] === cat)!;
-  const rows = useMemo(() => leaders(c.league, c.season, cat, 15), [cat, c.season.games]);
+  const [open, setOpen] = useState<string | null>(null);
+  const all = useMemo(() => Object.fromEntries(LEADER_CATS.map(([k]) => [k, leaders(c.league, c.season, k, 400)])), [c.season.games]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const fmt = (v: number | null, k: string) => (v == null ? '—' : k === 'rating' ? v.toFixed(1) : v.toLocaleString('en-US'));
+  if (!LEADER_CATS.some(([k]) => all[k].length)) return <section className="cr-card"><h3>League leaders</h3><p className="muted">Leaders show after the first week.</p></section>;
+  const C = open ? LEADER_CATS.find((x) => x[0] === open)! : null;
   return (
     <div className="cr-stack">
-      <div className="cr-seg cr-seg-scroll">
-        {LEADER_CATS.map(([k, l]) => <button key={k} className={cat === k ? 'on' : ''} onClick={() => setCat(k)}>{l}</button>)}
+      <div className="ld-grid">
+        {LEADER_CATS.map(([k, label, sub]) => {
+          const rows = all[k];
+          if (!rows.length) return null;
+          const top = rows[0], p = c.league.players[top.id], t = p.team ? teamById(c.league, p.team) : null;
+          const youAt = rows.findIndex((r) => r.id === c.you.pid);
+          return (
+            <section key={k} className={`cr-card ld-card${open === k ? ' on' : ''}`} style={t ? { ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 } : undefined}>
+              <div className="ld-head"><h3>{label}</h3><button className="btn ghost small" onClick={() => setOpen(open === k ? null : k)}>{open === k ? 'Close' : 'Top 15'}</button></div>
+              <div className={`ld-top${top.id === c.you.pid ? ' you' : ''}`}>
+                {t && <i className="lg-chip big">{t.id}</i>}
+                <span className="ld-who"><b>{p.name}</b><small>{POS_LABEL[p.slot]}{t ? ` · ${t.city}` : ''}</small><small>{sub(top.line)}</small></span>
+                <span className="ld-val">{fmt(statValue(top.line, k), k)}</span>
+              </div>
+              <ol className="ld-list" start={2}>
+                {rows.slice(1, 5).map((r, i) => { const q = c.league.players[r.id]; return (
+                  <li key={r.id} className={r.id === c.you.pid ? 'you' : ''}><span className="ld-rk">{i + 2}</span><span className="ld-n">{q.name}<small>{q.team ?? ''}</small></span><b>{fmt(statValue(r.line, k), k)}</b></li>
+                ); })}
+              </ol>
+              {youAt >= 5 && <p className="ld-you">You: <b>{ordinal(youAt + 1)}</b> · {fmt(statValue(rows[youAt].line, k), k)}</p>}
+            </section>
+          );
+        })}
       </div>
-      <section className="cr-card">
-        <h3>{C[1]} <span className="muted small">{c.season.year} regular season</span></h3>
-        {rows.length ? (
-          <table className="cr-t"><tbody>
-            {rows.map((r, i) => { const p = c.league.players[r.id]; const t = p.team ? teamById(c.league, p.team) : null; return (
-              <tr key={r.id} className={r.id === c.you.pid ? 'you' : ''}>
-                <td className="num">{i + 1}</td><td><b>{p.name}</b> <span className="muted small">{POS_LABEL[p.slot]}</span></td><td>{t && <TeamTag t={t} />}</td>
-                <td className="num"><b>{statValue(r.line, cat)?.toLocaleString('en-US')}</b></td><td className="muted small hide-sm">{C[2](r.line)}</td>
+      {C && (
+        <section className="cr-card">
+          <h3>{C[1]} <span className="muted small">{c.season.year} regular season · top 15</span></h3>
+          <table className="lg-t"><tbody>
+            {all[C[0]].slice(0, 15).map((r, i) => { const p = c.league.players[r.id]; const t = p.team ? teamById(c.league, p.team) : null; return (
+              <tr key={r.id} className={r.id === c.you.pid ? 'you' : ''} style={t ? { ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 } : undefined}>
+                <td className="num muted">{i + 1}</td><td><b>{p.name}</b> <span className="muted small">{POS_LABEL[p.slot]}</span></td><td>{t && <span className="lg-team"><i className="lg-chip">{t.id}</i><span className="hide-sm">{t.city}</span></span>}</td>
+                <td className="num"><b>{fmt(statValue(r.line, C[0]), C[0])}</b></td><td className="muted small hide-sm">{C[2](r.line)}</td>
               </tr>
             ); })}
           </tbody></table>
-        ) : <p className="muted">Leaders show after the first week.</p>}
-      </section>
+        </section>
+      )}
     </div>
   );
 }
 
+const UNITS: [string, string[]][] = [
+  ['Offense', ['QB', 'RB', 'WR1', 'WR2', 'WR3', 'TE', 'LT', 'LG', 'C', 'RG', 'RT']],
+  ['Defense', ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2']],
+  ['Special teams', ['K', 'P']],
+];
+const tier = (v: number) => (v >= 90 ? 'elite' : v >= 82 ? 'good' : v >= 74 ? 'ok' : 'low');
+
+/** A team page: the identity up top, its season, its depth chart by unit, and where it ranks. */
 function TeamTab({ c }: { c: Career }) {
   const me = youPlayer(c);
   const [id, setId] = useState(me.team!);
   const t = teamById(c.league, id), info = teamInfo(c.league, t);
-  const ranked = useMemo(() => c.league.teams.map((x) => ({ t: x, r: teamInfo(c.league, x).rat })).sort((a, b) => b.r.ovr - a.r.ovr), [c.league]);
-  const rank = (k: 'ovr' | 'off' | 'def') => [...ranked].sort((a, b) => b.r[k] - a.r[k]).findIndex((x) => x.t.id === id) + 1;
+  const pic = useMemo(() => standings(c.league.teams, c.season.games), [c.season.games]);
+  const ratings = useMemo(() => c.league.teams.map((x) => ({ t: x, r: teamInfo(c.league, x).rat })), [c.league]);
+  const rankBy = (k: 'ovr' | 'off' | 'def') => [...ratings].sort((a, b) => b.r[k] - a.r[k]).findIndex((x) => x.t.id === id) + 1;
+  // power: ratings, plus results once games are played
+  const power = useMemo(() => [...ratings].map((x) => {
+    const r = pic[x.t.id], gp = r ? r.w + r.l + r.t : 0;
+    return { ...x, rec: r, score: x.r.ovr + (gp ? (r!.pct - 0.5) * 16 + ((r!.pf - r!.pa) / gp) * 0.25 : 0) };
+  }).sort((a, b) => b.score - a.score), [ratings, pic]);
+  const ts = c.season.teamStats[id];
+  const gp = ts?.g ?? 0;
+  const r = pic[id];
+  const per = (v: number) => (gp ? (v / gp).toFixed(1) : '—');
+  const statRank = (f: (x: typeof ts) => number, low = false) => {
+    const vals = c.league.teams.map((x) => ({ id: x.id, v: c.season.teamStats[x.id]?.g ? f(c.season.teamStats[x.id]) / c.season.teamStats[x.id].g : 0 }));
+    vals.sort((a, b) => (low ? a.v - b.v : b.v - a.v));
+    return vals.findIndex((x) => x.id === id) + 1;
+  };
   return (
-    <div className="cr-grid">
-      <section className="cr-card">
-        <label className="cr-field"><span className="k">Team</span>
-          <select value={id} onChange={(e) => setId(e.target.value)}>{c.league.teams.map((x) => <option key={x.id} value={x.id}>{x.city} {x.name}</option>)}</select>
-        </label>
-        <div className="cr-grades big">
-          <em>Overall <b>{info.rat.ovr}</b><small>{ordinal(rank('ovr'))}</small></em>
-          <em>Offense <b>{info.rat.off}</b><small>{ordinal(rank('off'))}</small></em>
-          <em>Defense <b>{info.rat.def}</b><small>{ordinal(rank('def'))}</small></em>
+    <div className="cr-stack">
+      <section className="cr-card tm-hero" style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+        <span className="cr-chip big">{t.id}</span>
+        <div className="tm-id">
+          <div className="eyebrow">{CONF_NAME[t.conf]} {DIV_NAME[t.div]}{r ? ` · ${rec(r)}` : ''}{r?.seed ? ` · ${ordinal(r.seed)} seed` : ''}</div>
+          <h2>{t.city} <em>{t.name}</em></h2>
         </div>
-        <table className="cr-t cr-roster"><tbody>
-          {SLOTS.map((slot) => { const p = c.league.players[t.roster[slot]]; return p ? (
-            <tr key={slot} className={p.id === c.you.pid ? 'you' : ''}><td className="muted">{POS_LABEL[slot]}</td><td>#{p.number} {p.name}</td><td className="num muted hide-sm">{p.age}</td><td className="num"><b>{p.rating}</b></td></tr>
-          ) : null; })}
-        </tbody></table>
+        <label className="tm-pick"><span className="sr-only">Team</span>
+          <select value={id} onChange={(e) => setId(e.target.value)}>{[...c.league.teams].sort((a, b) => a.city.localeCompare(b.city)).map((x) => <option key={x.id} value={x.id}>{x.city} {x.name}{x.id === me.team ? ' (you)' : ''}</option>)}</select>
+        </label>
+        <div className="tm-dials">
+          {(['ovr', 'off', 'def'] as const).map((k) => (
+            <span key={k} className={`tm-dial t-${tier(info.rat[k])}`}><b>{info.rat[k]}</b><small>{k === 'ovr' ? 'Overall' : k === 'off' ? 'Offense' : 'Defense'}</small><em>{ordinal(rankBy(k))}</em></span>
+          ))}
+        </div>
       </section>
+      {gp > 0 && ts && (
+        <section className="cr-card">
+          <h3>{c.season.year} season <span className="muted small">per game · league rank</span></h3>
+          <div className="tm-tiles">
+            <span><b>{per(ts.pts)}</b><small>Points</small><em>{ordinal(statRank((x) => x.pts))}</em></span>
+            <span><b>{r ? (r.pa / gp).toFixed(1) : '—'}</b><small>Allowed</small><em>{ordinal([...c.league.teams].map((x) => ({ id: x.id, v: (pic[x.id]?.pa ?? 0) / Math.max(1, (pic[x.id]?.w ?? 0) + (pic[x.id]?.l ?? 0) + (pic[x.id]?.t ?? 0)) })).sort((a, b) => a.v - b.v).findIndex((x) => x.id === id) + 1)}</em></span>
+            <span><b>{per(ts.yds)}</b><small>Yards</small><em>{ordinal(statRank((x) => x.yds))}</em></span>
+            <span><b>{per(ts.py)}</b><small>Passing</small><em>{ordinal(statRank((x) => x.py))}</em></span>
+            <span><b>{per(ts.ry)}</b><small>Rushing</small><em>{ordinal(statRank((x) => x.ry))}</em></span>
+            <span><b>{per(ts.to)}</b><small>Turnovers</small><em>{ordinal(statRank((x) => x.to, true))}</em></span>
+          </div>
+        </section>
+      )}
+      <div className="cr-grid">
+        {UNITS.map(([unit, slots]) => (
+          <section key={unit} className="cr-card">
+            <h3>{unit}</h3>
+            <ul className="tm-depth">
+              {slots.map((slot) => { const p = c.league.players[t.roster[slot]]; return p ? (
+                <li key={slot} className={p.id === c.you.pid ? 'you' : ''}>
+                  <span className="tm-num" style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>{p.number}</span>
+                  <span className="tm-p"><b>{p.name}</b><small>{POS_LABEL[slot]} · age {p.age}{p.exp === 0 ? ' · rookie' : ''}</small></span>
+                  <span className={`tm-ovr t-${tier(p.rating)}`}>{p.rating}</span>
+                </li>
+              ) : null; })}
+            </ul>
+          </section>
+        ))}
+      </div>
       <section className="cr-card">
-        <h3>Power rankings</h3>
-        <table className="cr-t"><tbody>
-          {ranked.map((x, i) => <tr key={x.t.id} className={x.t.id === me.team ? 'you' : ''}><td className="num">{i + 1}</td><td><TeamTag t={x.t} /></td><td className="num">{x.r.ovr}</td><td className="num muted">{x.r.off}/{x.r.def}</td></tr>)}
-        </tbody></table>
-        <p className="muted small">Overall, then offense/defense ratings, from the players on each roster.</p>
+        <h3>Power rankings <span className="muted small">ratings, plus results once games are played</span></h3>
+        <ol className="tm-power">
+          {power.map((x, i) => (
+            <li key={x.t.id} className={`${x.t.id === me.team ? 'you' : ''}${x.t.id === id ? ' sel' : ''}`} style={{ ['--tc' as string]: x.t.color, ['--tc2' as string]: x.t.color2 }}>
+              <span className={`tm-rk${i < 3 ? ' top' : ''}`}>{i + 1}</span>
+              <button className="tm-pw" onClick={() => setId(x.t.id)}><i className="lg-chip">{x.t.id}</i><span>{x.t.city} <small>{x.t.name}</small></span></button>
+              <span className="tm-rec">{rec(x.rec)}</span>
+              <span className={`tm-ovr t-${tier(x.r.ovr)}`}>{x.r.ovr}</span>
+            </li>
+          ))}
+        </ol>
       </section>
     </div>
   );

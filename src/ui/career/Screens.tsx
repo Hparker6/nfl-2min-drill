@@ -1,7 +1,7 @@
 /** Career screens between games: draft night, the postgame, the season's end, and the offseason. */
 import { useEffect, useMemo, useState } from 'react';
 import { passerRating, type Box, type Line } from '../../career/box';
-import { ARCH, COLLEGES, levelOf, ordinal, youPlayer, type Career } from '../../career/career';
+import { ARCH, COLLEGES, levelOf, youPlayer, type Career } from '../../career/career';
 import { FINAL_NAME, teamById, teamInfo } from '../../career/league';
 import { offers, signWith, tradeTargets } from '../../career/offseason';
 import { liveTeams, gameOf } from '../../career/run';
@@ -18,55 +18,38 @@ const heard = new Set<string>();
 import { StatLine, TeamTag } from './Hub';
 import type { Commit } from './Career';
 
-export function DraftNight({ c, commit, onDone }: { c: Career; commit: Commit; onDone: () => void }) {
-  const d = c.draft!;
-  const [shown, setShown] = useState(d.revealed);
-  const stock = c.college.result?.stock ?? 50;
-  const range = stock >= 80 ? 'a top-10 pick' : stock >= 60 ? 'the middle of the first round' : stock >= 40 ? 'late first round' : 'the second round';
-  const done = shown >= d.picks.length;
+/** A number that counts up to its value when it first shows (instant under reduced motion). */
+function useCountUp(target: number, ms = 1100): number {
+  const [v, setV] = useState(() => (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? target : 0));
   useEffect(() => {
-    if (done) { commit((x) => { if (x.draft) x.draft.revealed = x.draft.picks.length; }); return; }
-    const t = setTimeout(() => setShown((n) => n + 1), shown === 0 ? 900 : 420);
-    return () => clearTimeout(t);
-  }, [shown, done]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const mine = d.picks[d.picks.length - 1];
-  const team = teamById(c.league, mine.team);
-  return (
-    <div className="cr-page">
-      <section className="cr-card">
-        <div className="eyebrow">{d.year} draft · Round {d.yourPick <= 32 ? 1 : 2}</div>
-        <h1>Draft night</h1>
-        <p className="cr-lede">Your bowl game: {c.college.result ? `${c.college.result.score[0]}-${c.college.result.score[1]}, ${c.college.result.line.pc ?? 0}/${c.college.result.line.pa ?? 0} for ${c.college.result.line.py ?? 0} yards, ${c.college.result.line.ptd ?? 0} TD, ${c.college.result.line.pint ?? 0} INT` : 'in the books'}. Draft stock <b>{stock}</b>/100: the scouts have you going in {range}.</p>
-        {!done && <button className="btn ghost small" onClick={() => setShown(d.picks.length)}>Skip to your pick</button>}
-      </section>
-      {done ? (
-        <section className="cr-card cr-drafted" style={{ ['--tc' as string]: team.color, ['--tc2' as string]: team.color2 }}>
-          <span className="cr-chip big">{team.id}</span>
-          <div className="eyebrow">With the {ordinal(d.yourPick)} pick</div>
-          <h2>The {team.city} {team.name} select {c.you.name}, quarterback, {c.you.college}</h2>
-          <p>{teamInfo(c.league, team).rat.ovr} overall team. You start from day one. Rookie deal: 4 years.</p>
-          <button className="btn primary big" onClick={onDone}>Start your rookie season</button>
-        </section>
-      ) : null}
-      <section className="cr-card">
-        <h3>The board</h3>
-        <ol className="cr-board">
-          {d.picks.slice(0, shown).map((p) => { const t = teamById(c.league, p.team); return (
-            <li key={p.pick} className={p.you ? 'you' : ''}><span className="num">{p.pick}</span><b>{p.name}</b><span className="cr-board-sub"><TeamTag t={t} /><em>{p.pos} · {p.college}</em></span></li>
-          ); }).reverse()}
-          {!done && <li className="cr-clock"><span className="num">{shown + 1}</span><b>On the clock…</b><span className="cr-board-sub"><TeamTag t={teamById(c.league, d.picks[shown].team)} /></span></li>}
-        </ol>
-      </section>
-    </div>
-  );
+    if (v === target) return;
+    const t0 = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const f = Math.min(1, (now - t0) / ms);
+      setV(Math.round(target * (1 - (1 - f) ** 3)));
+      if (f < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target]);   // eslint-disable-line react-hooks/exhaustive-deps
+  return v;
 }
 
-export function Postgame({ c, gameId, onContinue }: { c: Career; gameId: string; onContinue: () => void }) {
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+
+/**
+ * After a game, laid out like a sports app's game page: the actions at the top (no scrolling to move on), the
+ * scoreboard, your game and what it earned you, the team stats side by side, the scoring plays, and the full box
+ * score folded away for whoever wants it.
+ */
+export function Postgame({ c, gameId, onContinue }: { c: Career; gameId: string; onContinue: (upgrade?: boolean) => void }) {
   const box = c.boxes[gameId];
   const g = gameOf(c, gameId);
   const teams = useMemo(() => liveTeams(c, g), [gameId]);   // eslint-disable-line react-hooks/exhaustive-deps
   const L = c.last!;
   const won = !!box && box.final[0] > box.final[1];
+  const xp = useCountUp(L?.total ?? 0);
   useEffect(() => {
     const key = `${c.you.pid}:${c.season?.year ?? ''}:${gameId}`;
     if (!box || heard.has(key)) return;
@@ -74,26 +57,122 @@ export function Postgame({ c, gameId, onContinue }: { c: Career; gameId: string;
     audio.play(won ? 'win' : 'loss');
   }, [gameId]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!box) return null;
-  const win = won;
   const line = box.players[c.you.pid] ?? {};
   const college = gameId === 'college';
+  const st = college ? null : standings(c.league.teams, c.season.games);
+  const tie = box.final[0] === box.final[1];
+  const res = won ? 'Win' : tie ? 'Tie' : 'Loss';
+  const label = `${college ? 'Bowl game' : WEEK_NAME(g.week)} · Final${box.ot ? ' (OT)' : ''}`;
+  const spendable = !college && c.you.sp > 0;
+  const risks = L ? L.xp.filter((x) => x.label.startsWith('Risk paid off')) : [];
   return (
-    <div className="cr-page">
-      <section className={`cr-card cr-final ${win ? 'win' : 'loss'}`}>
-        <div className="eyebrow">{college ? 'Bowl game' : WEEK_NAME(g.week)} · Final{box.ot ? ' (OT)' : ''}</div>
-        <h1>{win ? 'Win' : box.final[0] === box.final[1] ? 'Tie' : 'Loss'} <span>{box.final[0]}-{box.final[1]}</span></h1>
-        <p className="muted">{teams[0].city} {teams[0].name} {win ? 'beat' : 'vs'} {teams[1].city} {teams[1].name}</p>
-        <StatLine l={line} />
-        {college && c.college.result && <p className="cr-stock">Draft stock: <b>{c.college.result.stock}</b>/100</p>}
+    <div className="cr-page pg">
+      <div className="pg-bar">
+        <span className={`pg-res ${won ? 'win' : tie ? '' : 'loss'}`}>{res}</span>
+        <span className="pg-label">{label}</span>
+        {spendable && <button className="btn" onClick={() => onContinue(true)}>Spend {c.you.sp} point{c.you.sp === 1 ? '' : 's'}</button>}
+        <button className="btn primary" onClick={() => onContinue()} autoFocus>{college ? 'On to draft night' : 'Continue'}</button>
+      </div>
+
+      <section className="cr-card pg-score">
+        {([0, 1] as const).map((s) => {
+          const t = teams[s], r = st?.[t.id];
+          const lead = box.final[s] > box.final[1 - s];
+          return (
+            <div key={s} className={`pg-team${s ? ' right' : ''}${lead || tie ? '' : ' dim'}`} style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+              <span className="cr-chip big">{t.id}</span>
+              <span className="pg-tn"><b>{t.name}</b><small>{t.city}{r ? ` · ${r.w}-${r.l}${r.t ? `-${r.t}` : ''}` : ''}</small></span>
+              <span className="pg-pts">{box.final[s]}</span>
+            </div>
+          );
+        })}
+        <div className="pg-mid"><b>Final</b>{box.ot && <small>OT</small>}</div>
+        <table className="pg-lines" aria-label="Score by quarter">
+          <thead><tr><th />{box.byQ[0].map((_, i) => <th key={i}>{i < 4 ? i + 1 : 'OT'}</th>)}<th>T</th></tr></thead>
+          <tbody>{([0, 1] as const).map((s) => <tr key={s}><td>{teams[s].id}</td>{box.byQ[s].map((p, i) => <td key={i}>{p}</td>)}<td><b>{box.final[s]}</b></td></tr>)}</tbody>
+        </table>
       </section>
-      <section className="cr-card">
-        <h3>XP earned <b className="cr-xpt">+{L.total}</b></h3>
-        <ul className="cr-xplist">{L.xp.map((x, i) => <li key={i} className={x.xp < 0 ? 'neg' : ''}><span>{x.label}</span><b>{x.xp > 0 ? '+' : ''}{x.xp}</b></li>)}</ul>
-        {(L.sp > 0 || L.levelUp) && <p className="cr-levelup">{L.levelUp ? `Level ${L.levelUp}! ` : ''}{L.sp ? `+${L.sp} skill point${L.sp === 1 ? '' : 's'} to spend.` : ''}</p>}
-      </section>
-      <BoxScore box={box} teams={teams} c={c} />
-      <button className="btn primary big" onClick={onContinue}>{college ? 'On to draft night' : 'Continue'}</button>
+
+      {L && (
+        <section className="cr-card pg-you">
+          <div className="pg-you-head">
+            <h3>Your game</h3>
+            <span className="pg-xp">+{xp}<small>XP</small></span>
+          </div>
+          <StatLine l={line} />
+          {(L.levelUp || (L.boosts?.length ?? 0) > 0 || (L.ovr1 ?? 0) > (L.ovr0 ?? 0) || L.sp > 0) && (
+            <div className="pg-gains">
+              {L.levelUp && <span className="pg-gain lv">Level {L.levelUp}!</span>}
+              {(L.ovr1 ?? 0) > (L.ovr0 ?? 0) && <span className="pg-gain ovr">Overall {L.ovr0} → {L.ovr1}</span>}
+              {L.boosts?.map((b, i) => <span key={i} className="pg-gain boost" style={{ animationDelay: `${0.3 + i * 0.15}s` }}>{b.label}</span>)}
+              {L.sp > 0 && <span className="pg-gain sp">+{L.sp} skill point{L.sp === 1 ? '' : 's'}</span>}
+            </div>
+          )}
+          {risks.length > 0 && (
+            <ul className="pg-risks">{risks.map((x, i) => <li key={i}><b>{x.label.replace('Risk paid off: ', '')}</b><em>+{x.xp} XP</em></li>)}</ul>
+          )}
+          <details className="pg-fold">
+            <summary>XP breakdown</summary>
+            <ul className="cr-xplist">{L.xp.map((x, i) => <li key={i} className={x.xp < 0 ? 'neg' : ''}><span>{x.label}</span><b>{x.xp > 0 ? '+' : ''}{x.xp}</b></li>)}</ul>
+          </details>
+          {college && c.college.result && <p className="cr-stock">Draft stock: <b>{c.college.result.stock}</b>/100</p>}
+        </section>
+      )}
+
+      <TeamStats box={box} teams={teams} />
+
+      {box.scoring.length > 0 && (
+        <section className="cr-card">
+          <h3>Scoring</h3>
+          <ol className="pg-scoring">{box.scoring.map((p, i) => (
+            <li key={i} style={{ ['--tc' as string]: teams[p.team].color }}>
+              <span className="pg-q">{p.q > 4 ? 'OT' : `Q${p.q}`}<small>{mmss(p.t)}</small></span>
+              <span className="pg-play"><b>{teams[p.team].id}</b> {p.text}</span>
+              <span className="pg-sc">{p.score[0]}-{p.score[1]}</span>
+            </li>
+          ))}</ol>
+        </section>
+      )}
+
+      <details className="pg-box">
+        <summary>Full box score <small>passing, rushing, receiving, defense</small></summary>
+        <BoxScore box={box} teams={teams} c={c} />
+      </details>
     </div>
+  );
+}
+
+/** The two teams' stats side by side, each row with a bar split by share (for turnovers, fewer is better). */
+function TeamStats({ box, teams }: { box: Box; teams: [TeamInfo, TeamInfo] }) {
+  const T = box.team;
+  const frac = (a: number, b: number) => `${a}/${b}`;
+  const rows: { k: string; a: number; b: number; la?: string; lb?: string; low?: boolean }[] = [
+    { k: 'Total yards', a: T[0].yds, b: T[1].yds },
+    { k: 'Passing', a: T[0].py, b: T[1].py },
+    { k: 'Rushing', a: T[0].ry, b: T[1].ry },
+    { k: 'First downs', a: T[0].fd, b: T[1].fd },
+    { k: 'Third down', a: T[0].att3 ? T[0].td3 / T[0].att3 : 0, b: T[1].att3 ? T[1].td3 / T[1].att3 : 0, la: frac(T[0].td3, T[0].att3), lb: frac(T[1].td3, T[1].att3) },
+    { k: 'Turnovers', a: T[0].to, b: T[1].to, low: true },
+    { k: 'Sacks', a: T[0].sacks, b: T[1].sacks },
+    { k: 'Plays', a: T[0].plays, b: T[1].plays },
+    { k: 'Possession', a: T[0].top, b: T[1].top, la: mmss(T[0].top), lb: mmss(T[1].top) },
+  ];
+  return (
+    <section className="cr-card pg-stats" style={{ ['--a' as string]: teams[0].color, ['--b' as string]: teams[1].color }}>
+      <div className="pg-stats-head"><span>{teams[0].id}</span><h3>Team stats</h3><span>{teams[1].id}</span></div>
+      {rows.map(({ k, a, b, la, lb, low }) => {
+        const sum = a + b;
+        const share = sum ? a / sum : 0.5;
+        const better = a === b ? -1 : (low ? a < b : a > b) ? 0 : 1;
+        return (
+          <div key={k} className="pg-row">
+            <b className={better === 0 ? 'lead' : ''}>{la ?? a}</b>
+            <div className="pg-mid-col"><span>{k}</span><i><em style={{ width: `${share * 100}%` }} /></i></div>
+            <b className={better === 1 ? 'lead' : ''}>{lb ?? b}</b>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 

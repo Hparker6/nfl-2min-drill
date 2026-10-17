@@ -7,7 +7,8 @@ import type { Ev } from '../engine/types';
 export type Sound =
   | 'whistle' | 'hit' | 'chime' | 'cheer' | 'groan'
   | 'turnoverBad' | 'turnoverGood' | 'tdFor' | 'tdAgainst'
-  | 'win' | 'loss' | 'gradeGood' | 'gradeBad';
+  | 'win' | 'loss' | 'gradeGood' | 'gradeBad'
+  | 'ring' | 'drum';      // draft night: the phone, and the roll before your name
 
 /** Big moments get a visual on the field. Turnovers you commit shake it; the final gets a stamp. */
 export type ImpactKind = 'giveaway' | 'takeaway' | 'tdFor' | 'tdAgainst' | 'win' | 'loss';

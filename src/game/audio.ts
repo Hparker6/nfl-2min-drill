@@ -161,6 +161,16 @@ class Engine {
       case 'gradeGood':
         this.tone(N.C6, t, 0.25, { type: 'sine', gain: 0.04, attack: 0.005, release: 0.2, out: o });
         break;
+      case 'ring':
+        // a phone: two tones together, two short bursts
+        for (const k of [0, 0.42]) for (const f of [440, 480]) this.tone(f, t + k, 0.34, { type: 'sine', gain: 0.05, attack: 0.01, release: 0.04, out: o });
+        break;
+      case 'drum': {
+        // a snare roll that speeds up over a second and a half
+        let at = t;
+        for (let k = 0; k < 22; k++) { this.hiss(at, 0.05, { gain: 0.05 + k * 0.004, filter: 'bandpass', freq: 2200, q: 0.7, out: o }); at += Math.max(0.035, 0.11 - k * 0.004); }
+        break;
+      }
       case 'gradeBad':
         this.tone(N.E3, t, 0.25, { type: 'triangle', gain: 0.05, attack: 0.005, release: 0.2, out: o });
         this.tone(N.C3, t + 0.12, 0.3, { type: 'triangle', gain: 0.05, attack: 0.005, release: 0.25, out: o });

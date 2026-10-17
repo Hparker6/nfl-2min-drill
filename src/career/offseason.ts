@@ -33,8 +33,11 @@ export function endSeason(c: Career) {
   c.phase = 'offseason';
 }
 
-/** Aging: growth until the mid-20s, a plateau, then decline. Ironman pushes your decline back three years. */
-function ageOne(p: CPlayer, r: () => number, iron = false) {
+/**
+ * Aging: growth until the mid-20s, a plateau, then decline. Ironman pushes your decline back three years. `dev` is the
+ * team's development year (coaching, scheme, luck): young players on some teams grow faster, on others slower.
+ */
+function ageOne(p: CPlayer, r: () => number, iron = false, dev = 0) {
   p.age++;
   p.exp++;
   const g = SLOT_GROUP[p.slot];
@@ -43,7 +46,7 @@ function ageOne(p: CPlayer, r: () => number, iron = false) {
   for (const k in p.attrs) {
     const a = k as keyof typeof p.attrs;
     let v = p.attrs[a] ?? 60;
-    if (p.age <= peak && p.id !== 'you') v += Math.max(0, ((p.pot ?? v) - v) * (0.18 + r() * 0.2));
+    if (p.age <= peak && p.id !== 'you') v += Math.max(0, ((p.pot ?? v) - v) * (0.18 + r() * 0.2) * (1 + dev));
     else if (p.age >= decline) v -= 1 + r() * (p.age - decline + 1) * 0.9;
     else v += gauss(r) * 0.8;
     p.attrs[a] = clip(Math.round(v), 30, 99);
@@ -63,6 +66,14 @@ function retires(p: CPlayer, r: () => number): boolean {
 /**
  * The offseason in one go: age, retire, then fill every empty slot from free agency (veterans who were let go) or
  * the draft (rookies). Each team also lets a weak starter go now and then and replaces him with a better free agent.
+ *
+ * So the league doesn't freeze into the same good and bad teams, a few forces move teams around every year, and they
+ * balance out (the league's average strength stays put):
+ * - draft order: last season's worst teams draft the best rookies, the best teams the weakest;
+ * - development years: each team's young players grow faster or slower this year;
+ * - the cap: the best teams often can't keep one of their stars;
+ * - rebuilds: the worst teams spend in free agency;
+ * - your team: a weak team builds around its franchise quarterback.
  */
 export function runOffseason(c: Career) {
   const lg = c.league, year = c.season.year + 1;
@@ -70,9 +81,23 @@ export function runOffseason(c: Career) {
   const used = new Set(Object.values(lg.players).map((p) => p.name));
   const name = nameMaker(rng(hash(c.seed, year, 'rookie-names')), used);
   const news: string[] = [];
+  // last season, worst to best
+  const st = standings(lg.teams, c.season.games);
+  const ranked = [...lg.teams].sort((a, b) => (st[a.id]?.pct ?? 0.5) - (st[b.id]?.pct ?? 0.5) || (st[a.id]?.pf ?? 0) - (st[b.id]?.pf ?? 0));
+  const rank = new Map(ranked.map((t, i) => [t.id, i]));   // 0: the worst team
+  const dev = new Map(lg.teams.map((t) => [t.id, clip(gauss(r) * 0.35, -0.5, 0.6)]));
   for (const p of Object.values(lg.players)) {
     if (p.retired) continue;
-    ageOne(p, r, p.id === 'you' && c.you.abilities.includes('iron'));
+    ageOne(p, r, p.id === 'you' && c.you.abilities.includes('iron'), p.team ? dev.get(p.team) ?? 0 : 0);
+  }
+  for (const t of lg.teams) { const d = dev.get(t.id)!; if (d >= 0.4) news.push(`${t.city}'s young core takes a big step forward.`); }
+  // the cap: a top-six team often loses one of its best players (never you)
+  for (const t of ranked.slice(26)) {
+    if (r() > 0.6) continue;
+    const star = SLOTS.map((slot) => ({ slot, p: lg.players[t.roster[slot]] })).filter((x) => x.p && x.p.id !== 'you' && x.slot !== 'QB' && x.p.rating >= 80).sort((a, b) => b.p.rating - a.p.rating)[0];
+    if (!star) continue;
+    star.p.team = null; delete t.roster[star.slot];
+    news.push(`Cap crunch: ${t.city} can't keep ${star.p.name} (${star.p.rating} overall).`);
   }
   // retirements
   for (const t of lg.teams) for (const slot of SLOTS) {
@@ -92,8 +117,9 @@ export function runOffseason(c: Career) {
       const g = SLOT_GROUP[slot];
       const pool = fa().filter((p) => SLOT_GROUP[p.slot] === g).sort((a, b) => b.rating - a.rating);
       const vet = pool[0];
-      // a rookie: 62-76 now, with room to grow
-      const rook = genPlayer(`r${year}-${(n++).toString(36)}`, slot, 62 + r() * 14, r, name(), 0, t.id);
+      // a rookie: 62-76 now, with room to grow; the worst teams draft better ones (up to 4.5 higher), the best worse
+      const draftEdge = 9 * (0.5 - (rank.get(t.id) ?? 16) / 31);
+      const rook = genPlayer(`r${year}-${(n++).toString(36)}`, slot, 62 + r() * 14 + draftEdge, r, name(), 0, t.id);
       rook.age = 21 + Math.floor(r() * 3); rook.exp = 0; rook.pot = clip(rook.rating + 6 + Math.round(r() * 16), 60, 99);
       const pick = vet && vet.rating > rook.rating + 2 && r() < 0.75 ? vet : rook;
       if (pick === rook) lg.players[rook.id] = rook;
@@ -116,6 +142,27 @@ export function runOffseason(c: Career) {
       cur.team = null; best.team = t.id; best.slot = slot; t.roster[slot] = best.id;
       if (best.rating >= 78) news.push(`${t.city} signs ${best.name}, moving on from ${cur.name}.`);
     }
+  }
+  // rebuilds: the six worst teams go shopping for their two weakest spots
+  const upgradeSlot = (t: typeof lg.teams[number], slot: string, margin: number) => {
+    const cur = lg.players[t.roster[slot]];
+    const best = fa().filter((p) => SLOT_GROUP[p.slot] === SLOT_GROUP[slot]).sort((a, b) => b.rating - a.rating)[0];
+    if (!cur || !best || best.rating < cur.rating + margin) return null;
+    cur.team = null; best.team = t.id; best.slot = slot; t.roster[slot] = best.id;
+    return best;
+  };
+  const me = youPlayer(c);
+  for (const t of ranked.slice(0, 6)) {
+    const weak = SLOTS.filter((slot) => slot !== 'QB' && slot !== 'K' && slot !== 'P').sort((a, b) => (lg.players[t.roster[a]]?.rating ?? 0) - (lg.players[t.roster[b]]?.rating ?? 0)).slice(0, 2);
+    const got = weak.map((slot) => upgradeSlot(t, slot, 3)).filter(Boolean);
+    if (got.length) news.push(`${t.city} rebuilds: signs ${got.map((p) => p!.name).join(' and ')}.`);
+  }
+  // a weak team with a good young quarterback builds around him
+  if (me.team && (rank.get(me.team) ?? 31) <= 11) {
+    const t = teamById(lg, me.team);
+    const help = ['WR1', 'WR2', 'TE', 'RB', 'LT', 'LG', 'C', 'RG', 'RT'].filter((slot) => t.roster[slot]).sort((a, b) => (lg.players[t.roster[a]]?.rating ?? 0) - (lg.players[t.roster[b]]?.rating ?? 0))[0];
+    const got = help ? upgradeSlot(t, help, 2) : null;
+    if (got) c.news.unshift({ week: 0, year, text: `${t.city} builds around ${c.you.name}: signs ${got.name} (${got.rating} overall).`, tone: 'good' });
   }
   for (const text of news.slice(0, 12)) c.news.unshift({ week: 0, year, text, tone: 'neutral' });
 }

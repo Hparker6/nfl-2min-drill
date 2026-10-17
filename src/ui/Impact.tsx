@@ -19,6 +19,17 @@ const PIECES = Array.from({ length: 36 }, (_, i) => ({
   w: 5 + (i % 3) * 2,
 }));
 
+/** Falling confetti, for any positioned container with the .impact class (it sizes the fall). */
+export function Confetti({ n }: { n: number }) {
+  return (
+    <div className="confetti">
+      {PIECES.slice(0, n).map((p, i) => (
+        <i key={i} style={{ left: `${p.x}%`, background: p.color, width: p.w, animationDelay: `${p.delay}s`, ['--drift' as string]: `${p.drift}px`, ['--spin' as string]: `${p.spin}deg` }} />
+      ))}
+    </div>
+  );
+}
+
 export function Impact({ kind, onDone }: { kind: ImpactKind; onDone: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDone, DUR[kind]);
@@ -27,13 +38,7 @@ export function Impact({ kind, onDone }: { kind: ImpactKind; onDone: () => void 
   const confetti = kind === 'win' ? 36 : kind === 'tdFor' || kind === 'takeaway' ? 22 : 0;
   return (
     <div className={`impact impact-${kind}`} aria-hidden>
-      {confetti > 0 && (
-        <div className="confetti">
-          {PIECES.slice(0, confetti).map((p, i) => (
-            <i key={i} style={{ left: `${p.x}%`, background: p.color, width: p.w, animationDelay: `${p.delay}s`, ['--drift' as string]: `${p.drift}px`, ['--spin' as string]: `${p.spin}deg` }} />
-          ))}
-        </div>
-      )}
+      {confetti > 0 && <Confetti n={confetti} />}
       {kind === 'win' && <div className="stamp win"><b>You win</b><span>Final</span></div>}
       {kind === 'loss' && <div className="stamp loss"><b>Final</b><span>Not this time</span></div>}
     </div>

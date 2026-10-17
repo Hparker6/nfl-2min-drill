@@ -33,9 +33,38 @@ export function prepHidden(c: State, s: State, r: Rng) {
   if (s.off === 1 && s.pendPlay && s.pendPlay !== 'fg' && s.pendPlay !== 'punt') c.pendPlay = aiOffPlay(c, r, true);
 }
 
+/**
+ * Paired differences between options, over the same simulations: for options a < b, the sums of (value a - value b)
+ * and of its square, so the noise in a comparison can be measured (a grade should not hang on simulation luck).
+ * Flattened k x k (only a < b is filled).
+ */
+export interface PairStat { k: number; n: number; d: number[]; d2: number[] }
+export const emptyPairs = (k: number): PairStat => ({ k, n: 0, d: new Array(k * k).fill(0), d2: new Array(k * k).fill(0) });
+export function addPairs(a: PairStat, b: PairStat): PairStat {
+  return { k: a.k, n: a.n + b.n, d: a.d.map((x, i) => x + b.d[i]), d2: a.d2.map((x, i) => x + b.d2[i]) };
+}
+/** Standard error (in win-chance points, 0-100) of the difference between options a and b. */
+export function pairSe(p: PairStat, a: number, b: number, nTotal = p.n): number {
+  if (a === b || !p.n) return 0;
+  const [i, j, sign] = a < b ? [a, b, 1] : [b, a, -1];
+  const m = (sign * p.d[i * p.k + j]) / p.n, v = Math.max(0, p.d2[i * p.k + j] / p.n - m * m);
+  return Math.sqrt(v / Math.max(1, nTotal)) * 100;
+}
+
 /** Evaluate `choices` at state `s`, simulations `from`..`from + n - 1` of `seed`. */
 export function evaluate(s: State, choices: Choice[], n: number, seed: number, from = 0): OptStat[] {
+  return run(s, choices, n, seed, from, null);
+}
+
+/** The same evaluation, also measuring the paired differences between the options. */
+export function evaluatePaired(s: State, choices: Choice[], n: number, seed: number, from = 0): { stats: OptStat[]; pairs: PairStat } {
+  const pairs = emptyPairs(choices.length);
+  return { stats: run(s, choices, n, seed, from, pairs), pairs };
+}
+
+function run(s: State, choices: Choice[], n: number, seed: number, from: number, pairs: PairStat | null): OptStat[] {
   const out = choices.map(emptyStat);
+  const vals = new Array<number>(choices.length).fill(0);
   const o = s.off;
   const measure = s.stage === 'pre' || s.stage === 'call';
   for (let i = from; i < from + n; i++) {
@@ -55,8 +84,15 @@ export function evaluate(s: State, choices: Choice[], n: number, seed: number, f
         st.pts += scored - (c.score[1 - o] - s.score[1 - o]);
       }
       simulate(c, r);
-      st.wp += value0(c);
+      const v = value0(c);
+      vals[j] = v;
+      st.wp += v;
       st.n++;
+    }
+    if (pairs) {
+      const k = choices.length;
+      for (let a = 0; a < k; a++) for (let b = a + 1; b < k; b++) { const x = vals[a] - vals[b]; pairs.d[a * k + b] += x; pairs.d2[a * k + b] += x * x; }
+      pairs.n++;
     }
   }
   return out;

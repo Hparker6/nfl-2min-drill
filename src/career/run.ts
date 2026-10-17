@@ -3,6 +3,7 @@
  * you the ball, the AI steps between them, and what a finished game turns into (stats, XP, the week moving on).
  */
 import { kickoffState, playOut, step } from '../engine/game';
+import { riskWins } from './risk';
 import { evaluate } from '../engine/evaluate';
 import { clip, hash, rng } from '../engine/rng';
 import { SLOTS, type Attr } from '../engine/roster';
@@ -147,6 +148,7 @@ export function endMoment(live: LiveGame, s: State, evs: Ev[], scores: number[])
   live.s = s;
   live.ev.push(...evs);
   live.scores = [...(live.scores ?? []), ...scores];
+  live.risks = [...(live.risks ?? []), ...riskWins(evs)];
   live.seg = undefined;
 }
 
@@ -182,8 +184,9 @@ export function finishLive(c: Career, how: 'sim' | 'moments' | 'full'): { box: B
   const line: Line = box.players[c.you.pid] ?? {};
   const win = box.final[0] > box.final[1];
   const scores = how === 'sim' ? [] : live.scores ?? [];
+  const risks = how === 'sim' ? [] : live.risks ?? [];
   if (g.id === 'college') {
-    awardXp(c, 'college', line, win, how, scores, 'reg');
+    awardXp(c, 'college', line, win, how, scores, 'reg', risks);
     const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
     const stock = draftStock(line, win, avg);
     c.college.result = { score: [box.final[0], box.final[1]], line, stock, grades: scores };
@@ -195,7 +198,7 @@ export function finishLive(c: Career, how: 'sim' | 'moments' | 'full'): { box: B
   }
   recordGame(c.season, g, box, teams, how, c.league);
   c.boxes[g.id] = box;
-  awardXp(c, g.id, line, win, how, scores, g.kind);
+  awardXp(c, g.id, line, win, how, scores, g.kind, risks);
   const opp = teams[1];
   const big = line.ptd && line.ptd >= 3 ? `, ${line.ptd} touchdown passes` : '';
   c.news.unshift({ week: c.season.week, year: c.season.year, text: `${WEEK_NAME(c.season.week)}: ${teams[0].name} ${win ? 'beat' : box.final[0] === box.final[1] ? 'tie' : 'lose to'} the ${opp.name} ${box.final[0]}-${box.final[1]}${big}.`, tone: win ? 'good' : 'bad' });

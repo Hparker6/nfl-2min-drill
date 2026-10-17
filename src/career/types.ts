@@ -6,6 +6,7 @@ import type { RosterPlayer } from '../engine/roster';
 import type { Ev, State } from '../engine/types';
 import type { Pick } from '../game/session';
 import type { Line, TeamLine } from './box';
+import type { RiskWin } from './risk';
 
 export type Conf = 0 | 1;          // the league's two conferences
 export type Div = 0 | 1 | 2 | 3;   // four divisions per conference: North, South, East, West
@@ -87,6 +88,8 @@ export interface LiveGame {
   ev: Ev[];
   /** call grades (0-100) from the moments you played, for XP */
   scores?: number[];
+  /** risks that paid off in the moments you played (career/risk.ts), for XP and attribute boosts */
+  risks?: RiskWin[];
   /** a moment in progress: where it started and the calls so far (GameScreen replays them after a refresh) */
   seg?: { start: State; picks: Pick[] };
 }

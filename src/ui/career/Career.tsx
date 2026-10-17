@@ -14,7 +14,8 @@ import { exportCareer, importCareer, loadCareer, saveCareer } from '../../career
 import { download } from '../../game/shareImage';
 import { LiveGameView } from './LiveGame';
 import { Hub } from './Hub';
-import { DraftNight, Offseason, Postgame, SeasonDone } from './Screens';
+import { Offseason, Postgame, SeasonDone } from './Screens';
+import { DraftNight } from './Draft';
 import { CareerBoundary } from './Boundary';
 import './career.css';
 
@@ -29,6 +30,7 @@ function CareerInner({ app }: { app: AppSettings }) {
   const [post, setPost] = useState<string | null>(null);      // the game id whose postgame is showing
   const [busy, setBusy] = useState<string | null>(null);
   const [unsaved, setUnsaved] = useState(false);
+  const [hubTab, setHubTab] = useState<'home' | 'player'>('home');   // the postgame's Spend points opens the Player tab
 
   const commit: Commit = useCallback((fn) => {
     setC((prev) => {
@@ -74,8 +76,9 @@ function CareerInner({ app }: { app: AppSettings }) {
   }
 
   if (post && c.last?.gameId === post) {
-    return <Postgame c={c} gameId={post} onContinue={() => {
+    return <Postgame c={c} gameId={post} onContinue={(upgrade) => {
       if (post === 'college') { setPost(null); return; }
+      setHubTab(upgrade ? 'player' : 'home');
       work('Simming the rest of the week…', () => { commit((x) => closeWeek(x)); setPost(null); });
     }} />;
   }
@@ -98,7 +101,7 @@ function CareerInner({ app }: { app: AppSettings }) {
   if (c.season.week > 22) {
     return <>{banner}<SeasonDone c={c} onOffseason={() => work('Awards, retirements, free agency…', () => commit((x) => { endSeason(x); runOffseason(x); }))} /></>;
   }
-  return <>{banner}<Hub c={c} commit={commit} onPlay={play} onBye={() => work('Simming the week…', () => commit((x) => closeWeek(x)))}
+  return <>{banner}<Hub key={hubTab} initialTab={hubTab} c={c} commit={commit} onPlay={play} onBye={() => work('Simming the week…', () => commit((x) => closeWeek(x)))}
     onRetire={() => { if (confirm('Start over? This career will be deleted from this browser.')) { saveCareer(null); setC(null); } }}
     onExport={() => download(exportCareer(c), `the-4th-call-career-${c.you.name.replace(/\W+/g, '-').toLowerCase()}.json`)} /></>;
 }

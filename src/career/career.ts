@@ -8,6 +8,7 @@ import { passerRating, type Box, type Line } from './box';
 import { nameMaker, newLeague, overall, type League } from './league';
 import { newSeason, placesFrom, simWeek, advanceWeek, REG_WEEKS } from './season';
 import type { CPlayer, Game, LiveGame, Season } from './types';
+import { RISK_ATTR_NAME, RISK_CAP, RISK_XP, type RiskAttr, type RiskWin } from './risk';
 
 export type Arch = 'pocket' | 'gunslinger' | 'dual' | 'general';
 export const QB_ATTRS: Attr[] = ['accuracy', 'arm', 'decision', 'mobility'];
@@ -78,7 +79,13 @@ export interface Career {
   season: Season;
   history: SeasonSummary[];
   college: CollegeGame;
-  draft?: { year: number; order: string[]; picks: DraftPick[]; yourPick: number; revealed: number };
+  draft?: {
+    year: number; order: string[]; picks: DraftPick[]; yourPick: number; revealed: number;
+    stock?: number;                          // draft stock after media day
+    media?: number;                          // media day's change to the stock (set once it's done)
+    trade?: { team: string; from: string };  // a team traded up into your slot
+    interest?: string[];                     // teams that called your agent before the draft
+  };
   goals: Goal[];                     // this week's
   news: NewsItem[];
   settings: Settings;
@@ -86,7 +93,7 @@ export interface Career {
   /** your games this season: box scores by game id */
   boxes: Record<string, Box>;
   /** XP earned in your last game, for the postgame screen */
-  last?: { gameId: string; xp: { label: string; xp: number }[]; total: number; sp: number; levelUp?: number };
+  last?: { gameId: string; xp: { label: string; xp: number }[]; total: number; sp: number; levelUp?: number; boosts?: { attr: RiskAttr; label: string }[]; ovr0?: number; ovr1?: number };
 }
 
 /** name, nickname, colors, abbreviation */
@@ -100,8 +107,11 @@ export const COLLEGES: [string, string, string, string, string][] = [
 /** Level from lifetime XP: each level costs a little more than the last. */
 export const levelOf = (xp: number) => Math.floor(Math.sqrt(xp / 120)) + 1;
 export const xpForLevel = (lv: number) => (lv - 1) * (lv - 1) * 120;
-/** Skill points per XP. */
-export const XP_PER_SP = 180;
+/**
+ * XP per skill point. 150 (it was 180): with the risk bonuses a quarterback who plays his games and takes his shots goes
+ * from the 60s to the 90s in about two seasons, about three if he plays it safe.
+ */
+export const XP_PER_SP = 150;
 
 /** What +1 in an attribute costs, by where it is now: cheap in the 60s, dear in the 90s. */
 export const attrCost = (v: number) => (v < 80 ? 1 : v < 88 ? 2 : v < 94 ? 3 : 4);
@@ -163,19 +173,45 @@ export function pickFor(stock: number, seed: number): number {
 
 const POS_POOL = ['QB', 'RB', 'WR', 'WR', 'TE', 'OT', 'OT', 'G', 'C', 'EDGE', 'EDGE', 'DT', 'DT', 'LB', 'LB', 'CB', 'CB', 'CB', 'S', 'S'];
 
-/** The draft board up to and including your pick: generated prospects for everyone else. */
+/** How often a better team trades up into your slot on draft night. */
+export const TRADE_UP = 0.45;
+
+/**
+ * The draft board up to and including your pick: generated prospects for everyone else. The team that holds your slot
+ * picks you, unless a better team trades up for you (TRADE_UP of drafts): contenders with a weak quarterback are the
+ * likeliest. Three teams call your agent beforehand, so draft night has teams to hope for.
+ */
 export function makeDraft(c: Career, order: string[], stock: number): NonNullable<Career['draft']> {
   const yourPick = pickFor(stock, c.seed);
+  const slotTeam = order[(yourPick - 1) % 32];
+  const tr = rng(hash(c.seed, 'draft-trade', stock));
+  let trade: { team: string; from: string } | undefined;
+  if (tr() < TRADE_UP) {
+    // the better half of the league (later in the order), the better and the weaker their quarterback, the keener
+    const cands = order.slice(16).filter((t) => t !== slotTeam);
+    const qb = (id: string) => c.league.players[c.league.teams.find((t) => t.id === id)!.roster.QB]?.rating ?? 70;
+    // a team with an elite quarterback almost never trades up for another one
+    const w = cands.map((id, i) => (qb(id) >= 85 ? 0.05 : 1 + i * 0.25 + (qb(id) < 78 ? 3 : 0)));
+    let x = tr() * w.reduce((a, b) => a + b, 0), k = 0;
+    while (k < w.length - 1 && (x -= w[k]) > 0) k++;
+    trade = { team: cands[k], from: slotTeam };
+  }
+  const yourTeam = trade?.team ?? slotTeam;
+  // who called: the team that takes you, plus two that won't (one near your slot, one contender)
+  const near = order.filter((t, i) => t !== yourTeam && Math.abs(i - (yourPick - 1)) <= 6);
+  const good = order.slice(20).filter((t) => t !== yourTeam && !near.includes(t));
+  const interest = [yourTeam, near[Math.floor(tr() * near.length)], good[Math.floor(tr() * good.length)]].filter(Boolean);
+  for (let i = interest.length - 1; i > 0; i--) { const j = Math.floor(tr() * (i + 1)); [interest[i], interest[j]] = [interest[j], interest[i]]; }
   const r = rng(hash(c.seed, 'draft'));
   const used = new Set(Object.values(c.league.players).map((p) => p.name));
   const name = nameMaker(rng(hash(c.seed, 'draft-names')), used);
   const picks: DraftPick[] = [];
   for (let i = 1; i <= yourPick; i++) {
     const team = order[(i - 1) % 32];
-    if (i === yourPick) picks.push({ pick: i, team, name: c.you.name, pos: 'QB', college: c.you.college, you: true });
+    if (i === yourPick) picks.push({ pick: i, team: yourTeam, name: c.you.name, pos: 'QB', college: c.you.college, you: true });
     else picks.push({ pick: i, team, name: name(), pos: POS_POOL[Math.floor(r() * POS_POOL.length)], college: COLLEGES[Math.floor(r() * COLLEGES.length)][0] });
   }
-  return { year: c.season.year + 1, order, picks, yourPick, revealed: 0 };
+  return { year: c.season.year + 1, order, picks, yourPick, revealed: 0, stock, trade, interest: [...new Set(interest)] };
 }
 
 /**
@@ -184,7 +220,7 @@ export function makeDraft(c: Career, order: string[], stock: number): NonNullabl
  */
 export function joinTeam(c: Career) {
   const d = c.draft!;
-  const team = d.order[(d.yourPick - 1) % 32];
+  const team = d.picks.find((p) => p.you)?.team ?? d.order[(d.yourPick - 1) % 32];
   const t = c.league.teams.find((x) => x.id === team)!;
   const old = c.league.players[t.roster.QB];
   if (old) old.team = null;
@@ -196,14 +232,18 @@ export function joinTeam(c: Career) {
   nums.delete(me.number);
   if (nums.has(me.number)) for (let n = 1; n <= 19; n++) if (!nums.has(n)) { me.number = n; c.you.number = n; break; }
   c.you.drafted = { year: d.year, round: d.yourPick <= 32 ? 1 : 2, pick: d.yourPick, team };
-  c.you.contract = { years: 4, salary: Math.round((d.yourPick <= 32 ? 10 - (d.yourPick - 1) * 0.22 : 2.2) * 10) / 10 };
+  c.you.contract = rookieDeal(d.yourPick);
   const places = placesFrom(c.league, c.season.games, c.seed);
   c.season = newSeason(c.league, d.year, places, c.seed);
   c.phase = 'season';
   c.boxes = {};
+  if (d.trade) c.news.unshift({ week: 0, year: d.year, text: `Draft-night trade: ${t.city} moves up to ${ordinal(d.yourPick)} overall, from ${c.league.teams.find((x) => x.id === d.trade!.from)?.city}, to take ${c.you.name}.`, tone: 'good' });
   c.news.unshift({ week: 0, year: d.year, text: `${c.you.name} goes ${ordinal(d.yourPick)} overall to ${t.city}.`, tone: 'good' });
   c.goals = weeklyGoals(c);
 }
+
+/** A rookie deal: four years, paid by where he went ($ millions a year). */
+export const rookieDeal = (pick: number) => ({ years: 4, salary: Math.round((pick <= 32 ? 10 - (pick - 1) * 0.22 : 2.2) * 10) / 10 });
 
 export const ordinal = (n: number) => {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
@@ -247,7 +287,7 @@ const goalMet = (g: Goal, line: Line, win: boolean, callAvg: number | null): boo
  * XP for a game: the box score, the result, the goals, and the play calls you made yourself (a simmed game earns
  * less: the calls weren't yours). Returns the breakdown for the postgame screen.
  */
-export function awardXp(c: Career, gameId: string, line: Line, win: boolean, how: 'sim' | 'moments' | 'full', callScores: number[], kind: string) {
+export function awardXp(c: Career, gameId: string, line: Line, win: boolean, how: 'sim' | 'moments' | 'full', callScores: number[], kind: string, risks: RiskWin[] = []) {
   const parts: { label: string; xp: number }[] = [];
   const add = (label: string, xp: number) => { if (xp) parts.push({ label, xp: Math.round(xp) }); };
   const mult = how === 'sim' ? 0.6 : 1;
@@ -260,6 +300,16 @@ export function awardXp(c: Career, gameId: string, line: Line, win: boolean, how
   const avg = callScores.length ? callScores.reduce((a, b) => a + b, 0) / callScores.length : null;
   if (avg != null) add(`Play calls (${callScores.length}, average ${Math.round(avg)})`, callScores.length * Math.max(0, avg - 40) * 0.3);
   for (const g of c.goals) if (goalMet(g, line, win, avg)) { g.done = true; add(`Goal: ${g.text}`, g.xp); }
+  // risks that paid off: XP, and a free point in the attribute each one showed off
+  const me = youPlayer(c);
+  const ovr0 = me.rating;
+  const boosts: { attr: RiskAttr; label: string }[] = [];
+  for (const rk of risks.slice(0, RISK_CAP)) {
+    add(`Risk paid off: ${rk.label}`, RISK_XP);
+    const v = me.attrs[rk.attr] ?? 60;
+    if (v < 99) { me.attrs[rk.attr] = v + 1; boosts.push({ attr: rk.attr, label: `${RISK_ATTR_NAME[rk.attr]} +1` }); }
+  }
+  if (boosts.length) me.rating = overall(me.attrs);
   const total = Math.max(20, parts.reduce((a, b) => a + b.xp, 0));
   const lv0 = levelOf(c.you.xp);
   const sp0 = Math.floor(c.you.xp / XP_PER_SP);
@@ -267,7 +317,7 @@ export function awardXp(c: Career, gameId: string, line: Line, win: boolean, how
   const sp = Math.floor(c.you.xp / XP_PER_SP) - sp0;
   c.you.sp += sp;
   const lv1 = levelOf(c.you.xp);
-  c.last = { gameId, xp: parts, total, sp, levelUp: lv1 > lv0 ? lv1 : undefined };
+  c.last = { gameId, xp: parts, total, sp, levelUp: lv1 > lv0 ? lv1 : undefined, boosts, ovr0, ovr1: me.rating };
 }
 
 /** Spend skill points on an attribute. */

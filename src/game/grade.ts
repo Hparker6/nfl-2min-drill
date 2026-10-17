@@ -20,6 +20,18 @@ export const GRADE_INFO: Record<GradeKey, { word: string; emoji: string; glyph: 
 export function gradeOf(lost: number): GradeKey {
   return lost <= 0.75 ? 'g' : lost <= 2.5 ? 'y' : lost <= 6 ? 'o' : 'r';
 }
+/**
+ * How many standard errors of simulation noise a call gets the benefit of. Two independent gradings of the same call
+ * disagreed about a quarter of the time on the raw estimate. Now a call near a grade boundary gets up to 12,000 more
+ * paired simulations (grader.ts), and the grade and call score use the loss minus this much remaining noise (never
+ * below 0): together about 15% disagree, and those are calls sitting right on a boundary.
+ */
+export const NOISE_K = 1;
+/** Grade boundaries, in points of win chance lost (see gradeOf). */
+export const GRADE_EDGES = [0.75, 2.5, 6];
+/** A call this close to a boundary (in standard errors) gets more simulations before it is graded. */
+export const nearEdge = (lost: number, se: number) => se > 0 && GRADE_EDGES.some((t) => Math.abs(lost - t) < 2 * se);
+
 /** A 0-100 score for one call. */
 export const callScore = (lost: number) => clip(Math.round(100 - lost * 7), 0, 100);
 
@@ -27,6 +39,7 @@ export interface Summary { wp: number; succ: number; secs: number; give: number;
 export interface Grade {
   g: GradeKey;
   lost: number;
+  se?: number;      // simulation noise in `lost` (points); the grade allows NOISE_K of it
   score: number;
   wp: number;
   bestWp: number;
@@ -46,15 +59,15 @@ export const summarize = (s: OptStat): Summary => ({
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const secs = (x: number) => `${Math.round(x)}s`;
 
-export function makeGrade(dec: Decision, mine: Opt, mineStat: OptStat, stats: Map<string, OptStat>): Grade {
+export function makeGrade(dec: Decision, mine: Opt, mineStat: OptStat, stats: Map<string, OptStat>, seVs?: (bestKey: string) => number, minN?: number): Grade {
   const sums = new Map<string, Summary>();
   stats.forEach((v, k) => sums.set(k, summarize(v)));
   const m = summarize(mineStat);
   // the best option, judged on the options with the most simulations (the refined ones) so noise does not pick it
   let bestKey = mine.key, best = m;
-  const maxN = Math.max(...[...sums.values()].map((x) => x.n));
+  const maxN = minN ?? Math.max(...[...sums.values()].map((x) => x.n)) * 0.9;
   sums.forEach((v, k) => {
-    if (v.n >= maxN * 0.9 && v.wp > best.wp) { best = v; bestKey = k; }
+    if (v.n >= maxN && v.wp > best.wp) { best = v; bestKey = k; }
   });
   if (m.wp > best.wp) { best = m; bestKey = mine.key; }
   const label = (k: string) => dec.options.find((o) => o.key === k)?.label ?? k;
@@ -62,13 +75,15 @@ export function makeGrade(dec: Decision, mine: Opt, mineStat: OptStat, stats: Ma
   const ai = sums.get(dec.aiKey);
   const aiLost = ai ? Math.max(0, (best.wp - ai.wp) * 100) : 0;
   const ranked = [...sums.entries()]
-    .filter(([, v]) => v.n >= maxN * 0.9)
+    .filter(([, v]) => v.n >= maxN)
     .sort((a, b) => b[1].wp - a[1].wp)
     .slice(0, 5)
     .map(([k, v]) => ({ key: k, label: label(k), wp: v.wp }));
-  const g = gradeOf(lost);
+  const se = bestKey === mine.key ? 0 : seVs?.(bestKey) ?? 0;
+  const judged = Math.max(0, lost - NOISE_K * se);
+  const g = gradeOf(judged);
   return {
-    g, lost, score: callScore(lost), wp: m.wp, bestWp: best.wp, bestKey, bestLabel: label(bestKey),
+    g, lost, se, score: callScore(judged), wp: m.wp, bestWp: best.wp, bestKey, bestLabel: label(bestKey),
     aiKey: dec.aiKey, aiLabel: label(dec.aiKey), aiLost, ranked,
     why: explain(dec, mine.label, label(bestKey), m, best, lost),
   };
