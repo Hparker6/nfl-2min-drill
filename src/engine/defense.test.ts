@@ -200,7 +200,7 @@ describe('game state stays consistent with every defense in use', () => {
       const s = clone(even({ t: 240, lead: -3 }));
       s.stage = 'pre' as State['stage'];
       simulate(s, rng(i));
-      expect(s.stage).toBe('over');
+      expect(['over', 'toss']).toContain(s.stage);   // a tie stops at overtime's coin toss
     }
   });
 });

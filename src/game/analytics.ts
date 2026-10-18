@@ -29,6 +29,13 @@ const GA_DEFAULT = 'G-WVFFZZWS61';
 const env = (import.meta.env.VITE_GA_ID as string | undefined)?.trim();
 const GA_ID = env === 'off' ? '' : env || GA_DEFAULT;
 
+/**
+ * Only the production site reports. Local development, `vite preview`, Cloudflare preview URLs and automated test runs
+ * would otherwise send events into the same GA4 property (which other sites share), mixed in with real players.
+ */
+export const PROD_HOSTS = ['nfl-2min-drill.com', 'www.nfl-2min-drill.com'];
+export const analyticsAllowed = (hostname: string) => PROD_HOSTS.includes(hostname.toLowerCase());
+
 /** Where the player is right now, sent with leave events and errors. */
 const ctx: Record<string, string | number | boolean> = {};
 let since = Date.now();
@@ -43,8 +50,14 @@ export function setContext(c: Record<string, string | number | boolean | undefin
 }
 const secsHere = () => Math.round((Date.now() - since) / 1000);
 
+/** Sends once per time away: hiding the tab and unloading the page (closing a tab does both) count as one leave. */
+export function leaveOnce(send: () => void) {
+  let away = false;
+  return { hidden: () => { if (!away) { away = true; send(); } }, back: () => { away = false; } };
+}
+
 export function initAnalytics() {
-  if (!GA_ID || typeof document === 'undefined' || window.gtag) return;
+  if (!GA_ID || typeof document === 'undefined' || window.gtag || !analyticsAllowed(location.hostname)) return;
   const s = document.createElement('script');
   s.async = true;
   s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
@@ -61,10 +74,10 @@ export function initAnalytics() {
     const coarse = matchMedia('(pointer: coarse)').matches;
     window.gtag('set', 'user_properties', { device_class: coarse ? 'touch' : 'pointer', reduced_motion: reduced ? 'yes' : 'no', viewport: innerWidth < 600 ? 'phone' : innerWidth < 1000 ? 'tablet' : 'desktop' });
   } catch { /* fine */ }
-  // where people leave: the tab goes hidden or the page unloads
-  const leave = () => track('leave', { ...ctx, secs_here: secsHere() });
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') leave(); });
-  window.addEventListener('pagehide', leave);
+  // where people leave: the tab goes hidden or the page unloads. Closing a tab does both, so one leave per time away
+  const away = leaveOnce(() => track('leave', { ...ctx, secs_here: secsHere() }));
+  document.addEventListener('visibilitychange', () => (document.visibilityState === 'hidden' ? away.hidden() : away.back()));
+  window.addEventListener('pagehide', away.hidden);
   window.addEventListener('error', (e) => track('app_error', { ...ctx, message: String(e.message ?? 'error').slice(0, 120) }));
   window.addEventListener('unhandledrejection', (e) => track('app_error', { ...ctx, message: String((e.reason && (e.reason.message || e.reason)) ?? 'rejection').slice(0, 120) }));
 }

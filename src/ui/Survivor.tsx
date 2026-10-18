@@ -116,7 +116,7 @@ export function Survivor({ store, update, toast }: Props) {
         <h2>One loss and you're out</h2>
         <ul>
           <li>Random late-game spots, back to back, on offense or defense.</li>
-          <li><b>Win the game to keep going.</b> Lose once and the run is over. A tie goes to overtime, settled by a coin weighted to the stronger team.</li>
+          <li><b>Win the game to keep going.</b> Lose once and the run is over. A tie goes to overtime by the NFL’s playoff rules: you call the toss, both teams get the ball, then the next score wins.</li>
           <li>The holes get deeper and the clock shorter the longer you last.</li>
           <li>Every call is still graded, so you can see what to do better next run.</li>
         </ul>

@@ -154,7 +154,7 @@ uses analytics that already exist. No new events or tracking code are needed to 
 
 ### What already exists (do not rename)
 
-GA4 property `G-WVFFZZWS61` receives these events from the game, among others (full list in `src/game/analytics.ts`):
+The site's GA4 property receives these events from the game, among others (full list in `src/game/analytics.ts`):
 
 | Event | Means | Use it for |
 |---|---|---|

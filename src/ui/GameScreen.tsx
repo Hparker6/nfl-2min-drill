@@ -3,11 +3,11 @@ import { CALL, POS_ROUTES } from '../engine/data';
 import { DESIGN } from '../engine/formation';
 import { WEATHER, clone, leadOf } from '../engine/sim';
 import { utcDate, type Scenario } from '../engine/scenario';
-import type { Ev, Rcv, State } from '../engine/types';
+import type { Coin, Ev, Rcv, State } from '../engine/types';
 import { ballOn, defenseVerdict, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import { GradeJob } from '../game/grader';
-import { Session, type Decision, type Opt, type Pick, type Record_ } from '../game/session';
+import { Session, isToss, type Decision, type Opt, type Pick, type Record_ } from '../game/session';
 import { spotResult } from '../game/rating';
 import type { Settings, SpotResult } from '../game/storage';
 import { setContext, track } from '../game/analytics';
@@ -21,6 +21,7 @@ import { gameOnScreen } from './AdSlot';
 import { audio } from '../game/audio';
 import { cueFor, finalCue, type ImpactKind } from '../game/fx';
 import { Impact } from './Impact';
+import { CoinToss } from './CoinToss';
 
 interface Props {
   sc: Scenario;
@@ -50,7 +51,7 @@ interface Props {
  * Clock and timeout decisions are complete in one tap: they go straight on to the play call, and their grade shows
  * as "Last call" there. Steps with no decision for you ('auto': kickoffs, their kneel-downs) play out on their own.
  */
-type Phase = 'brief' | 'deciding' | 'snapping' | 'auto' | 'result' | 'over';
+type Phase = 'brief' | 'deciding' | 'snapping' | 'auto' | 'result' | 'coin' | 'over';
 interface FeedLine { id: number; t: number; text: string; tone: string }
 interface Last { evs: Ev[]; lines: Told[]; head: Told | null; grade: Grade | null; failed?: boolean; label: string; pre?: State }
 
@@ -258,6 +259,15 @@ export function GameScreen(p: Props) {
     setHintMap(null);
     peekJobRef.current = null;
     setBanner(null);
+    if (isToss(d.step)) {
+      // overtime's coin toss: the player's call, with nothing to grade (CoinToss shows it)
+      jobRef.current = null;
+      setView(clone(session.s));
+      setPhase('deciding');
+      shownAt.current = Date.now();
+      track('decision_shown', { mode: sc.mode, step: d.step, options: d.options.length, n: session.records.length });
+      return;
+    }
     const job = new GradeJob(d, sc.seed);
     jobRef.current = job;
     job.ready.then(() => {
@@ -299,7 +309,9 @@ export function GameScreen(p: Props) {
     if (boot.lost) onPicks([]);
     field.current?.setup(session.s, {}, true);
     if (phase !== 'brief') {
-      track('game_start', { mode: sc.mode, resumed: saved.length > 0 });
+      // straight into the game: a resume (after a refresh, or back to a game in progress). A career moment is part of a
+      // career game, which reports its own game_start once (Career.tsx), so its drives don't each count as a game.
+      if (!p.segment) track('game_start', { mode: sc.mode, resumed: true });
       proceed();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -480,6 +492,25 @@ export function GameScreen(p: Props) {
 
   const next = () => { if (!replaying && (last?.grade || last?.failed)) { track('next_play', { mode: sc.mode }); proceed(); } };
 
+  /** Overtime's toss: the call (then the coin lands on screen), and the winner's choice. Neither is graded. */
+  const tossPick = (step: 'toss' | 'otpick', key: string) => {
+    const d = session.decision();
+    const o = d?.step === step ? d.options.find((x) => x.key === key) : undefined;
+    if (!o || busyRef.current) return false;
+    liveRef.current = true;
+    const n = session.records.length;
+    const evs = session.choose(o);
+    onPicks(session.picks);
+    track('call_made', { mode: sc.mode, step, call: key, n, secs: Math.round((Date.now() - shownAt.current) / 1000) });
+    // into the play-by-play once the coin has landed on screen, so the log doesn't give it away
+    for (const e of evs) { const told = tell(e, sc.teams); if (told.text) setTimeout(() => setFeed((f) => [{ id: ++uid, t: e.t, ...told }, ...f]), e.type === 'toss' ? 1500 : 0); }
+    setView(clone(session.s));
+    setDec(null);
+    return true;
+  };
+  const onCall = (c: Coin) => { if (tossPick('toss', c)) setPhase('coin'); };
+  const onChoose = (recv: boolean) => { if (tossPick('otpick', recv ? 'receive' : 'kick')) { setPhase('auto'); proceed(); } };
+
   // Enter or Space: Next play. R: replay.
   useEffect(() => {
     if (phase !== 'result') return;
@@ -511,6 +542,8 @@ export function GameScreen(p: Props) {
         {p.briefExtra}
       </section>
     );
+  } else if ((phase === 'deciding' && dec && isToss(dec.step)) || phase === 'coin') {
+    side = <CoinToss s={view} teams={T} onCall={onCall} onChoose={onChoose} onContinue={() => { setPhase('auto'); proceed(); }} />;
   } else if (phase === 'deciding' && dec) {
     side = <CallPanel dec={mainDec ?? dec} clock={mainDec && isClock ? dec : null} clockSel={clockSel} s={session.s} teams={T} selected={sel} edits={edits}
       hints={isClock && !mainDec ? clockHints : hintMap} clockHints={clockHints} prev={prev} autoTempo={defaultTempo(dec)?.key}
@@ -547,7 +580,7 @@ export function GameScreen(p: Props) {
       <Scoreboard s={view} teams={T} wp={wp} trail={trail} />
       <div className="arena">
         <div className="stage" ref={stageRef}>
-          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots}>
+          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots} home={sc.home}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
             {impact && <Impact key={impact.id} kind={impact.kind} onDone={() => setImpact((x) => (x?.id === impact.id ? null : x))} />}
             <div className="legend" aria-hidden>

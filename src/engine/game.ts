@@ -4,13 +4,14 @@
  */
 import { advance, clone, other } from './sim';
 import { hash, rng } from './rng';
-import type { Ev, Ratings, State, Team, Weather } from './types';
+import type { Choice, Ev, Ratings, State, Team, Weather } from './types';
 
 export interface GameOpts {
   seed: number;
   qLen?: number;        // seconds per quarter (900 for a real game)
   po?: boolean;         // playoffs: no ties
   weather?: Weather;
+  toss?: boolean;       // overtime opens with a coin toss the player calls (your own games); the AI's games keep the silent one
 }
 
 /** The opening kickoff: a seeded toss decides who receives. Team 0 and team 1 are whoever the caller says. */
@@ -20,7 +21,7 @@ export function kickoffState(rat: [Ratings, Ratings], o: GameOpts): State {
   return {
     t: qLen, off: rec, score: [0, 0], to: [3, 3], down: 1, dist: 10, yl: 25, running: false, stage: 'kick', warned: true,
     adj: 0, kicker: other(rec), safetyKick: false, pendLook: null, shownLook: null, pendPlay: null, k: 0,
-    rat, weather: o.weather ?? 'clear', mix: true, cov: true, q: 1, qLen, po: !!o.po, rec,
+    rat, weather: o.weather ?? 'clear', mix: true, cov: true, q: 1, qLen, po: !!o.po, rec, ...(o.toss ? { toss: true } : {}),
   };
 }
 
@@ -28,8 +29,8 @@ export function kickoffState(rat: [Ratings, Ratings], o: GameOpts): State {
 export const stepRng = (seed: number, s: State) => rng(hash(seed, s.k, 'g'));
 
 /** Advance one step with the AI (or `ch`), keeping the snap counter. */
-export function step(seed: number, s: State, ev: Ev[]) {
-  advance(s, stepRng(seed, s), null, ev);
+export function step(seed: number, s: State, ev: Ev[], ch: Choice | null = null) {
+  advance(s, stepRng(seed, s), ch, ev);
   s.k++;
 }
 

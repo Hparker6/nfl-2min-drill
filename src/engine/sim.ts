@@ -24,7 +24,7 @@ export const WEATHER: Record<Weather, { catch: number; deepCatch: number; fumble
   wind: { catch: 0, deepCatch: -0.05, fumble: 1, int: 1.1, run: 0, yac: 1, fgYards: 8, punt: -6, name: 'Wind', blurb: 'Gusting wind: field goals and deep balls are a gamble.' },
 };
 const wx = (s: State) => WEATHER[s.weather ?? 'clear'];
-import type { Choice, DefClock, Ev, KickChoice, Look, OffClock, PassMods, PatChoice, PlayResult, Rcv, RouteId, State, StChoice, Team, Weather } from './types';
+import type { Choice, Coin, DefClock, Ev, KickChoice, Look, OffClock, PassMods, PatChoice, PlayResult, Rcv, RouteId, Stage, State, StChoice, Team, Weather } from './types';
 
 export const ytg = (s: State) => 100 - s.yl;
 export const leadOf = (s: State, team: Team) => s.score[team] - s.score[1 - team];
@@ -273,15 +273,25 @@ function endCheck(s: State) {
   if (s.t <= 0 && (s.stage === 'pre' || s.stage === 'call' || s.stage === 'kick')) expire(s);
 }
 
-/** The clock hit 0:00. A late-game spot is over; a full game moves on to the next period (or ends). */
+/** A late-game spot whose 0:00 ends the game (one tied at 0:00 that plays overtime goes on). */
+const spotEnds = (s: State) => s.q == null && !(s.otPlay && s.score[0] === s.score[1]);
+
+/**
+ * The clock hit 0:00. A late-game spot is over, unless it's tied and plays overtime: from here it's a full game's
+ * overtime by the playoff rules (15-minute periods until someone wins), since a spot's result is a win or a loss.
+ * A full game moves on to the next period (or ends).
+ */
 function expire(s: State) {
-  if (s.q == null) { s.stage = 'over'; return; }
+  if (s.q == null) {
+    if (spotEnds(s)) { s.stage = 'over'; return; }
+    s.q = 4; s.qLen = 900; s.po = true;
+  }
   s.held = s.stage;
   s.stage = 'over';
   endPeriod(s);
 }
 
-/** Overtime's length: 10 minutes of a 15-minute-quarter game in the regular season, a full quarter in the playoffs. */
+/** Overtime's length: 10 minutes of a 15-minute-quarter game in the regular season, a full quarter (15) in the playoffs. */
 export const otLen = (s: State) => Math.round((s.qLen ?? 900) * (s.po ? 1 : 2 / 3));
 
 /**
@@ -304,6 +314,7 @@ function endPeriod(s: State) {
     s.kicker = s.rec ?? 0; s.safetyKick = false; s.stage = 'kick';
     return;
   }
+  if (q >= 4 && s.toss) { otPeriod(s, held); return; }
   if (q === 4) {
     s.t = otLen(s); s.to = [2, 2]; s.warned = s.t <= 120;
     // the toss: seeded by the game so far, so a replay gets the same one
@@ -325,22 +336,83 @@ function endPeriod(s: State) {
 }
 
 /**
+ * Overtime in a game with a called toss, by the NFL's current rules. Regular season: one period (10 minutes of a
+ * 15-minute game), two timeouts each, the two-minute warning; still tied at its end, the game is a tie. Playoffs:
+ * 15-minute periods played like a game's halves: three timeouts each per two periods, the two-minute warning only in
+ * the second and fourth, and between the first and second (and third and fourth) the teams just switch ends. The
+ * first period opens with the coin toss; the third with the choice of the team that lost it; after the fourth, a new
+ * toss.
+ */
+function otPeriod(s: State, held: Stage) {
+  const n = s.q! - 4;
+  s.t = otLen(s);
+  if (n % 2 === 0) {
+    s.warned = s.t <= 120;
+    s.stage = held === 'kick' ? 'kick' : 'pre';
+    return;
+  }
+  s.to = s.po ? [3, 3] : [2, 2];
+  s.warned = !!s.po || s.t <= 120;
+  s.safetyKick = false;
+  s.stage = 'toss';
+  if (n % 4 === 1 || !s.coin) s.coin = undefined;
+  else s.coin = { ...s.coin, pick: other(s.coin.won) };
+}
+
+/**
+ * Stage 'toss': overtime's coin toss. Team 0 calls it in the air (the player, in this game); the winner chooses to
+ * receive or kick. The AI always takes the ball. At the third playoff period the coin is already in, and the team
+ * that lost the toss chooses.
+ */
+function tossStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
+  if (!s.coin) {
+    const call: Coin = ch?.toss ?? (r() < 0.5 ? 'heads' : 'tails');
+    const face: Coin = r() < 0.5 ? 'heads' : 'tails';
+    const won: Team = call === face ? 0 : 1;
+    s.coin = { call, face, won, pick: won };
+    ev?.push({ type: 'toss', call, face, won, t: s.t });
+    return;
+  }
+  const by = s.coin.pick ?? s.coin.won;
+  const recv = ch?.recv ?? true;
+  const rcv: Team = recv ? by : other(by);
+  s.coin = { ...s.coin, pick: undefined };
+  s.kicker = other(rcv);
+  s.off = s.kicker;
+  s.stage = 'kick';
+  if (s.otp == null) { s.otOwn = rcv; s.otp = 1; s.otS = [s.score[0], s.score[1]]; }
+  ev?.push({ type: 'otpick', team: by, recv, q: s.q ?? 5, t: s.t });
+}
+
+/** Is overtime's toss waiting on team 0: its call, or its choice? */
+export const tossFor0 = (s: State) => s.stage === 'toss' && (!s.coin || s.coin.pick === 0);
+
+/**
  * Overtime by the NFL's current rules: both teams get the ball once. The defense scoring on the first possession
  * ends it; on the second, the game ends as soon as the second team leads, or when its possession ends with anyone
  * ahead. After that, the next score wins.
  */
 function otCheck(s: State) {
-  if (s.stage === 'over' || s.stage === 'pat' || s.otp == null) return;
+  if (s.stage === 'over' || s.otp == null) return;
   const S = s.otS ?? [s.score[0], s.score[1]];
   const scorer: Team | -1 = s.score[0] > S[0] ? 0 : s.score[1] > S[1] ? 1 : -1;
-  s.otS = [s.score[0], s.score[1]];
   const unequal = s.score[0] !== s.score[1];
   const end = () => { s.stage = 'over'; s.brk = 0; };
+  if (s.stage === 'pat' && s.off !== s.otOwn) {
+    // the ball changed hands on the scoring play (a kickoff, punt or turnover returned for a touchdown): that was the
+    // scoring team's possession, so judge the score as theirs (a return that leaves them short still gets its try)
+    if (s.otp === 2 && S[0] !== S[1]) return end();
+    s.otp++;
+    s.otOwn = s.off;
+  }
   if (scorer !== -1) {
+    // a touchdown that decides it ends the game on the spot: no try
     if (s.otp === 1 && scorer !== s.otOwn) return end();
     if (s.otp === 2 && unequal && (scorer !== s.otOwn || leadOf(s, s.otOwn!) > 0)) return end();
     if (s.otp >= 3 && unequal) return end();
   }
+  if (s.stage === 'pat') return;   // the try is still to come: judge the score after it
+  s.otS = [s.score[0], s.score[1]];
   if ((s.stage === 'pre' || s.stage === 'call') && s.off !== s.otOwn) {
     if (s.otp === 2 && unequal) return end();
     s.otp++;
@@ -436,7 +508,7 @@ export function applySnap(s: State, res: PlayResult): boolean {
   }
   if (s.down > 4) { changePoss(s, 100 - s.yl); return false; }
   // out of bounds stops the clock only late in a half (the fourth quarter's rule for a late-game spot)
-  const late = s.t <= 120 && (s.q == null || s.q === 2 || s.q >= 4);
+  const late = s.t <= 120 && endOfHalf(s);
   s.running = !(inc || warn || (res.oob && late));
   if (res.oob && !late) s.adj = -7;
   s.stage = 'pre';
@@ -506,7 +578,7 @@ function clockStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) 
   }
   if (oc === 'spike' || oc === 'kneel') {
     if (runoff(s, oc === 'spike' ? 3 + r() * 2 : 38)) { ev?.push({ type: 'warning', t: s.t }); s.stage = 'call'; return; }
-    if (s.t <= 0) { if (s.q == null) ev?.push({ type: 'expire', t: 0 }); expire(s); return; }
+    if (s.t <= 0) { if (spotEnds(s)) ev?.push({ type: 'expire', t: 0 }); expire(s); return; }
     snap(s, r, oc, 'balanced', null, ev);
     return;
   }
@@ -514,7 +586,7 @@ function clockStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) 
   const secs = Math.max(3, T.secs + T.sd * gauss(r) + s.adj + (s.q != null ? fullGamePace(oc) : 0));
   s.adj = 0;
   if (runoff(s, secs)) { ev?.push({ type: 'warning', t: s.t }); s.stage = 'call'; return; }
-  if (s.t <= 0) { if (s.q == null) ev?.push({ type: 'expire', t: 0 }); expire(s); return; }
+  if (s.t <= 0) { if (spotEnds(s)) ev?.push({ type: 'expire', t: 0 }); expire(s); return; }
   s.stage = 'call';
 }
 
@@ -584,6 +656,7 @@ export function advance(s: State, r: Rng, ch?: Choice | null, ev?: Ev[]) {
     case 'call': callStage(s, r, ch, ev); break;
     case 'pat': patStage(s, r, ch, ev); break;
     case 'kick': kickStage(s, r, ch, ev); break;
+    case 'toss': tossStage(s, r, ch, ev); break;
     default: break;
   }
   if (s.q == null) return;
@@ -594,9 +667,12 @@ export function advance(s: State, r: Rng, ch?: Choice | null, ev?: Ev[]) {
   }
 }
 
-/** Play the rest of the game with the AI on both sides. */
+/**
+ * Play the rest of the game with the AI on both sides (to value a decision). It stops at an overtime coin toss: the
+ * game is tied there, and value0 counts it at overtime's odds, so grading costs no more than a game that ends at 0:00.
+ */
 export function simulate(s: State, r: Rng, maxSteps = 500) {
-  for (let i = 0; i < maxSteps && s.stage !== 'over'; i++) advance(s, r);
+  for (let i = 0; i < maxSteps && s.stage !== 'over' && s.stage !== 'toss'; i++) advance(s, r);
 }
 
 /** Overtime, not played out: a coin flip tilted by team strength. */
@@ -623,10 +699,17 @@ export function canKneel(s: State): boolean {
   return s.t <= burn;
 }
 
-/** A full game before the fourth quarter: the late-game logic (kneel it out, hurry when behind) waits until then. */
-const early = (s: State) => s.q != null && s.q < 4;
-/** The last two minutes of the first half. */
-const halfEnd = (s: State) => s.q === 2 && s.t <= 120;
+/** Playoff overtime: 0:00 only ends a period, never the game. */
+const poOT = (s: State) => !!s.po && (s.q ?? 0) >= 5;
+/**
+ * A full game before the fourth quarter: the late-game logic (kneel it out, hurry when behind) waits until then.
+ * Playoff overtime plays the same way: its clock never ends the game.
+ */
+const early = (s: State) => s.q != null && (s.q < 4 || poOT(s));
+/** A period that ends a half: the 2nd and 4th quarters (a late-game spot is the 4th), regular-season overtime, and the even playoff overtime periods. */
+export const endOfHalf = (s: State) => s.q == null || s.q === 2 || s.q === 4 || (s.q >= 5 && (!s.po || (s.q - 4) % 2 === 0));
+/** The last two minutes of a half that isn't the game's end: the second quarter, or an even playoff overtime period. */
+const halfEnd = (s: State) => s.t <= 120 && (s.q === 2 || (poOT(s) && (s.q! - 4) % 2 === 0));
 
 export function aiOffClock(s: State, r: Rng): OffClock {
   if (early(s)) return earlyOffClock(s, r);
@@ -668,6 +751,11 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
   const o = s.off, d = leadOf(s, o), t = s.t, fd = fgDist(s);
   const fgWins = d >= -3 && d <= 0;
   const E = early(s);
+  if (!normalOnly) {
+    const ot = otSpecial(s);
+    if (ot) return ot;
+    if (ot === null) return aiHailMary(s) ? 'hail' : pickWeighted(r, aiOffWeights(s));
+  }
   if (E && !normalOnly) { const x = earlySpecial(s, r); if (x) return x; }
   if (!E && !normalOnly) {
     if (d > 0 && canKneel(s)) return 'kneel';
@@ -681,6 +769,25 @@ export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
   }
   if (aiHailMary(s)) return 'hail';
   return pickWeighted(r, aiOffWeights(s));
+}
+
+/**
+ * Overtime's possession rules, for the AI offense: a kick or punt (a call), go for it (null), or the usual logic
+ * (undefined). On the second possession a team that trails has to score, since a punt loses the game: it goes for it
+ * on fourth down unless a field goal ties or wins. Once a field goal wins (the second team when the first didn't
+ * score, or anyone in sudden death), a makeable one is kicked on fourth down, or on third from close in.
+ */
+function otSpecial(s: State): string | null | undefined {
+  if ((s.q ?? 0) < 5 || s.otp == null) return undefined;
+  const d = leadOf(s, s.off), fd = fgDist(s);
+  const second = s.otp === 2 && s.off === s.otOwn;
+  if (second && d < 0) {
+    if (s.down === 4 || (!s.po && s.t <= 6)) return fd <= 57 && d >= -3 ? 'fg' : null;
+    return null;
+  }
+  const fgWins = d === 0 && (s.otp >= 3 || second);
+  if (fgWins && fd <= 57 && (s.down === 4 || (s.down === 3 && fd <= 38) || (!s.po && s.t <= 6))) return 'fg';
+  return undefined;
 }
 
 /** The AI offense throws a Hail Mary: seconds left, far out, and a field goal won't do. */
@@ -725,7 +832,7 @@ export function aiOffWeights(s: State): Record<string, number> {
 /** Kicks, punts and fourth downs before the fourth quarter, and the end of the first half. */
 function earlySpecial(s: State, r: Rng): string | null {
   const t = s.t, yt = ytg(s), fd = fgDist(s), d = leadOf(s, s.off);
-  if (s.q === 2) {
+  if (s.q === 2 || halfEnd(s)) {
     if (t <= 6) return fd <= 58 ? 'fg' : yt <= 60 && r() < 0.6 ? 'hail' : 'kneel';
     if (t <= 35 && s.yl < 35 && s.down < 4) return 'kneel';
   }
@@ -767,8 +874,11 @@ function aiBaseLook(s: State, r: Rng): Look {
 }
 
 export function aiPat(s: State): PatChoice {
-  if (early(s)) return 'xp';
   const l = leadOf(s, s.off);
+  // overtime's second possession, a point or two short after the touchdown: two points win it, while a kick only ties
+  // and hands the other team the ball with the next score winning (late in a regular-season overtime, take the tie)
+  if ((s.q ?? 0) >= 5 && s.otp === 2 && s.off === s.otOwn && (l === -1 || l === -2)) return l === -2 || s.po || s.t > 120 ? 'two' : 'xp';
+  if (early(s)) return 'xp';
   return [-5, -2, 1, 5].includes(l) ? 'two' : 'xp';
 }
 

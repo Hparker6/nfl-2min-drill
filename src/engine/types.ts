@@ -11,7 +11,9 @@ export type Look = LookFam | 'soft'
   | 'twoman' | 'press' | 'robber'
   | 'firezone' | 'mike' | 'cblitz' | 'sblitz'
   | 'glblitz' | 'glman' | 'runblitz';
-export type Stage = 'pre' | 'call' | 'pat' | 'kick' | 'over';
+export type Stage = 'pre' | 'call' | 'pat' | 'kick' | 'toss' | 'over';
+/** A side of overtime's coin. */
+export type Coin = 'heads' | 'tails';
 export type Rcv = 'WR1' | 'WR2' | 'WR3' | 'TE' | 'RB';
 export type RouteId =
   | 'screen' | 'flat' | 'angle' | 'hitch' | 'slant' | 'out' | 'cross' | 'dig' | 'comeback' | 'seam' | 'post' | 'corner' | 'go' | 'wheel' | 'hail';
@@ -86,6 +88,9 @@ export interface State {
   otOwn?: Team;           // overtime: whose possession it is, by the overtime rules
   otp?: number;           // overtime: possessions so far (1 = the first team's, 2 = the second's, 3+ sudden death)
   otS?: [number, number]; // overtime: the score when last checked
+  toss?: boolean;         // overtime opens with a called coin toss and the winner's choice (stage 'toss'); absent: a silent seeded toss, as older games had
+  coin?: { call: Coin; face: Coin; won: Team; pick?: Team };   // overtime's toss: the call, how it landed, who won, and who chooses now
+  otPlay?: boolean;       // a late-game spot that ends tied plays overtime (the playoff rules); absent on older dailies, where a weighted coin settles it
 }
 
 /** A decision. Only the fields for the stage being decided are read; the rest fall to the AI. */
@@ -102,6 +107,8 @@ export interface Choice {
   st?: StChoice;
   pat?: PatChoice;
   kick?: KickChoice;
+  toss?: Coin;            // overtime: the call while the coin is in the air
+  recv?: boolean;         // overtime: the team with the choice receives (true) or kicks (false)
 }
 
 export type ResultKind = 'run' | 'pass' | 'sack' | 'scramble' | 'kneel' | 'spike' | 'fg' | 'punt' | 'kickoff' | 'pat' | 'none';
@@ -144,4 +151,6 @@ export type Ev =
   | { type: 'kick'; kind: 'kickoff' | 'onside' | 'free'; kicker: Team; recover: Team; touchback: boolean; td: boolean; yl: number; t: number }
   | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number }
   | { type: 'period'; q: number; t: number }       // full games: a new quarter, halftime (q 3) or overtime (q 5+)
+  | { type: 'toss'; call: Coin; face: Coin; won: Team; t: number }   // overtime's coin toss (team 0 calls it)
+  | { type: 'otpick'; team: Team; recv: boolean; q: number; t: number }   // overtime: the team with the choice receives or kicks
   | { type: 'final'; t: number; ot: boolean };     // full games: the game is over

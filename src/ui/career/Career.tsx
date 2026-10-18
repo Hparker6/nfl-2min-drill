@@ -91,6 +91,8 @@ function CareerInner({ app }: { app: AppSettings }) {
       return;
     }
     commit((x) => { startLive(x, gameOf(x, g.id), mode); });
+    // one game_start per career game you play (its moments don't each count; a simmed game isn't played)
+    track('game_start', { mode: 'career', resumed: false, how: mode });
   };
 
   if (c.phase === 'college') return <>{banner}<CollegeIntro c={c} onPlay={play} /></>;
@@ -122,15 +124,19 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
   const [college, setCollege] = useState(0);
   const [qLen, setQLen] = useState(2);
   const [diff, setDiff] = useState<Settings['diff']>('pro');
+  const [moments, setMoments] = useState<Settings['moments']>('normal');
+  const [speed, setSpeed] = useState<Settings['speed']>('normal');
+  const [numText, setNumText] = useState('7');   // what's typed in the number box (it may be empty while typing)
   const [err, setErr] = useState<string | null>(null);
   const clean = name.trim().replace(/\s+/g, ' ').slice(0, 24);
   const ok = clean.length >= 2;
   const A = ARCH[arch];
   const col = COLLEGES[college];
   const ovr = Math.round(ATTRS.reduce((s, k) => s + A.attrs[k], 0) / ATTRS.length);
-  const start = () => ok && onCreate({ name: clean, number, arch, college, settings: { qLen: qLen * 60, diff } });
-  const nums = Array.from({ length: 19 }, (_, i) => i + 1);
-  const step = (d: number) => setNumber((n) => nums[(nums.indexOf(n) + d + nums.length) % nums.length]);
+  const start = () => ok && onCreate({ name: clean, number, arch, college, settings: { qLen: qLen * 60, diff, moments, speed } });
+  // any number 0-99: type it, or step with the arrows (which wrap around)
+  const setNum = (n: number) => { const v = ((Math.round(n) % 100) + 100) % 100; setNumber(v); setNumText(String(v)); };
+  const step = (d: number) => setNum(number + d);
   return (
     <div className="cr-page nc">
       <header className="nc-hero">
@@ -149,7 +155,13 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
               </label>
               <div className="nc-num" role="group" aria-label="Jersey number">
                 <button type="button" onClick={() => step(-1)} aria-label="Lower number">‹</button>
-                <b aria-live="polite">#{number}</b>
+                <label className="nc-num-in"><span aria-hidden>#</span>
+                  <input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} aria-label="Jersey number, 0 to 99" value={numText}
+                    onChange={(e) => { const t = e.target.value.replace(/\D/g, '').slice(0, 2); setNumText(t); if (t) setNumber(Number(t)); }}
+                    onBlur={() => setNum(numText ? Number(numText) : number)}
+                    onKeyDown={(e) => { if (e.key === 'ArrowUp') { e.preventDefault(); step(1); } else if (e.key === 'ArrowDown') { e.preventDefault(); step(-1); } }}
+                    onFocus={(e) => e.target.select()} />
+                </label>
                 <button type="button" onClick={() => step(1)} aria-label="Higher number">›</button>
               </div>
             </div>
@@ -184,7 +196,7 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
           </section>
 
           <details className="nc-step nc-settings">
-            <summary><h2><i>4</i>Game settings</h2><span>{qLen}-minute quarters · {diff === 'allpro' ? 'All-Pro' : diff === 'rookie' ? 'Rookie' : 'Pro'}</span></summary>
+            <summary><h2><i>4</i>Game settings</h2><span>{diff === 'allpro' ? 'All-Pro' : diff === 'rookie' ? 'Rookie' : 'Pro'} · {moments === 'few' ? 'few moments' : moments === 'lots' ? 'lots of moments' : 'the big moments'} · {qLen}-min quarters</span></summary>
             <div className="nc-set">
               <label><span>Quarter length (full games)</span>
                 <select value={qLen} onChange={(e) => setQLen(Number(e.target.value))}>
@@ -193,9 +205,22 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
               </label>
               <label><span>Difficulty</span>
                 <select value={diff} onChange={(e) => setDiff(e.target.value as Settings['diff'])}>
-                  <option value="rookie">Rookie: softer defenses, win chance on every call</option>
+                  <option value="rookie">Rookie: softer, win chance shown</option>
                   <option value="pro">Pro</option>
                   <option value="allpro">All-Pro: tougher defenses</option>
+                </select>
+              </label>
+              <label><span>How much you play (the sim runs the rest)</span>
+                <select value={moments} onChange={(e) => setMoments(e.target.value as Settings['moments'])}>
+                  <option value="few">Few: the final drive and overtime</option>
+                  <option value="normal">Normal: plus the end of the half, red zone, big fourth downs</option>
+                  <option value="lots">Lots: most drives of a close second half</option>
+                </select>
+              </label>
+              <label><span>Sim speed</span>
+                <select value={speed} onChange={(e) => setSpeed(e.target.value as Settings['speed'])}>
+                  <option value="normal">Normal: watch the drives</option>
+                  <option value="fast">Fast: get to your moments</option>
                 </select>
               </label>
             </div>

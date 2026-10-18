@@ -8,7 +8,7 @@ import { evaluate } from './evaluate';
 import { clip, hash, pickWeighted, rng, type Rng } from './rng';
 import type { Player, Ratings, State, Team, TeamInfo, Weather } from './types';
 import { GROUP_ATTRS, SLOT_GROUP, units, type Attr, type PosGroup, type RosterMeta, type RosterPlayer } from './roster';
-import { NFL_IDS, hasRealTeam, realTeam } from './nfl';
+import { NFL_IDS, hasRealTeam, realTeam, rosterSetFor } from './nfl';
 import { DEF_AMP } from './defense';
 
 /** The current rosters are fictional: every name, number and rating below is generated. */
@@ -49,7 +49,7 @@ export interface Scenario {
   /** Career: which steps are the player's (a quarterback calls the offense; the AI runs his defense). */
   /** Career: how often the pre-snap read of the defense is right (the Film Room ability raises it). */
   readAcc?: number;
-  control?: (s: State, step: 'offClock' | 'defClock' | 'play' | 'look' | 'st' | 'pat' | 'kick') => boolean;
+  control?: (s: State, step: 'offClock' | 'defClock' | 'play' | 'look' | 'st' | 'pat' | 'kick' | 'toss' | 'otpick') => boolean;
 }
 
 /** The situation types a daily rotates through, so no two days in a row feel alike. */
@@ -142,7 +142,7 @@ const rnd = (r: Rng, lo: number, hi: number) => lo + Math.floor(r() * (hi - lo +
 
 /** A real team when the id is one (the season's rosters), otherwise a generated fictional one (tests, old saves). */
 export function makeTeam(id: string, seed: string): TeamInfo {
-  if (hasRealTeam(id)) return realTeam(id);
+  if (hasRealTeam(id)) return realTeam(id, rosterSetFor(seed));
   const f = FRANCHISES.find((x) => x[0] === id) || FRANCHISES[0];
   const r = rng(hash('team', id, seed));
   const off = rnd(r, 72, 92), def = rnd(r, 72, 92);
@@ -271,6 +271,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; }
     if (fair && checkSpot(s, { daily: true }).length) continue;   // never keep a spot that breaks the rules
     const wp = quickWp(s, hash(seedStr, tries));
     if (fair ? wp >= FAIR_WP[0] && wp <= FAIR_WP[1] : wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
@@ -292,6 +293,7 @@ function repairDaily(p0: SpotParams, teams: [TeamInfo, TeamInfo], seedStr: strin
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; }
     if (checkSpot(s, { daily: true }).length) continue;
     const wp = quickWp(s, hash(seedStr, 'repair', step));
     if (wp >= FAIR_WP[0] && wp <= FAIR_WP[1]) return { s, wp, p };
@@ -343,6 +345,18 @@ function covOn(seedStr: string): boolean {
   return !m || m[1] >= COV_FROM;
 }
 
+/**
+ * Overtime is played (a coin toss you call, then the NFL's playoff overtime: both teams get the ball, then the next
+ * score wins) from the OT_FROM daily on, and in Survivor and Practice. Earlier dailies settle a tie with a coin
+ * weighted to the stronger team, as they did, so their saved games replay. The date must be later than the deploy
+ * that ships this, so nobody's daily changes rules mid-day.
+ */
+export const OT_FROM = '2026-10-21';
+function otOn(seedStr: string): boolean {
+  const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return !m || m[1] >= OT_FROM;
+}
+
 export function dailyScenarios(date: string): Scenario[] {
   const y = genScenario(`daily:${prevDate(date)}:0`, 'daily', { kind: dailyKind(prevDate(date)) });
   return [genScenario(`daily:${date}:0`, 'daily', { kind: dailyKind(date), avoid: [y.teams[0].id, y.teams[1].id] })];
@@ -358,5 +372,7 @@ export function customScenario(p: SpotParams, seedStr: string): Scenario {
   s.mix = true;
   s.dx = DEF_AMP;
   s.cov = true;
+  s.otPlay = true;
+  s.toss = true;
   return { id: seedStr, seed: hash(seedStr), mode: 'practice', teams, home: p.home, start: s, baseWp: quickWp(s, hash(seedStr)) };
 }

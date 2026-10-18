@@ -159,4 +159,22 @@ describe('the real-team roster set', () => {
     expect(best.attrs!.speed!).toBeGreaterThan(median.attrs!.speed!);
     console.log(`top backs: ${sorted.slice(0, 5).map((b) => `${b.name} ${b.rating}`).join(', ')} | median ${median.name} ${median.rating}`);
   });
+  it('fields the healthy starters: a star who missed time is still the starter, not his fill-in', async () => {
+    const { realTeam } = await import('./nfl');
+    // Joe Flacco started for Cincinnati while Joe Burrow was hurt in 2025; the depth charts make Burrow the starter
+    expect(realTeam('CIN').players.QB.name).toBe('Joe Burrow');
+    expect(realTeam('CIN', 'prev').players.QB.name).toBe('Joe Flacco');   // the old set, kept only for older dailies
+    expect(realTeam('SF').players.RB.name).toBe('Christian McCaffrey');
+  });
+  it('dailies before ROSTERS_FROM keep the earlier rosters; everything else uses the current set', async () => {
+    const { ROSTERS_FROM, rosterSetFor } = await import('./nfl');
+    const { OT_FROM } = await import('./scenario');
+    expect(ROSTERS_FROM).toBe(OT_FROM);   // they ship together
+    expect(rosterSetFor('daily:2026-10-20:0')).toBe('prev');
+    expect(rosterSetFor(`daily:${ROSTERS_FROM}:0`)).toBe('current');
+    expect(rosterSetFor('surv:3:1')).toBe('current');
+    expect(rosterSetFor('practice:rand:1')).toBe('current');
+    expect(makeTeam('CIN', 'daily:2026-10-18:0').players.QB.name).toBe('Joe Flacco');
+    expect(makeTeam('CIN', `daily:${ROSTERS_FROM}:0`).players.QB.name).toBe('Joe Burrow');
+  });
 });

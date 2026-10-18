@@ -87,7 +87,7 @@ export function startLive(c: Career, g: Game, mode: 'moments' | 'full'): LiveGam
   const teams = liveTeams(c, g);
   const seed = g.id === 'college' ? hash(c.seed, 'college-game') : gameSeed(c.seed, g);
   const s = kickoffState(liveRatings(c, g, teams, false), {
-    seed, qLen: mode === 'full' ? c.settings.qLen : 900, po: g.kind !== 'reg', weather: g.id === 'college' ? 'clear' : gameWeather(g.home, g.week, c.seed),
+    seed, qLen: mode === 'full' ? c.settings.qLen : 900, po: g.kind !== 'reg', weather: g.id === 'college' ? 'clear' : gameWeather(g.home, g.week, c.seed), toss: true,
   });
   const live: LiveGame = { gameId: g.id, seed, mode, youAre: 0, s, ev: [] };
   c.live = live;
@@ -112,8 +112,8 @@ export function isMoment(c: Career, s: State, mode: 'moments' | 'full'): boolean
   return s.yl >= 80;
 }
 
-/** A moment lasts until your possession is over: a score's kickoff, a change of possession, or the end of the game. */
-export const driveOver = (s: State) => s.stage === 'over' || s.stage === 'kick' || ((s.stage === 'pre' || s.stage === 'call') && s.off !== 0);
+/** A moment lasts until your possession is over: a score's kickoff, a change of possession, overtime's coin toss, or the end of the game. */
+export const driveOver = (s: State) => s.stage === 'over' || s.stage === 'kick' || s.stage === 'toss' || ((s.stage === 'pre' || s.stage === 'call') && s.off !== 0);
 
 /** AI steps until a moment (or the end). Returns the events. `max` caps the steps (the tracker plays a few at a time). */
 export function simUntilMoment(c: Career, live: LiveGame, max = 4000): Ev[] {

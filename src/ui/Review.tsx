@@ -25,7 +25,7 @@ export function SpotReview({ result, session, trail, onContinue, continueLabel, 
         <span className="rv-score">{result.score[0]}–{result.score[1]}</span>
       </div>
       {lastPlay && <p className="rv-last"><span className="k">Final play</span>{lastPlay}</p>}
-      {result.ot && <p className="muted small">Tied at the gun. Overtime: {result.win ? 'your kicker won it.' : 'they kicked the winner.'}</p>}
+      {result.ot && <p className="muted small">Tied at the end of regulation. {result.win ? 'You won it in overtime.' : 'They won it in overtime.'}</p>}
       <div className="rv-stats">
         <div className="stat big" title="Performance = 55% Decisions + 45% Result"><span className="k">Performance</span><b>{rt.performance}</b></div>
         <div className="stat" title="100 = you never gave up win chance versus the best call"><span className="k">Decisions</span><b>{graded.length ? rt.decisions : '—'}</b></div>

@@ -5,8 +5,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { step } from '../../engine/game';
-import { clone, leadOf } from '../../engine/sim';
-import type { Ev, State, TeamInfo } from '../../engine/types';
+import { clone, leadOf, tossFor0 } from '../../engine/sim';
+import type { Choice, Ev, State, TeamInfo } from '../../engine/types';
 import { downDist, fmtClock, tell } from '../../game/describe';
 import type { Settings as AppSettings } from '../../game/storage';
 import type { Career } from '../../career/career';
@@ -17,6 +17,7 @@ import { WEEK_NAME } from '../../career/season';
 import { GameScreen } from '../GameScreen';
 import { gameOnScreen } from '../AdSlot';
 import { Scoreboard, periodName } from '../Scoreboard';
+import { CoinToss } from '../CoinToss';
 
 interface Props {
   c: Career;
@@ -26,7 +27,7 @@ interface Props {
   onLeave: () => void;
 }
 
-type View = 'watch' | 'prompt' | 'play' | 'final';
+type View = 'watch' | 'prompt' | 'play' | 'toss' | 'final';
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const shownEv = (e: Ev) => e.type === 'snap' || e.type === 'kick' || e.type === 'pat' || e.type === 'period' || e.type === 'final' || e.type === 'timeout' || e.type === 'warning';
 
@@ -60,6 +61,8 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
       while (!cancelled) {
         const s = liveRef.current.s;
         if (s.stage === 'over') { persist(); setView('final'); return; }
+        // overtime's coin toss: you call it (unless you're simming to the end)
+        if (tossFor0(s) && ffRef.current !== 'end') { ffRef.current = null; setFf(null); persist(); setView('toss'); return; }
         if (atMoment(s)) {
           ffRef.current = null; setFf(null);
           liveRef.current.seg = { start: clone(s), picks: [] };
@@ -80,6 +83,14 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
   }, [view, fast]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const takeOver = () => { setView('play'); };
+  /** Your call at the toss, or your choice after it: one step of the game with your decision. */
+  const tossStep = (ch: Choice) => {
+    const ev: Ev[] = [];
+    step(liveRef.current.seed, liveRef.current.s, ev, ch);
+    liveRef.current.ev.push(...ev);
+    persist();
+    if (liveRef.current.s.stage === 'toss') rerender(); else setView('watch');
+  };
   const keepSimming = () => { skipRef.current = true; liveRef.current.seg = undefined; persist(); setView('watch'); };
   const skipAhead = (to: 'moment' | 'end') => { ffRef.current = to; setFf(to); if (view === 'prompt' && to === 'end') { liveRef.current.seg = undefined; setView('watch'); } };
 
@@ -128,6 +139,11 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
       <div className="cg-grid">
         <section className="cg-main">
           {view === 'prompt' && <MomentPrompt s={s} teams={teams} onTake={takeOver} onSim={keepSimming} />}
+          {view === 'toss' && s.stage === 'toss' && (
+            <div className="cg-toss">
+              <CoinToss s={s} teams={teams} onCall={(c) => tossStep({ toss: c })} onChoose={(recv) => tossStep({ recv })} onContinue={() => setView('watch')} />
+            </div>
+          )}
           {view === 'final' && (
             <div className="cg-final">
               <div className="eyebrow">Final{s.q && s.q >= 5 ? ' · overtime' : ''}</div>

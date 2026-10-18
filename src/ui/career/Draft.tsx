@@ -5,7 +5,7 @@
  * so the night has a pace instead of a progress bar.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ordinal, rookieDeal, type Career } from '../../career/career';
+import { ARCH, ordinal, rookieDeal, type Career } from '../../career/career';
 import { LEAGUE_NAME, teamById, teamInfo } from '../../career/league';
 import { finishMediaDay, mediaQuestions, MEDIA_RIGHT, MEDIA_WRONG } from '../../career/media';
 import { standings } from '../../career/standings';
@@ -117,18 +117,46 @@ function MediaDay({ c, onFinish }: { c: Career; onFinish: (right: number, wrong:
 
 /* ---------------------------------------------------------------- green room --- */
 
+/** The numbers behind projection(): the pick range the scouts give a stock. */
+function range(stock: number): [number, number] {
+  const base = 1 + ((100 - stock) / 100) ** 1.4 * 64;
+  return [Math.max(1, Math.round(base - 4)), Math.min(64, Math.round(base + 4))];
+}
+
+const TEXTS = [
+  ['Mom', 'Whatever happens tonight, we are so proud of you.'],
+  ['Dad', 'Breathe. Your name is coming.'],
+  ['Your college coach', 'Told you that bowl game would do it.'],
+  ['Your little sister', 'my whole class is watching!!'],
+];
+type Beat = 'clock' | 'in' | 'reveal';
+
+/**
+ * The green room, run like the broadcast: each pick is on the clock, then "the pick is in", then the name. When a team
+ * that called your agent is up, it takes longer, and for a second it could be you. Around it: your projected range on
+ * a strip of every pick up to yours, your heart rate climbing as the board closes in, a text from home, an analyst
+ * ticker, and the board itself.
+ */
 function GreenRoom({ c, onYourPick }: { c: Career; onYourPick: () => void }) {
   const d = c.draft!;
   const last = d.picks.length - 1;                 // index of your pick
   const [shown, setShown] = useState(Math.min(d.revealed, last));
+  const [beat, setBeat] = useState<Beat>('clock');
   const [trade, setTrade] = useState(false);
+  const [text, setText] = useState<string[] | null>(null);
+  const [tick, setTick] = useState(0);
   const called = (d.interest ?? []).length;
   const [agent, setAgent] = useState<string[]>([`Agent: "${['Nobody', 'One team', 'Two teams', 'Three teams'][called] ?? `${called} teams`} called this week. ${last > 8 ? 'Stay loose.' : "You won't be waiting long."}"`]);
   const interest = d.interest ?? [];
   const cur = d.picks[shown];
   const curTeam = teamById(c.league, cur.team);
   const fast = last - shown > 6;
+  const hot = interest.includes(cur.team) && shown < last;
   const said = useRef(new Set<number>());
+  const texted = useRef(false);
+  const stock = d.stock ?? c.college.result?.stock ?? 50;
+  const [lo, hi] = range(stock);
+  const R = reduced();
 
   useEffect(() => {
     if (shown >= last) {
@@ -139,46 +167,86 @@ function GreenRoom({ c, onYourPick }: { c: Career; onYourPick: () => void }) {
         setAgent((a) => [`Agent: "Hold on… ${teamById(c.league, d.trade!.team).city} just traded up. Phone's ringing."`, ...a]);
         return;
       }
-      const t = setTimeout(onYourPick, trade ? (reduced() ? 1200 : 3200) : 1300);
+      const t = setTimeout(onYourPick, trade ? (R ? 1200 : 3200) : 1500);
       return () => clearTimeout(t);
     }
-    // a team that called is on the clock: the agent gets nervous
-    if (interest.includes(cur.team) && !said.current.has(shown)) {
+    if (beat === 'clock' && hot && !said.current.has(shown)) {
+      // a team that called is on the clock: the agent gets nervous
       said.current.add(shown);
+      audio.play('drum');
       setAgent((a) => [`Agent: "${curTeam.city} is on the clock. They were high on you…"`, ...a]);
     }
+    if (beat === 'clock' && !texted.current && last > 4 && shown >= Math.floor(last / 2)) {
+      texted.current = true;
+      setText(TEXTS[hash(c.seed, 'text') % TEXTS.length]);
+      setTimeout(() => setText(null), R ? 2500 : 5200);
+    }
+    const ms = R ? 250 : beat === 'clock' ? (fast ? 500 : hot ? 2600 : 1300) : beat === 'in' ? (fast ? 160 : hot ? 1300 : 650) : (fast ? 380 : hot ? 1700 : 1000);
     const t = setTimeout(() => {
-      if (interest.includes(cur.team)) setAgent((a) => [`${curTeam.city} takes ${cur.name}, ${cur.pos}. Not you. Not yet.`, ...a]);
+      if (beat === 'clock') { setBeat('in'); if (!fast) audio.play('whistle'); return; }
+      if (beat === 'in') { setBeat('reveal'); return; }
+      if (hot) setAgent((a) => [`${curTeam.city} takes ${cur.name}, ${cur.pos}. Not you. Not yet.`, ...a]);
+      setBeat('clock');
       setShown((n) => n + 1);
-    }, fast ? 650 : interest.includes(cur.team) ? 2600 : 1500);
+    }, ms);
     return () => clearTimeout(t);
-  }, [shown, trade]);   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [shown, beat, trade]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the analyst ticker turns over every few seconds
+  useEffect(() => { const id = setInterval(() => setTick((n) => n + 1), 4200); return () => clearInterval(id); }, []);
+  const prev = d.picks[shown - 1];
+  const ticker = [
+    `ANALYST: ${c.you.name} is the ${ARCH[c.you.arch].name.toLowerCase()} teams want. We have him going ${projection(stock)}.`,
+    prev ? `PICK ${prev.pick}: ${teamById(c.league, prev.team).city} takes ${prev.name}, ${prev.pos} out of ${prev.college}.` : `THE ${d.year} ${LEAGUE_NAME.toUpperCase()} DRAFT IS UNDER WAY.`,
+    interest.length ? `HEARING: ${interest.map((id) => teamById(c.league, id).city).join(', ')} ${interest.length === 1 ? 'has' : 'have'} done the most work on ${c.you.name.split(' ').slice(-1)[0]}.` : `HEARING: teams are quiet on ${c.you.name.split(' ').slice(-1)[0]}. That can mean anything.`,
+    `QB WATCH: ${d.picks.slice(0, shown).filter((p) => p.pos === 'QB').length} quarterbacks off the board so far.`,
+  ];
+  // your heart, faster as the board closes in, and racing when a team that called is up
+  const near = last ? shown / last : 1;
+  const bpm = Math.round(72 + 62 * near * near + (hot ? 22 : 0) + (shown >= last ? 30 : 0));
 
   const status = (id: string) => {
-    const taken = d.picks.slice(0, shown).find((p) => p.team === id);
+    const taken = d.picks.slice(0, shown + (beat === 'reveal' ? 1 : 0)).find((p) => p.team === id);
     return taken ? `Took ${taken.pos}` : id === cur.team && shown < last ? 'On the clock' : 'Waiting';
   };
+  const done = d.picks.slice(0, shown + (beat === 'reveal' && shown < last ? 1 : 0));
+  const tradeTeam = d.trade ? teamById(c.league, d.trade.team) : null;
+  const clockTeam = trade && tradeTeam ? tradeTeam : curTeam;
   return (
     <div className="cr-page">
       <section className="cr-card dn-hero">
         <div className="eyebrow">{d.year} {LEAGUE_NAME} Draft · The green room</div>
         <h1>Draft <em>night</em></h1>
-        <p className="cr-lede">Your family, your agent, a camera in your face. Stock <b>{d.stock ?? c.college.result?.stock}</b>: projected {projection(d.stock ?? 50)}.</p>
-        {shown < last - 4 && <button className="btn ghost small" onClick={() => setShown(Math.max(shown, last - 4))}>Skip ahead to the last few picks</button>}
+        <p className="cr-lede">Your family, your agent, a camera in your face. Stock <b>{stock}</b>: projected {projection(stock)}.</p>
+        <div className="dn-slots" aria-label={`Pick ${cur.pick} of your ${d.yourPick}`}>
+          {d.picks.map((p, i) => (
+            <i key={p.pick} title={`Pick ${p.pick}`} className={[i < done.length ? 'done' : '', i === shown ? 'now' : '', p.pick >= lo && p.pick <= hi ? 'range' : '', i === last ? 'you' : ''].join(' ')} />
+          ))}
+          <span className="dn-slots-k"><b>Your range</b> picks {lo}–{hi}</span>
+        </div>
+        <div className="dn-heart" style={{ ['--beat' as string]: `${(60 / bpm).toFixed(2)}s` }} aria-label={`Heart rate ${bpm}`}><i aria-hidden />{bpm}<small>bpm</small></div>
+        {shown < last - 4 && <button className="btn ghost small" onClick={() => { setShown(Math.max(shown, last - 4)); setBeat('clock'); }}>Skip ahead to the last few picks</button>}
       </section>
       <div className="dn-room">
-        <section className={`cr-card dn-clock${trade ? ' trade' : ''}`} style={{ ['--tc' as string]: (trade ? teamById(c.league, d.trade!.team) : curTeam).color, ['--tc2' as string]: (trade ? teamById(c.league, d.trade!.team) : curTeam).color2 }} aria-live="polite">
-          {trade ? (
+        <section className={`cr-card dn-clock${trade ? ' trade' : ''}${hot ? ' hot' : ''} beat-${beat}`} style={{ ['--tc' as string]: clockTeam.color, ['--tc2' as string]: clockTeam.color2 }} aria-live="polite">
+          {trade && tradeTeam ? (
             <>
               <div className="dn-alert">Trade alert</div>
-              <h2>{teamById(c.league, d.trade!.team).city} {teamById(c.league, d.trade!.team).name} trade up to No. {d.yourPick}</h2>
+              <h2>{tradeTeam.city} {tradeTeam.name} trade up to No. {d.yourPick}</h2>
               <p>From {teamById(c.league, d.trade!.from).city}. Your phone lights up.</p>
             </>
           ) : (
             <>
               <div className="eyebrow">Pick {cur.pick}{shown >= last ? ' · You\'re next to hear it' : ''}</div>
-              <div className="dn-otc"><span className="cr-chip big">{curTeam.id}</span><div><b>{curTeam.city} {curTeam.name}</b><span>{shown >= last ? 'On the clock…' : 'On the clock'}</span></div></div>
-              {shown < last && <span className="dn-bar" key={shown} style={{ animationDuration: `${fast ? 0.65 : interest.includes(cur.team) ? 2.6 : 1.5}s` }} />}
+              <div className="dn-otc"><span className="cr-chip big">{curTeam.id}</span><div><b>{curTeam.city} {curTeam.name}</b><span>{shown >= last ? 'On the clock… and your phone is buzzing' : beat === 'clock' ? (hot ? 'On the clock. They called your agent.' : 'On the clock') : beat === 'in' ? 'The pick is in' : 'The pick'}</span></div></div>
+              {shown < last && beat === 'clock' && <span className="dn-bar" key={shown} style={{ animationDuration: `${R ? 0.25 : fast ? 0.5 : hot ? 2.6 : 1.3}s` }} />}
+              {shown < last && beat === 'in' && <div className="dn-pickin" key={`in${shown}`}>{hot ? 'The pick is in… could it be you?' : 'The pick is in'}</div>}
+              {shown < last && beat === 'reveal' && (
+                <div className={`dn-reveal${hot ? ' notyou' : ''}`} key={`r${shown}`}>
+                  <b>{cur.name}</b><span>{cur.pos} · {cur.college}</span>
+                  {hot && <em>Not you</em>}
+                </div>
+              )}
             </>
           )}
         </section>
@@ -187,12 +255,14 @@ function GreenRoom({ c, onYourPick }: { c: Career; onYourPick: () => void }) {
           <ul>{interest.map((id) => { const t = teamById(c.league, id); const st = status(id); return <li key={id} className={st === 'On the clock' ? 'live' : st.startsWith('Took') ? 'gone' : ''}><TeamTag t={t} /><em>{st}</em></li>; })}</ul>
           <h3>Agent</h3>
           <ul className="dn-feed">{agent.slice(0, 4).map((a, k) => <li key={agent.length - k}>{a}</li>)}</ul>
+          {text && <div className="dn-text" role="status"><b>{text[0]}</b>{text[1]}</div>}
         </section>
       </div>
+      <div className="dn-ticker" aria-live="off"><span className="dn-ticker-k">Draft desk</span><span key={tick} className="dn-ticker-t">{ticker[tick % ticker.length]}</span></div>
       <section className="cr-card">
         <h3>The board</h3>
         <ol className="cr-board">
-          {d.picks.slice(0, shown).map((p) => { const t = teamById(c.league, p.team); return (
+          {done.map((p) => { const t = teamById(c.league, p.team); return (
             <li key={p.pick} className={interest.includes(p.team) ? 'called' : ''}><span className="num">{p.pick}</span><b>{p.name}</b><span className="cr-board-sub"><TeamTag t={t} /><em>{p.pos} · {p.college}</em></span></li>
           ); }).reverse()}
         </ol>

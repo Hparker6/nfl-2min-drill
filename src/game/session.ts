@@ -5,7 +5,7 @@
  */
 import { CALLS, LOOKS, TEMPO } from '../engine/data';
 import {
-  advance, fullGamePace, aiDefClock, aiDefLook, aiKick, aiOffClock, aiOffPlay, aiPat, aiST, clone, fgDist, fgProb, leadOf, lookOther, otProb, ytg,
+  advance, endOfHalf, fullGamePace, aiDefClock, aiDefLook, aiKick, aiOffClock, aiOffPlay, aiPat, aiST, clone, fgDist, fgProb, leadOf, lookOther, otProb, ytg,
 } from '../engine/sim';
 import { hash, rng } from '../engine/rng';
 import { READ_ACCURACY } from '../engine/evaluate';
@@ -15,8 +15,11 @@ import type { Choice, Ev, State } from '../engine/types';
 import type { Grade } from './grade';
 import { situation } from './describe';
 
-export type Step = 'offClock' | 'defClock' | 'play' | 'look' | 'st' | 'pat' | 'kick';
-export type Group = 'clock' | 'run' | 'pass' | 'rpo' | 'trick' | 'special' | 'def' | 'st' | 'pat' | 'kick';
+export type Step = 'offClock' | 'defClock' | 'play' | 'look' | 'st' | 'pat' | 'kick' | 'toss' | 'otpick';
+export type Group = 'clock' | 'run' | 'pass' | 'rpo' | 'trick' | 'special' | 'def' | 'st' | 'pat' | 'kick' | 'toss';
+
+/** Overtime's toss and the choice after it: the player's calls, but nothing to grade (a coin has no better side). */
+export const isToss = (step: Step) => step === 'toss' || step === 'otpick';
 
 export interface Opt {
   key: string;
@@ -148,6 +151,22 @@ export class Session {
       ];
       return { step: 'pat', title: 'Touchdown! The try', options, aiKey: aiPat(s), state: clone(s) };
     }
+    if (s.stage === 'toss') {
+      if (!s.coin) {
+        const options: Opt[] = [
+          { key: 'heads', label: 'Heads', group: 'toss', choice: { toss: 'heads' } },
+          { key: 'tails', label: 'Tails', group: 'toss', choice: { toss: 'tails' } },
+        ];
+        return { step: 'toss', title: 'Overtime coin toss: call it in the air', options, aiKey: 'heads', state: clone(s) };
+      }
+      if (s.coin.pick !== 0) return null;
+      const third = (s.q ?? 5) > 5;
+      const options: Opt[] = [
+        { key: 'receive', label: 'Receive', sub: 'Ball first. Both teams still get a possession: score, and they have to match it', group: 'toss', choice: { recv: true } },
+        { key: 'kick', label: 'Kick', sub: 'They go first. On your possession you know exactly what you need', group: 'toss', choice: { recv: false } },
+      ];
+      return { step: 'otpick', title: third ? 'Third overtime period: your choice' : 'You won the toss: your choice', options, aiKey: 'receive', state: clone(s) };
+    }
     if (s.stage === 'kick') {
       if (s.kicker !== 0 || s.safetyKick || leadOf(s, 0) >= 0) return null;
       const options: Opt[] = [
@@ -168,7 +187,7 @@ export class Session {
     }));
     if (s.to[0] > 0) {
       options.push({ key: 'timeout', label: 'Timeout', sub: `Stop it now (${s.to[0]} left)`, group: 'clock', choice: { offClock: 'timeout' } });
-      if (s.t <= 45 && s.t > 4 && fgDist(s) <= 60 && (s.q == null || s.q === 2 || s.q >= 4)) options.push({ key: 'drain', label: 'Run it down', sub: 'Let it run to 0:03, then timeout', group: 'clock', choice: { offClock: 'drain' } });
+      if (s.t <= 45 && s.t > 4 && fgDist(s) <= 60 && endOfHalf(s)) options.push({ key: 'drain', label: 'Run it down', sub: 'Let it run to 0:03, then timeout', group: 'clock', choice: { offClock: 'drain' } });
     }
     if (s.down < 4) options.push({ key: 'spike', label: 'Spike it', sub: 'Stop the clock, lose a down', group: 'clock', choice: { offClock: 'spike' } });
     if (leadOf(s, 0) > 0) options.push({ key: 'kneel', label: 'Kneel', sub: 'Run the play clock, take a knee', group: 'clock', choice: { offClock: 'kneel' } });
@@ -236,10 +255,13 @@ export class Session {
     if (this.picks[idx]) this.picks[idx].grade = grade;
   }
 
-  /** The final result. A tie goes to overtime, settled by a seeded coin weighted by team strength. */
+  /**
+   * The final result. A spot that plays overtime is decided on the field (`ot` when it went past regulation). An older
+   * spot that ended tied goes to an overtime settled by a seeded coin weighted by team strength.
+   */
   result(): { win: boolean; ot: boolean; score: [number, number] } {
     const l = leadOf(this.s, 0);
-    if (l !== 0) return { win: l > 0, ot: false, score: [this.s.score[0], this.s.score[1]] };
+    if (l !== 0) return { win: l > 0, ot: (this.s.q ?? 0) >= 5, score: [this.s.score[0], this.s.score[1]] };
     const win = rng(hash(this.sc.seed, 'ot'))() < otProb(this.s);
     const score: [number, number] = [this.s.score[0] + (win ? 3 : 0), this.s.score[1] + (win ? 0 : 3)];
     return { win, ot: true, score };

@@ -106,12 +106,12 @@ describe('state transitions', () => {
 });
 
 describe('simulation', () => {
-  it('always finishes a game', () => {
+  it('always plays to the end of regulation: the final, or a tie’s overtime coin toss (where a rollout stops)', () => {
     for (let i = 0; i < 200; i++) {
       const s = clone(spot({ t: 240, lead: -7 }));
       simulate(s, rng(i));
-      expect(s.stage).toBe('over');
-      expect(s.t).toBe(0);
+      if (s.stage === 'toss') expect([s.q, s.score[0] - s.score[1]]).toEqual([5, 0]);
+      else { expect(s.stage).toBe('over'); expect(s.t).toBe(0); }
     }
   });
   it('is deterministic for a seed', () => {

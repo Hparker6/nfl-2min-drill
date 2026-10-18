@@ -22,7 +22,8 @@ const lead = (s: State) => s.score[0] - s.score[1];
 
 // recorded from the generator as it was before the fairness change. Survivor 2:2 and 2:4 and the AI-offense sample
 // were re-recorded when coverage schemes arrived (scenario.ts COV_FROM): Survivor and Practice spots are picked by
-// win chance, which the coverage scheme changes. Dailies before COV_FROM are untouched.
+// win chance, which the coverage scheme changes. Dailies before COV_FROM are untouched. Survivor 2:4 and the AI-offense
+// sample were re-recorded again with the 2026 rosters (nfl.ts ROSTERS_FROM); dailies before that keep the 2025 set.
 const BEFORE: Record<string, string> = {
   'daily 2026-10-01': '3636b6fa', 'daily 2026-10-02': 'a0077643', 'daily 2026-10-03': 'b27bd7e7', 'daily 2026-10-04': '19f7aae2', 'daily 2026-10-05': '2dac63bb',
   'daily 2026-10-06': '76ad971c', 'daily 2026-10-07': 'beaeed7e', 'daily 2026-10-08': '7a2c96d3', 'daily 2026-10-09': 'e0b5dbdd', 'daily 2026-10-10': '8f4c1f01',
@@ -30,10 +31,10 @@ const BEFORE: Record<string, string> = {
   'daily 2026-10-16': 'df9d034f', 'daily 2026-10-17': '9257d987', 'daily 2026-10-18': 'cfa383fa', 'surv 1:0': 'bed0058c', 'surv 1:1': 'a6ec6ba0',
   'surv 1:2': '2b49b538', 'surv 1:3': 'fa8e3604', 'surv 1:4': 'bdbc5961', 'surv 1:5': '78624373', 'surv 1:6': 'fab59852',
   'surv 1:7': 'e7d9ecf2', 'surv 2:0': '2bfc88aa', 'surv 2:1': '50a9323f', 'surv 2:2': 'c9107cc6', 'surv 2:3': '18a8ed1',
-  'surv 2:4': 'a42266f7', 'surv 2:5': '5e8845d6', 'surv 2:6': '19b95a93', 'surv 2:7': '53265770', 'surv 3:0': '3448e85c',
+  'surv 2:4': 'cfd1575f', 'surv 2:5': '5e8845d6', 'surv 2:6': '19b95a93', 'surv 2:7': '53265770', 'surv 3:0': '3448e85c',
   'surv 3:1': 'e0e13832', 'surv 3:2': '39bfd6f4', 'surv 3:3': '5d96c198', 'surv 3:4': 'e1538da', 'surv 3:5': '9117e81',
   'surv 3:6': '28270c53', 'surv 3:7': 'bef6d5a4', 'practice rand 0': '7ca907ca', 'practice rand 1': '671c61ad', 'practice rand 2': 'e964c193',
-  'practice rand 3': 'b2e67022', 'practice rand 4': '804f0fd8', 'practice rand 5': '79281c22', custom: '3dc4c014', aiOffPlay: 'f8998078',
+  'practice rand 3': 'b2e67022', 'practice rand 4': '804f0fd8', 'practice rand 5': '79281c22', custom: '3dc4c014', aiOffPlay: 'd71b2ad1',
 };
 
 describe('modes the fairness change must not touch', () => {

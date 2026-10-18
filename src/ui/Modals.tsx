@@ -70,7 +70,7 @@ export function About({ onClose }: { onClose: () => void }) {
     <Modal title="About & privacy" onClose={onClose}>
       <p><b>The 4th Call</b> is an independent fan game about late-game play-calling. The teams and players are real; the game situations are made up.</p>
       <h3>Where the data comes from</h3>
-      <p>Rosters (names, jersey numbers, positions) and season statistics come from <b>nflverse</b> (nflverse-data, CC-BY 4.0), season {NFL_SEASON}. Every player's 0–100 ratings are computed by this game from those statistics (the formula is in the open build script); linemen, kickers and low-snap players are marked <i>estimated</i>. They are game ratings, not official measurements and not any other game's ratings.</p>
+      <p>Rosters (names, jersey numbers, positions), depth charts, injury reports and player statistics come from <b>nflverse</b> (nflverse-data, CC-BY 4.0), season {NFL_SEASON}. Each team fields its healthy starters: a star who is hurt still starts here. Ratings use this season's statistics and last season's. Every player's 0–100 ratings are computed by this game from those statistics (the formula is in the open build script); linemen, kickers and low-snap players are marked <i>estimated</i>. They are game ratings, not official measurements and not any other game's ratings.</p>
       <h3>About the grades</h3>
       <p>Plays are resolved by a simplified football simulation written for this game. Win chances and grades are that simulation's estimates: useful for comparing your options, but not official evaluations, real coaching grades or real-world probabilities.</p>
       <h3>Your data</h3>

@@ -22,26 +22,29 @@ interface Props {
   offense?: 0 | 1;           // which team has the ball, so hovering a marker shows the right player
   weather?: Weather;         // tints the field
   byRating?: boolean;        // markers colored by overall rating
+  home?: 0 | 1;              // whose stadium: the midfield emblem and most of the crowd
 }
 
-export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather, byRating = true }, ref) {
+export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather, byRating = true, home = 0 }, ref) {
   const [inspect, setInspect] = useState<{ side: 'o' | 'd'; pos: string } | null>(null);
   // touch screens and narrow windows get the one-line card: the full table would cover the field
   const compact = typeof matchMedia === 'function' && matchMedia('(pointer: coarse), (max-width: 999px)').matches;
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const rRef = useRef<FieldRenderer | null>(null);
+  const kickRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!svgRef.current) return;
     rRef.current = new FieldRenderer(svgRef.current);
-    rRef.current.setTeams(teams);
+    rRef.current.setTeams(teams, home);
+    rRef.current.attachKickCam(kickRef.current);
     const el = wrapRef.current!;
     rRef.current.resize(el.clientWidth, el.clientHeight);
     const ro = new ResizeObserver(() => rRef.current?.resize(el.clientWidth, el.clientHeight));
     ro.observe(el);
     return () => { ro.disconnect(); rRef.current?.stop(); };
-  }, [teams]);
+  }, [teams, home]);
 
   useEffect(() => {
     if (rRef.current) rRef.current.onTap = onTap ?? null;
@@ -70,6 +73,7 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
     <div className={`field-wrap wx-${weather ?? 'clear'}`} ref={wrapRef}>
       <WeatherLayer weather={weather} />
       <svg ref={svgRef} className="field" role="img" aria-label="Field: your end zone at the bottom, theirs at the top" />
+      <div ref={kickRef} className="kickcam" aria-hidden />
       {banner && (
         <div key={banner.id} className={`ribbon tone-${banner.tone}`} role="status">
           <span className="ribbon-main">{banner.text}</span>

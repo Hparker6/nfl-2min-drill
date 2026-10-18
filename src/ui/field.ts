@@ -6,6 +6,10 @@
  * The camera is a window onto the field whose height follows the element's aspect ratio (resize()), so the field
  * fills whatever space the layout gives it. The renderer is plain DOM so the animation loop never goes through React.
  *
+ * Around it, the stadium (stadium.ts): festive end zones, a midfield emblem, and behind each end line the goal post, a
+ * team wall, a cheer squad and a crowd; the camera can look a few yards past an end line to show them. Field goals and
+ * extra points cut to the kick cam (kickcam.ts) when the view has one attached.
+ *
  * Lifecycle of a snap: setup() draws the pre-snap picture (players jog into it from where they were), play()
  * animates the engine's result and calls onOutcome at the moment the play is decided (tackle, catch, drop, kick),
  * then holds the final frame; the next setup() jogs everyone to the new spot.
@@ -17,18 +21,13 @@ import { hash, rng } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
 import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo, PassMods, Weather } from '../engine/types';
+import { BEHIND, BEHIND_VIEW, drawEnd, drawEndZone, drawMidfield, drawNumberArrow } from './stadium';
+import { KickCam } from './kickcam';
 
 const NS = 'http://www.w3.org/2000/svg';
 
 const lerp = (a: number, b: number, f: number) => a + (b - a) * f;
 const easeInOut = (f: number) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
-
-function hexRgb(h: string): [number, number, number] {
-  const m = h.replace('#', '');
-  const n = parseInt(m.length === 3 ? m.split('').map((c) => c + c).join('') : m, 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
-const lum = (h: string) => { const [r, g, b] = hexRgb(h); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; };
 
 export interface Preview {
   play?: string | null;        // selected call
@@ -82,6 +81,11 @@ export class FieldRenderer {
   onInspect: ((side: 'o' | 'd' | null, pos: string | null) => void) | null = null;
   /** markers filled by overall rating, red to green (shape still tells offense from defense) */
   byRating = true;
+  private home: Team = 0;
+  private uid = Math.random().toString(36).slice(2, 8);   // ids inside this SVG (patterns) stay unique on the page
+  private ends: SVGGElement[] = [];
+  private hypeT = 0;
+  private kickCam: KickCam | null = null;
 
   constructor(svg: SVGSVGElement) {
     this.svg = svg;
@@ -142,25 +146,38 @@ export class FieldRenderer {
     if (this.teams) this.drawField();
   }
 
-  setTeams(teams: [TeamInfo, TeamInfo]) {
+  /** home: which team's stadium it is (the midfield emblem, most of the crowd). */
+  setTeams(teams: [TeamInfo, TeamInfo], home: Team = 0) {
     this.teams = teams;
+    this.home = home;
     this.drawField();
+  }
+
+  /** Field goals and extra points play in the kick cam, drawn into this element (an overlay over the field). */
+  attachKickCam(host: HTMLElement | null) {
+    this.kickCam?.stop();
+    this.kickCam = host ? new KickCam(host) : null;
+  }
+
+  /** A score: the cheer squads and the crowds jump for a few seconds. */
+  hype(secs = 2.8) {
+    for (const e of this.ends) { e.classList.remove('hype'); void e.getBoundingClientRect(); e.classList.add('hype'); }
+    clearTimeout(this.hypeT);
+    this.hypeT = window.setTimeout(() => this.ends.forEach((e) => e.classList.remove('hype')), secs * 1000);
   }
 
   private drawField() {
     const g = this.gField;
     g.innerHTML = '';
     const T = this.teams!;
-    this.el('rect', { x: -6, y: -6, width: W + 12, height: 132, class: 'f-apron' }, g);
+    const el = this.el.bind(this);
+    const H = T[this.home], A = T[this.home === 0 ? 1 : 0];
+    this.el('rect', { x: -6, y: -BEHIND - 2, width: W + 12, height: 120 + 2 * BEHIND + 4, class: 'f-apron' }, g);
     for (let u = 0; u < 100; u += 5) this.el('rect', { x: 0, y: 110 - u - 5, width: W, height: 5, class: (u / 5) % 2 ? 'f-turf2' : 'f-turf' }, g);
-    // end zones: theirs at the top, yours at the bottom
-    const ez = (y: number, team: TeamInfo, flip: boolean) => {
-      this.el('rect', { x: 0, y, width: W, height: 10, fill: team.color, class: 'f-ez' }, g);
-      const t = this.el('text', { x: CX, y: y + 5, class: 'f-ezt', fill: lum(team.color) > 0.6 ? '#111' : '#fff', transform: flip ? `rotate(180 ${CX} ${y + 5})` : '' }, g);
-      t.textContent = team.name.toUpperCase();
-    };
-    ez(0, T[1], true);
-    ez(110, T[0], false);
+    // end zones: theirs at the top, yours at the bottom, both names upright from the field
+    drawEndZone(el, g, T[1], true, W, this.uid);
+    drawEndZone(el, g, T[0], false, W, this.uid);
+    drawMidfield(el, g, H, W);
     this.drawGround(g);
     for (let u = 0; u <= 100; u += 5) this.el('line', { x1: 0, x2: W, y1: 110 - u, y2: 110 - u, class: u === 0 || u === 100 ? 'f-line f-goal' : 'f-line' }, g);
     for (let u = 1; u < 100; u++) {
@@ -173,10 +190,12 @@ export class FieldRenderer {
       for (const x of [7.5, W - 7.5]) {
         const t = this.el('text', { x, y: 110 - u, class: 'f-num' }, g);
         t.textContent = String(n);
+        drawNumberArrow(el, g, x, u);
       }
     }
-    for (const y of [0.15, 119.85]) this.el('line', { x1: CX - 3.1, x2: CX + 3.1, y1: y, y2: y, class: 'f-post' }, g);
     this.el('rect', { x: 0, y: 0, width: W, height: 120, class: 'f-border' }, g);
+    // behind each end line: the post, the wall, the squad, the crowd (the near post leans over your end zone, so last)
+    this.ends = [drawEnd(el, g, T[1], H, A, true, W), drawEnd(el, g, T[0], H, A, false, W)];
   }
 
   /**
@@ -291,7 +310,8 @@ export class FieldRenderer {
   }
 
   private camLead() { return Math.max(4, this.viewH / 2 - 13); }   // keep ~13 yards behind the line in view
-  private clampCam(u: number) { return Math.max(-10 + this.viewH / 2, Math.min(110 - this.viewH / 2, u)); }
+  // the camera may look a few yards past either end line, at the post, the squad and the front rows
+  private clampCam(u: number) { return Math.max(-10 - BEHIND_VIEW + this.viewH / 2, Math.min(110 + BEHIND_VIEW - this.viewH / 2, u)); }
   private applyCam() {
     const y0 = 110 - this.cam - this.viewH / 2;
     this.svg.setAttribute('viewBox', `0 ${y0.toFixed(2)} ${W} ${this.viewH.toFixed(2)}`);
@@ -510,6 +530,8 @@ export class FieldRenderer {
   stop() {
     this.interrupt();
     cancelAnimationFrame(this.tweenRaf);
+    this.kickCam?.stop();
+    clearTimeout(this.hypeT);
   }
 
   private interrupt() {
@@ -549,6 +571,10 @@ export class FieldRenderer {
     cancelAnimationFrame(this.tweenRaf);
     const res = ev.res;
     const T = this.teams;
+    if (res.kind === 'fg' && !res.blocked && this.kickCam && speed > 0) {
+      const dist = 100 - ev.yl0 + 17;
+      return this.kick({ dist, xp: false, good: !!res.good, seed: hash('fg', ev.t0, ev.yl0, ev.off, res.good ? 1 : 0), kicking: T[ev.off], defending: T[ev.off === 0 ? 1 : 0], home: T[this.home] }, ev.off, speed, onOutcome);
+    }
     const map = this.frame(ev.off, ev.yl0);
     const seed = hash(ev.t0, ev.yl0, ev.down0, ev.off, res.call, res.kind, res.yards, res.carrier, res.target ?? '', res.route ?? '');
     const tl: Timeline = choreograph({ res, yl0: ev.yl0, off: T[ev.off].rat, def: T[ev.off === 0 ? 1 : 0].rat, seed });
@@ -581,12 +607,26 @@ export class FieldRenderer {
     cancelAnimationFrame(this.tweenRaf);
     const T = this.teams;
     const seed = hash(ev.t, ev.off, ev.two ? 'two' : 'xp', ev.good ? 1 : 0);
+    if (!ev.two && this.kickCam && speed > 0) {
+      return this.kick({ dist: 33, xp: true, good: ev.good, seed, kicking: T[ev.off], defending: T[ev.off === 0 ? 1 : 0], home: T[this.home] }, ev.off, speed, onOutcome);
+    }
     const { tl, res, yl0 } = patTimeline(ev, T[ev.off].rat, T[ev.off === 0 ? 1 : 0].rat, seed);
     this.lastOff = ev.off;
     for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.off].players[k], k);
     for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.off === 0 ? 1 : 0].players[k], k);
     const fake = { type: 'snap', off: ev.off, yl0, down0: 1, dist0: 100 - yl0, t0: ev.t, t: ev.t, res, first: false } as Extract<Ev, { type: 'snap' }>;
     return this.runTimeline(tl, fake, this.frame(ev.off, yl0), 'kick', speed, onOutcome);
+  }
+
+  /** A kick in the kick cam; the top-down field waits underneath. A make sets the stadium off. */
+  private async kick(shot: import('./kickcam').KickShot, off: Team, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
+    this.lastOff = off;
+    let called = false;
+    const p = this.kickCam!.play(shot, speed, () => { called = true; if (shot.good) this.hype(); onOutcome?.('kick'); });
+    this.finish = () => { this.kickCam?.stop(); };
+    await p;
+    this.finish = null;
+    if (!called) onOutcome?.('kick');
   }
 
   private runTimeline(tl: Timeline, ev: Extract<Ev, { type: 'snap' }>, map: (p: Pt) => Pt, outcome: Outcome, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
@@ -670,10 +710,11 @@ export class FieldRenderer {
       case 'td': {
         const scorerTop = good !== !!res.defTd;
         this.fx('td', [0, scorerTop ? 0 : 110]);
+        this.hype();
         this.callout('TOUCHDOWN', at, good !== !!res.defTd ? 'good' : 'bad', 2.2);
         break;
       }
-      case 'good': this.fx('td', [0, good ? 0 : 110]); this.callout(res.call === 'xp' || res.call === 'fg' ? "IT'S GOOD!" : 'GOOD · 2 POINTS', at, good ? 'good' : 'bad', 2.2); break;
+      case 'good': this.fx('td', [0, good ? 0 : 110]); this.hype(); this.callout(res.call === 'xp' || res.call === 'fg' ? "IT'S GOOD!" : 'GOOD · 2 POINTS', at, good ? 'good' : 'bad', 2.2); break;
       case 'nogood': this.fx('x', at); this.callout('NO GOOD', at, good ? 'bad' : 'good', 2.2); break;
       case 'blocked': this.fx('hit', at); this.callout('BLOCKED!', at, good ? 'bad' : 'good', 2.2); break;
       case 'touchback': this.callout('TOUCHBACK', at, 'neutral', 1.6); break;

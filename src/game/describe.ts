@@ -144,6 +144,8 @@ const short = (full: string) => {
 
 export interface Told { text: string; banner?: string; tone: 'good' | 'bad' | 'neutral' }
 
+const OT_ORD = ['first', 'second', 'third', 'fourth'];
+
 export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
   const tone = (team: Team, good: boolean): Told['tone'] => ((team === 0) === good ? 'good' : 'bad');
   switch (ev.type) {
@@ -172,10 +174,14 @@ export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
       return tellSnap(ev, teams);
     case 'period':
       return ev.q === 3 ? { text: 'Halftime.', banner: 'Halftime', tone: 'neutral' }
-        : ev.q >= 5 ? { text: ev.q === 5 ? 'Tied at the end of regulation: overtime.' : 'Still tied: another overtime period.', banner: 'Overtime', tone: 'neutral' }
+        : ev.q >= 5 ? { text: ev.q === 5 ? 'Tied at the end of regulation: overtime.' : `End of the ${OT_ORD[ev.q - 6] ?? `${ev.q - 5}th`} overtime period.`, banner: 'Overtime', tone: 'neutral' }
         : { text: `End of the ${ev.q === 2 ? 'first' : 'third'} quarter.`, banner: `End of Q${ev.q - 1}`, tone: 'neutral' };
     case 'final':
       return { text: ev.ot ? 'Final, in overtime.' : 'Final.', banner: 'Final', tone: 'neutral' };
+    case 'toss':
+      return { text: `${teams[0].city} calls ${ev.call}. It's ${ev.face}: ${teams[ev.won].city} wins the toss.`, banner: ev.won === 0 ? 'You win the toss' : 'They win the toss', tone: tone(ev.won, true) };
+    case 'otpick':
+      return { text: `${ev.q > 5 ? 'Third overtime period: ' : ''}${teams[ev.team].city} will ${ev.recv ? 'receive' : 'kick off'}.`, tone: 'neutral' };
   }
 }
 

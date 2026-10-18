@@ -1,9 +1,14 @@
 /**
  * The real-team roster set built by scripts/build-rosters.mjs from nflverse data (CC-BY 4.0). Names, jersey numbers
- * and positions are the season's real ones; the 0-100 ratings are this game's own estimates derived from that
- * season's statistics (the formulas are in the build script). Nothing here is an official rating.
+ * and positions are the season's real ones, and each team's starters are its healthy starters (an injured star still
+ * starts); the 0-100 ratings are this game's own estimates derived from statistics (the formulas are in the build
+ * script). Nothing here is an official rating.
+ *
+ * The set before it stays for the dailies generated with it: a daily before ROSTERS_FROM keeps its teams' ratings, so
+ * its spot (picked by win chance) and a game saved on it replay exactly, and everyone on a given day plays the same.
  */
 import rosters from '../data/nfl-rosters.json';
+import rostersPrev from '../data/nfl-rosters-2025.json';
 import { units, validateRoster, type RosterMeta, type RosterPlayer } from './roster';
 import type { Ratings, TeamInfo } from './types';
 
@@ -14,6 +19,14 @@ interface Data {
   teams: Record<string, { id: string; city: string; name: string; color: string; color2: string; players: Record<string, RosterPlayer & { id?: string }> }>;
 }
 const DATA = rosters as unknown as Data;
+const PREV = rostersPrev as unknown as Data;
+export const ROSTERS_FROM = '2026-10-21';
+export type RosterSet = 'current' | 'prev';
+/** The roster set a scenario's seed uses: dailies before ROSTERS_FROM keep the earlier one. */
+export function rosterSetFor(seed: string): RosterSet {
+  const m = seed.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return m && m[1] < ROSTERS_FROM ? 'prev' : 'current';
+}
 
 export const NFL_SEASON = DATA.season;
 export const NFL_SOURCE = DATA.source;
@@ -26,10 +39,10 @@ const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 const cache = new Map<string, TeamInfo>();
 
 /** A real team as the engine sees it. The same every day: the ratings come from the season's stats, not a seed. */
-export function realTeam(id: string): TeamInfo {
-  const hit = cache.get(id);
+export function realTeam(id: string, set: RosterSet = 'current'): TeamInfo {
+  const hit = cache.get(`${set}:${id}`);
   if (hit) return hit;
-  const t = DATA.teams[id];
+  const t = (set === 'prev' ? PREV : DATA).teams[id];
   if (!t) throw new Error(`no roster for ${id}`);
   const p = t.players;
   const u = units(p);
@@ -43,7 +56,7 @@ export function realTeam(id: string): TeamInfo {
     units: u,
   };
   const info: TeamInfo = { id: t.id, city: t.city, name: t.name, color: t.color, color2: t.color2, rat, players: p };
-  cache.set(id, info);
+  cache.set(`${set}:${id}`, info);
   return info;
 }
 

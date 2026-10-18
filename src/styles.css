@@ -1056,3 +1056,104 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .best li.ai b { color: var(--def); }
 .best li small { display: block; color: var(--muted); font-size: 11px; }
 .ai-badge { margin-left: 6px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--def) 22%, transparent); color: var(--def); font: 700 10px/1.6 var(--body); font-style: normal; letter-spacing: .06em; vertical-align: 1px; }
+
+/* ---------- overtime coin toss (CoinToss.tsx) ---------- */
+.toss { display: flex; flex-direction: column; gap: 14px; }
+.toss-head { font-size: 40px; text-transform: uppercase; }
+.toss-text { font-size: 17px; color: var(--ink-2); line-height: 1.5; }
+.toss-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.toss-opts:has(> :only-child) { grid-template-columns: 1fr; }
+.toss-pick { display: grid; gap: 6px; align-content: start; text-align: left; }
+.toss-pick small { font: 500 13px/1.35 var(--body); text-transform: none; letter-spacing: 0; opacity: .85; }
+.toss-rule { line-height: 1.5; }
+.coin-stage { display: grid; place-items: center; height: 150px; perspective: 700px; }
+/* no transform transition: the flip ends whole turns away from the resting pose, which must swap in without a spin */
+.coin { position: relative; width: 112px; height: 112px; transform-style: preserve-3d; }
+.coin.show-tails { transform: rotateY(180deg); }
+.coin-face { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%; backface-visibility: hidden;
+  font: 800 52px/1 var(--display); color: #4a3a00;
+  background: radial-gradient(circle at 35% 30%, #fff3b0 0%, #f5c518 45%, #b98f00 100%);
+  box-shadow: inset 0 0 0 6px rgba(120, 90, 0, .45), inset 0 0 0 9px rgba(255, 240, 170, .5), 0 10px 24px rgba(0, 0, 0, .45); }
+.coin-face.tails { transform: rotateY(180deg); background: radial-gradient(circle at 35% 30%, #fff1a6 0%, #e8b70f 45%, #a67f00 100%); }
+.coin.flip-heads { animation: coin-heads 1.5s var(--ease) forwards; }
+.coin.flip-tails { animation: coin-tails 1.5s var(--ease) forwards; }
+@keyframes coin-heads { 0% { transform: translateY(0) rotateY(0); } 45% { transform: translateY(-46px) rotateY(1080deg); } 100% { transform: translateY(0) rotateY(1800deg); } }
+@keyframes coin-tails { 0% { transform: translateY(0) rotateY(0); } 45% { transform: translateY(-46px) rotateY(1080deg); } 100% { transform: translateY(0) rotateY(1980deg); } }
+.cg-toss { padding: 18px; border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--line); }
+@media (max-width: 480px) {
+  .toss-head { font-size: 32px; }
+  .toss-opts { grid-template-columns: 1fr; }
+  .coin-stage { height: 120px; }
+  .coin { width: 88px; height: 88px; }
+  .coin-face { font-size: 42px; }
+}
+
+/* ---------- the stadium around the field (stadium.ts) ---------- */
+.f-pylon { fill: #ff7a1a; stroke: rgba(0, 0, 0, .35); stroke-width: .06; }
+.f-arrow { fill: var(--chalk); opacity: .42; }
+.f-mid { opacity: .9; }
+.f-midt { font: 800 1.9px var(--display); letter-spacing: .06px; text-anchor: middle; dominant-baseline: central; }
+.f-ezt { font-size: 6.2px; letter-spacing: 1px; opacity: 1; }
+.f-behind { fill: #1a4a2d; }
+.f-stands { fill: #14191e; }
+.f-wallt { font: 800 .92px var(--display); letter-spacing: .3px; text-anchor: middle; dominant-baseline: central; }
+.f-gp, .f-squad, .f-crowd { pointer-events: none; }
+.f-ribbon { transform-box: fill-box; transform-origin: 0 50%; animation: flag-wave 1.3s ease-in-out infinite alternate; }
+@keyframes flag-wave { from { transform: scaleX(1) skewY(0deg); } to { transform: scaleX(.72) skewY(9deg); } }
+/* cheerleaders: a bob, and pom-poms that swing about the shoulder (the bottom middle of each arm's box) */
+.f-squad .cheer, .f-squad .masc { transform-box: fill-box; transform-origin: 50% 100%; animation: cheer-bob var(--d, .8s) ease-in-out var(--o, 0s) infinite alternate; }
+.f-squad .sw, .f-crowd .sw { transform-box: fill-box; transform-origin: 50% 100%; }
+.f-squad .pat-a .arm-l .sw { animation: pom-al var(--d, .8s) ease-in-out var(--o, 0s) infinite alternate; }
+.f-squad .pat-a .arm-r .sw { animation: pom-ar var(--d, .8s) ease-in-out var(--o, 0s) infinite alternate; }
+.f-squad .pat-b .arm-l .sw { animation: pom-bl var(--d, .8s) ease-in-out var(--o, 0s) infinite alternate; }
+.f-squad .pat-b .arm-r .sw { animation: pom-br var(--d, .8s) ease-in-out var(--o, 0s) infinite alternate; }
+.f-squad .masc .arm-r .sw { animation: masc-wave .55s ease-in-out var(--o, 0s) infinite alternate; }
+.f-squad .masc .arm-l .sw { transform: rotate(-150deg); }
+@keyframes cheer-bob { from { transform: translateY(0); } to { transform: translateY(-.1px); } }
+@keyframes pom-al { from { transform: rotate(-64deg); } to { transform: rotate(-16deg); } }
+@keyframes pom-ar { from { transform: rotate(64deg); } to { transform: rotate(16deg); } }
+@keyframes pom-bl { from { transform: rotate(-10deg); } to { transform: rotate(-140deg); } }
+@keyframes pom-br { from { transform: rotate(140deg); } to { transform: rotate(10deg); } }
+@keyframes masc-wave { from { transform: rotate(20deg); } to { transform: rotate(70deg); } }
+/* fans in the front rows wave their arms; on a score the squads and the stands jump */
+.f-crowd .fan .sw { animation: fan-wave var(--d, 1s) ease-in-out var(--o, 0s) infinite alternate; }
+@keyframes fan-wave { from { transform: rotate(-35deg); } to { transform: rotate(35deg); } }
+.f-end.hype .cheer, .f-end.hype .masc { animation: cheer-jump .3s ease-out var(--o, 0s) infinite alternate; }
+.f-end.hype .sw { animation-duration: .2s !important; }
+.f-end.hype .row { animation: crowd-jump .26s ease-in-out var(--o, 0s) infinite alternate; }
+@keyframes cheer-jump { from { transform: translateY(0); } to { transform: translateY(-.6px); } }
+@keyframes crowd-jump { from { transform: translateY(0); } to { transform: translateY(-.32px); } }
+
+/* ---------- the kick cam (kickcam.ts): field goals and extra points from behind the kicker ---------- */
+.kickcam { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .18s; }
+.kickcam.on { opacity: 1; }
+.kickcam.out { opacity: 0; transition-duration: .25s; }
+.field-wrap:has(.kickcam.on) .ribbon { visibility: hidden; }
+.kc-svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #05080d; }
+.kc-cam { transform-box: view-box; transform-origin: 50% 40%; transition: transform 2.4s cubic-bezier(.2, .6, .2, 1); }
+.kickcam.kc-live .kc-cam { transform: scale(1.08); }
+.kc-wallt, .kc-ezt, .kc-num, .kc-numb { font-family: var(--display); font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+.kc-wallt { letter-spacing: .1px; }
+.kc-num { fill: rgba(255, 255, 255, .72); }
+.kc-light { animation: kc-flicker 3s ease-in-out infinite alternate; }
+@keyframes kc-flicker { from { opacity: .75; } to { opacity: 1; } }
+.kickcam.kc-cheer .kc-light { animation: kc-flash .16s steps(2) 10; }
+@keyframes kc-flash { 50% { opacity: .35; } }
+.kc-ribbon { transform-box: fill-box; transform-origin: 0 50%; animation: flag-wave 1s ease-in-out infinite alternate; }
+.kc-kicker { transition: transform .28s ease-out; }
+.kc-kicker.swing { transform: translate(1.4px, -.5px); }
+.kickcam.kc-live .kc-rush { animation: kc-jump .55s ease-out forwards; }
+@keyframes kc-jump { 50% { transform: translateY(-2.4px); } 100% { transform: translateY(0); } }
+.kickcam.kc-cheer .kc-stands { animation: crowd-jump .26s ease-in-out 8 alternate; }
+.kc-clank { stroke: #ffffff !important; }
+.kc-lower { position: absolute; left: 14px; bottom: 14px; display: grid; gap: 2px; padding: 7px 14px 8px 11px; border-left: 4px solid var(--accent); background: rgba(8, 12, 10, .88); color: #fff; border-radius: 0 6px 6px 0; }
+.kc-lower b { font: 800 18px/1 var(--display); text-transform: uppercase; letter-spacing: .04em; }
+.kc-lower span { font: 600 12px var(--body); color: #c9d3cc; }
+.kc-verdict { position: absolute; left: 50%; top: 12%; transform: translateX(-50%) scale(.7); opacity: 0; display: grid; justify-items: center; gap: 2px; padding: 9px 20px 10px; border-radius: 10px; color: #fff; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); transition: opacity .2s, transform .35s cubic-bezier(.2, 1.6, .4, 1); }
+.kc-verdict.show { opacity: 1; transform: translateX(-50%) scale(1); }
+.kc-verdict.good { background: rgba(31, 122, 64, .96); }
+.kc-verdict.bad { background: rgba(176, 44, 36, .96); }
+.kc-verdict b { font: 800 32px/1 var(--display); text-transform: uppercase; letter-spacing: .04em; }
+.kc-verdict span { font: 600 13px var(--body); opacity: .92; }
+@media (max-width: 600px) { .kc-verdict b { font-size: 22px; } .kc-lower { left: 8px; bottom: 8px; } .kc-lower b { font-size: 14px; } }
+.f-mascn { font: 800 .5px var(--display); text-anchor: middle; dominant-baseline: central; }
