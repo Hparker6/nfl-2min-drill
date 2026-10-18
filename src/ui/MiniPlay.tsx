@@ -4,7 +4,7 @@
  * the card matches what the play looks like once it is snapped.
  */
 import { CALL, ROUTES } from '../engine/data';
-import { DEF_PLAYS, famOf } from '../engine/defense';
+import { defShapes } from './defShapes';
 import { DESIGN, defAlign, formation } from '../engine/formation';
 import { routePoints } from '../engine/timeline';
 import type { Look, PassMods, Rcv, RouteId } from '../engine/types';
@@ -66,20 +66,14 @@ export function MiniPlay({ play, look, side, routes, target, mods, className }: 
   const cls = `mini mp${className ? ' ' + className : ''}`;
   if (look) {
     // the defense's eleven, with the ghost of a base offense so the shape of the call reads
-    const call = look === 'soft' ? 'prevent' : look;
-    const L = famOf(call);
-    const da = defAlign(call);
+    const { fam: L, rush: rushers, zones, zoneR, man: manPairs } = defShapes(look);
+    const da = defAlign(look === 'soft' ? 'prevent' : look);
     const fm = formation('gun');
     const qb: Pt = [CX, -5.4];
-    const rushers = DEF_PLAYS[call].rush ?? [];
-    // deep help drawn as zones on the man calls that have it
-    const deepHelp: Partial<Record<Look, string[]>> = { twoman: ['S1', 'S2'], robber: ['S2'], cover4: ['CB1', 'CB2', 'S1', 'S2', 'LB1', 'LB3'], tampa2: ['LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'], firezone: ['DL1', 'LB2', 'S1', 'S2', 'CB1', 'CB2'] };
-    const zones = (deepHelp[call] ?? (L === 'zone' ? ['LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2'] : L === 'prevent' ? ['CB1', 'CB2', 'S1', 'S2', 'LB2'] : L === 'balanced' ? ['S1', 'S2'] : [])).filter((k) => !rushers.includes(k));
-    const manPairs: [string, Rcv][] = (L === 'man' || call === 'glman' || call === 'blitz' ? [['CB1', 'WR1'], ['CB2', 'WR2'], ['LB1', 'WR3'], ['LB3', 'TE'], ['LB2', 'RB']] as [string, Rcv][] : []).filter(([d]) => !rushers.includes(d));
     return (
       <svg className={`${cls} mp-def look-${L}`} viewBox={VB} aria-hidden>
         <Turf />
-        {zones.map((k) => <circle key={k} cx={da[k][0]} cy={Y(da[k][1]) - 1.2} r={L === 'prevent' ? 6 : 4.6} className="mp-zone" />)}
+        {zones.map((k) => <circle key={k} cx={da[k][0]} cy={Y(da[k][1]) - 1.2} r={zoneR} className="mp-zone" />)}
         {[...OL, 'QB', 'RB', 'TE', 'WR1', 'WR2', 'WR3'].map((k) => <circle key={k} cx={fm[k][0]} cy={Y(fm[k][1])} r="1.15" className="mp-ghost" />)}
         {manPairs.map(([d, o]) => <line key={d} x1={da[d][0]} y1={Y(da[d][1])} x2={fm[o][0]} y2={Y(fm[o][1]) - 1.3} className="mp-man" />)}
         {rushers.map((k) => { const pts: Pt[] = [da[k], [qb[0] + (da[k][0] - CX) * 0.25, qb[1] + 1.2]]; return <g key={k}><path d={path(pts)} className="mp-rush" /><path d={head(pts, 1.4)} className="mp-rush" /></g>; })}

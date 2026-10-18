@@ -18,6 +18,11 @@
  *   stuffed      +0.003 per point of run defense over run blocking, -0.002 per point of carrier agility over 80, -0.06 to +0.08
  *   scrambles    +0.05 yards per point of quarterback mobility over 75
  *
+ * Coverage scheme (when the game state has `cov`): in man coverage the receiver-defender matchup counts almost twice
+ * as much (+0.009 per point of separation over coverage) and on deep throws his speed over the defender's adds
+ * +0.003 a point; in zone it counts for less (+0.003) and the quarterback's read adds +0.002 per point of
+ * decision-making over 80. So man is the safer call against slow receivers, zone against fast ones.
+ *
  * Teams without unit ratings (old saves, tests) fall back to the team-level formula the game used before.
  */
 import { clip } from './rng';
@@ -26,7 +31,7 @@ import type { Ratings, Rcv } from './types';
 export interface PassMods { sackMul: number; comp: number; intMul: number; yacMul: number; bigYac: number; scramble: number }
 export interface RunMods { m: number; bigMul: number; stuff: number }
 
-export function passMods(R: Ratings, D: Ratings, tgt: Rcv, deep: boolean): PassMods {
+export function passMods(R: Ratings, D: Ratings, tgt: Rcv, deep: boolean, cov?: 'man' | 'zone'): PassMods {
   const O = R.units, X = D.units;
   if (!O || !X) {
     return {
@@ -35,7 +40,10 @@ export function passMods(R: Ratings, D: Ratings, tgt: Rcv, deep: boolean): PassM
     };
   }
   const rc = O.rcv[tgt], cv = X.cov[tgt], q = O.qb;
-  let comp = (rc.sep - cv.coverage) * 0.005 + (rc.hands - 80) * 0.002 + (q.accuracy - 80) * 0.004;
+  const match = cov === 'man' ? 0.009 : cov === 'zone' ? 0.003 : 0.005;
+  let comp = (rc.sep - cv.coverage) * match + (rc.hands - 80) * 0.002 + (q.accuracy - 80) * 0.004;
+  if (cov === 'man' && deep) comp += (rc.speed - cv.speed) * 0.003;
+  if (cov === 'zone') comp += (q.decision - 80) * 0.002;
   // deep throws: arm and contested catches help; good safeties take some away (help over the top)
   if (deep) comp += (q.arm - 80) * 0.003 + (rc.contested - cv.coverage) * 0.002 - ((X.safety?.coverage ?? 80) - 80) * 0.002;
   return {

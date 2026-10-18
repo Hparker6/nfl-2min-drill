@@ -106,6 +106,15 @@ function CareerInner({ app }: { app: AppSettings }) {
     onExport={() => download(exportCareer(c), `the-4th-call-career-${c.you.name.replace(/\W+/g, '-').toLowerCase()}.json`)} /></>;
 }
 
+const ATTR_LABEL: Record<'accuracy' | 'arm' | 'decision' | 'mobility', string> = { accuracy: 'Accuracy', arm: 'Arm', decision: 'Decisions', mobility: 'Mobility' };
+const ATTRS = ['accuracy', 'arm', 'decision', 'mobility'] as const;
+/** Each style's best attribute, for its card. */
+const peak = (a: Arch) => ATTRS.reduce((b, k) => (ARCH[a].attrs[k] > ARCH[a].attrs[b] ? k : b), 'accuracy' as (typeof ATTRS)[number]);
+
+/**
+ * Create your quarterback: four short steps on the left (who, how he plays, where he played, the settings, folded away)
+ * and his card on the right, built live as you choose, with the button to start on the card itself.
+ */
 function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number: number; arch: Arch; college: number; settings: Partial<Settings> }) => void; onLoad: (c: Career) => void }) {
   const [name, setName] = useState('');
   const [number, setNumber] = useState(7);
@@ -116,81 +125,112 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
   const [err, setErr] = useState<string | null>(null);
   const clean = name.trim().replace(/\s+/g, ' ').slice(0, 24);
   const ok = clean.length >= 2;
+  const A = ARCH[arch];
+  const col = COLLEGES[college];
+  const ovr = Math.round(ATTRS.reduce((s, k) => s + A.attrs[k], 0) / ATTRS.length);
+  const start = () => ok && onCreate({ name: clean, number, arch, college, settings: { qLen: qLen * 60, diff } });
+  const nums = Array.from({ length: 19 }, (_, i) => i + 1);
+  const step = (d: number) => setNumber((n) => nums[(nums.indexOf(n) + d + nums.length) % nums.length]);
   return (
-    <div className="cr-page cr-new">
-      <header className="cr-hero">
-        <div className="eyebrow">New · Career mode (beta)</div>
+    <div className="cr-page nc">
+      <header className="nc-hero">
+        <div className="eyebrow">Career mode · beta</div>
         <h1>Become the <em>franchise</em> quarterback</h1>
-        <p className="cr-lede">Create your quarterback. Play one college game in front of the scouts, hear your name on draft night, then play a full 17-game season, the playoffs and the Gridiron Bowl. Call your own plays when the game's on the line. Get better every week.</p>
+        <p>One bowl game in front of the scouts. Draft night. Then a 17-game season, the playoffs and the Gridiron Bowl, calling your own plays when it's on the line.</p>
       </header>
-      <section className="cr-card">
-        <h2>Your quarterback</h2>
-        <div className="cr-form">
-          <label className="cr-field"><span className="k">Name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="First Last" maxLength={24} autoComplete="off" />
-          </label>
-          <label className="cr-field cr-num"><span className="k">Number</span>
-            <select value={number} onChange={(e) => setNumber(Number(e.target.value))}>
-              {Array.from({ length: 19 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
+
+      <div className="nc-layout">
+        <div className="nc-steps">
+          <section className="nc-step">
+            <h2><i>1</i>Who he is</h2>
+            <div className="nc-id">
+              <label className="nc-name"><span className="sr-only">Name</span>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your quarterback's name" maxLength={24} autoComplete="off" autoFocus />
+              </label>
+              <div className="nc-num" role="group" aria-label="Jersey number">
+                <button type="button" onClick={() => step(-1)} aria-label="Lower number">‹</button>
+                <b aria-live="polite">#{number}</b>
+                <button type="button" onClick={() => step(1)} aria-label="Higher number">›</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="nc-step">
+            <h2><i>2</i>How he plays</h2>
+            <div className="nc-styles" role="radiogroup" aria-label="Style of play">
+              {(Object.keys(ARCH) as Arch[]).map((k) => {
+                const S = ARCH[k], top = peak(k);
+                return (
+                  <button key={k} role="radio" aria-checked={arch === k} className={`nc-style${arch === k ? ' on' : ''}`} onClick={() => setArch(k)}>
+                    <b>{S.name}</b>
+                    <span>{S.tag}</span>
+                    <em>{ATTR_LABEL[top]} {S.attrs[top]}</em>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="nc-blurb">{A.blurb}</p>
+          </section>
+
+          <section className="nc-step">
+            <h2><i>3</i>Where he played</h2>
+            <div className="nc-colleges" role="radiogroup" aria-label="College">
+              {COLLEGES.map((c, i) => (
+                <button key={c[0]} role="radio" aria-checked={college === i} className={`nc-col${college === i ? ' on' : ''}`} onClick={() => setCollege(i)} style={{ ['--tc' as string]: c[2], ['--tc2' as string]: c[3] }}>
+                  <i aria-hidden>{c[4]}</i><span>{c[0]}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <details className="nc-step nc-settings">
+            <summary><h2><i>4</i>Game settings</h2><span>{qLen}-minute quarters · {diff === 'allpro' ? 'All-Pro' : diff === 'rookie' ? 'Rookie' : 'Pro'}</span></summary>
+            <div className="nc-set">
+              <label><span>Quarter length (full games)</span>
+                <select value={qLen} onChange={(e) => setQLen(Number(e.target.value))}>
+                  {[2, 3, 4, 5, 6, 8, 10, 12].map((m) => <option key={m} value={m}>{m} minutes{m === 2 ? ' (quick)' : ''}</option>)}
+                </select>
+              </label>
+              <label><span>Difficulty</span>
+                <select value={diff} onChange={(e) => setDiff(e.target.value as Settings['diff'])}>
+                  <option value="rookie">Rookie: softer defenses, win chance on every call</option>
+                  <option value="pro">Pro</option>
+                  <option value="allpro">All-Pro: tougher defenses</option>
+                </select>
+              </label>
+            </div>
+          </details>
         </div>
-        <h3 className="cr-sub">Style of play</h3>
-        <div className="cr-arch" role="radiogroup" aria-label="Style of play">
-          {(Object.keys(ARCH) as Arch[]).map((k) => {
-            const A = ARCH[k];
-            return (
-              <button key={k} role="radio" aria-checked={arch === k} className={`cr-archcard${arch === k ? ' on' : ''}`} onClick={() => setArch(k)}>
-                <span className="cr-arch-name">{A.name}</span>
-                <span className="cr-arch-tag">{A.tag}</span>
-                <span className="cr-arch-blurb">{A.blurb}</span>
-                <span className="cr-bars">
-                  {(['accuracy', 'arm', 'decision', 'mobility'] as const).map((a) => (
-                    <span key={a} className="cr-bar"><span className="k">{a === 'decision' ? 'Decisions' : a[0].toUpperCase() + a.slice(1)}</span><i><b style={{ width: `${(A.attrs[a] - 40) / 0.59}%` }} /></i><em>{A.attrs[a]}</em></span>
-                  ))}
-                </span>
-                <span className="cr-arch-sig">Starts with <b>{ABILITIES[A.sig].name}</b>: {ABILITIES[A.sig].blurb}</span>
-              </button>
-            );
-          })}
-        </div>
-        {/* phones: the cards are compact, so the pick's description sits under them */}
-        <p className="cr-arch-pick"><b>{ARCH[arch].name}.</b> {ARCH[arch].blurb} Starts with <b>{ABILITIES[ARCH[arch].sig].name}</b>: {ABILITIES[ARCH[arch].sig].blurb}</p>
-        <h3 className="cr-sub">College</h3>
-        <div className="cr-colleges">
-          {COLLEGES.map((col, i) => (
-            <button key={col[0]} className={`cr-col${college === i ? ' on' : ''}`} onClick={() => setCollege(i)} aria-pressed={college === i} style={{ ['--tc' as string]: col[2], ['--tc2' as string]: col[3] }}>
-              <i /><span>{col[0]}</span><em>{col[1]}</em>
-            </button>
-          ))}
-        </div>
-        <h3 className="cr-sub">Game settings</h3>
-        <div className="cr-form">
-          <label className="cr-field"><span className="k">Quarter length (full games)</span>
-            <select value={qLen} onChange={(e) => setQLen(Number(e.target.value))}>
-              {[2, 3, 4, 5, 6, 8, 10, 12].map((m) => <option key={m} value={m}>{m} minutes{m === 2 ? ' (quick)' : ''}</option>)}
-            </select>
-          </label>
-          <label className="cr-field"><span className="k">Difficulty</span>
-            <select value={diff} onChange={(e) => setDiff(e.target.value as Settings['diff'])}>
-              <option value="rookie">Rookie: softer defenses, win chance on every call</option>
-              <option value="pro">Pro</option>
-              <option value="allpro">All-Pro: tougher defenses</option>
-            </select>
-          </label>
-        </div>
-        <button className="btn primary big" disabled={!ok} onClick={() => onCreate({ name: clean, number, arch, college, settings: { qLen: qLen * 60, diff } })}>Start your career</button>
-        {!ok && <p className="muted small">Give him a name to start.</p>}
-      </section>
-      <p className="muted small cr-loadline">
-        Have a saved career file? <label className="cr-linkish">Load it<input type="file" accept="application/json" hidden onChange={async (e) => {
+
+        <aside className="nc-card" style={{ ['--tc' as string]: col[2], ['--tc2' as string]: col[3] }} aria-label="Your quarterback">
+          <div className="nc-card-top">
+            <span className="nc-school">{col[0]} <small>{col[1]}</small></span>
+            <span className="nc-ovr"><b>{ovr}</b><small>OVR</small></span>
+          </div>
+          <div className="nc-jersey" aria-hidden><span>{(clean.split(' ').slice(-1)[0] || 'Rookie').toUpperCase()}</span><b>{number}</b></div>
+          <div className="nc-who">
+            <b className={ok ? '' : 'empty'}>{ok ? clean : 'Your name here'}</b>
+            <span>Quarterback · {A.name}</span>
+          </div>
+          <div className="nc-bars">
+            {ATTRS.map((k) => (
+              <span key={k} className="nc-bar"><em>{ATTR_LABEL[k]}</em><i><b style={{ width: `${(A.attrs[k] - 40) / 0.59}%` }} /></i><strong>{A.attrs[k]}</strong></span>
+            ))}
+          </div>
+          <p className="nc-sig"><b>{ABILITIES[A.sig].name}</b> {ABILITIES[A.sig].blurb}</p>
+          <button className="btn primary big nc-go" disabled={!ok} onClick={start}>{ok ? 'Start your career' : 'Name him to start'}</button>
+        </aside>
+      </div>
+
+      <p className="muted small nc-foot">
+        Have a saved career? <label className="cr-linkish">Load it<input type="file" accept="application/json" hidden onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
           try { onLoad(await importCareer(f)); } catch (x) { setErr((x as Error).message); }
         }} /></label>
         {err && <span className="cr-err"> {err}</span>}
+        <span> · A fictional league: every team and player is made up. Not affiliated with the NFL.</span>
       </p>
-      <p className="muted small">A fictional league: every team and player is made up. Not affiliated with the NFL.</p>
     </div>
   );
 }

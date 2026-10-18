@@ -270,6 +270,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     const s = stateFrom(p, teams);
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
+    if (covOn(seedStr)) s.cov = true;
     if (fair && checkSpot(s, { daily: true }).length) continue;   // never keep a spot that breaks the rules
     const wp = quickWp(s, hash(seedStr, tries));
     if (fair ? wp >= FAIR_WP[0] && wp <= FAIR_WP[1] : wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
@@ -290,6 +291,7 @@ function repairDaily(p0: SpotParams, teams: [TeamInfo, TeamInfo], seedStr: strin
     const s = stateFrom(p, teams);
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
+    if (covOn(seedStr)) s.cov = true;
     if (checkSpot(s, { daily: true }).length) continue;
     const wp = quickWp(s, hash(seedStr, 'repair', step));
     if (wp >= FAIR_WP[0] && wp <= FAIR_WP[1]) return { s, wp, p };
@@ -331,6 +333,16 @@ function defAmp(seedStr: string): boolean {
   return !m || m[1] >= DEF_AMP_FROM;
 }
 
+/**
+ * The coverage scheme shapes the receiver matchup (attributes.ts) from the 2026-10-20 daily on, and in Survivor,
+ * Practice and Career. Earlier dailies play as they did, so their saved games replay.
+ */
+export const COV_FROM = '2026-10-20';
+function covOn(seedStr: string): boolean {
+  const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return !m || m[1] >= COV_FROM;
+}
+
 export function dailyScenarios(date: string): Scenario[] {
   const y = genScenario(`daily:${prevDate(date)}:0`, 'daily', { kind: dailyKind(prevDate(date)) });
   return [genScenario(`daily:${date}:0`, 'daily', { kind: dailyKind(date), avoid: [y.teams[0].id, y.teams[1].id] })];
@@ -345,5 +357,6 @@ export function customScenario(p: SpotParams, seedStr: string): Scenario {
   const s = stateFrom(p, teams);
   s.mix = true;
   s.dx = DEF_AMP;
+  s.cov = true;
   return { id: seedStr, seed: hash(seedStr), mode: 'practice', teams, home: p.home, start: s, baseWp: quickWp(s, hash(seedStr)) };
 }

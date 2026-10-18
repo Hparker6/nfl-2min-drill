@@ -135,7 +135,7 @@ export function GameScreen(p: Props) {
     const s = session.s;
     if (!d) return {};
     if (d.step === 'play') return { play: o?.choice.play ?? null, target: e.target, edits: e.routes, side: e.side, mods: e.mods, look: s.shownLook, routes: true };
-    if (d.step === 'look') return { look: o?.choice.look ?? null };
+    if (d.step === 'look') return { look: o?.choice.look ?? null, defCall: !!o?.choice.look };
     return {};
   }, [session]);
 

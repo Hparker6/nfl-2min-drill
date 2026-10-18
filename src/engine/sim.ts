@@ -9,7 +9,7 @@
  */
 import { CALL, DROPS, ROUTES, TEMPO, type Call, type DropId } from './data';
 import { clip, gauss, pickWeighted, type Rng } from './rng';
-import { BASE_CALLS, DEF_CALLS, DEF_PLAYS, defFx, famOf, goalLineSituation } from './defense';
+import { BASE_CALLS, DEF_CALLS, DEF_PLAYS, coverageOf, defFx, famOf, goalLineSituation } from './defense';
 import { passMods, runMods } from './attributes';
 
 /**
@@ -106,7 +106,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
 
   if (r() < 0.022) { res.penalty = 'hold'; res.dur = drop.release + 1.5; return res; }
 
-  const PM = passMods(R, D, tgt, RT.depth >= 15);
+  const PM = passMods(R, D, tgt, RT.depth >= 15, s.cov ? coverageOf(look) : undefined);
   // play action holds the ball longer; a roll-out gets the quarterback away from the rush
   const ps = drop.sack * L.sack * PM.sackMul * (mods.pa && !c.pa ? 1.15 : 1) * (mods.roll ? 0.8 : 1);
   if (r() < ps) {

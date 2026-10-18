@@ -188,6 +188,17 @@ export const DEF_PLAYS: Record<Exclude<Look, 'soft'>, DefPlay> = {
   }) },
 };
 
+/**
+ * Who covers how: man calls put a defender on a receiver (the matchup decides it: slow receivers can't separate, fast
+ * ones win deep), zone calls cover areas (the quarterback's read decides more than any one matchup).
+ */
+export const COVERAGE: Record<Exclude<Look, 'soft'>, 'man' | 'zone'> = {
+  balanced: 'zone', zone: 'zone', cover4: 'zone', tampa2: 'zone', prevent: 'zone', firezone: 'zone',
+  man: 'man', twoman: 'man', press: 'man', robber: 'man', blitz: 'man', mike: 'man', cblitz: 'man', sblitz: 'man',
+  goal: 'man', glblitz: 'man', glman: 'man', load: 'man', runblitz: 'man',
+};
+export const coverageOf = (look: Look): 'man' | 'zone' => (look === 'soft' ? 'zone' : COVERAGE[look]);
+
 /** The seven family calls in their original order: what the AI calls, and what a wrong pre-snap read can show. */
 export const BASE_CALLS: Exclude<LookFam, never>[] = ['balanced', 'blitz', 'load', 'zone', 'man', 'prevent', 'goal'];
 

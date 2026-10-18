@@ -14,6 +14,7 @@
  */
 import { DurableObject } from 'cloudflare:workers';
 import PCT from '../../src/data/percentiles.json';
+import { rivalsFor } from '../../src/game/rivals.ts';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
@@ -184,10 +185,8 @@ const breadcrumb = (name, path) => ({ '@type': 'BreadcrumbList', itemListElement
 // labeled, never ranked, so a new day's board has something to beat without pretending anyone played.
 const SIM = [...PCT.scores].sort((a, b) => a - b);
 const simAt = (q) => SIM[Math.min(SIM.length - 1, Math.floor(q * (SIM.length - 1)))];
-const BENCH = [
-  { name: 'Simulated pro', tag: 'Top 10%', score: simAt(0.9) },
-  { name: 'Simulated coach', tag: 'Average', score: simAt(0.5) },
-];
+/** The day's AI rivals (src/game/rivals.ts): the same named computer play-callers the game shows, badged, never ranked. */
+const benchFor = (day) => rivalsFor(day).map((x) => ({ name: x.name, tag: 'AI', score: x.score }));
 const untilNext = () => {
   const ms = Date.parse(utcDay(Date.now() + 864e5) + 'T00:00:00Z') - Date.now();
   const h = Math.floor(ms / 36e5), m = Math.floor((ms % 36e5) / 6e4);
@@ -195,10 +194,10 @@ const untilNext = () => {
 };
 const shortDay = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
-/** Players and benchmarks in one table: players ranked 1, 2, 3…; benchmarks sit at their score, unranked. */
-function boardTable(best, withBench) {
+/** Players and AI rivals in one table: players ranked 1, 2, 3…; rivals sit at their score, badged and unranked. */
+function boardTable(best, rivalDay) {
   const rows = best.map((e, i) => ({ ...e, rank: i + 1 }));
-  if (withBench) for (const b of BENCH) rows.push({ ...b, bench: true });
+  if (rivalDay) for (const b of benchFor(rivalDay)) rows.push({ ...b, bench: true });
   rows.sort((a, b) => b.score - a.score || (a.bench ? 1 : 0) - (b.bench ? 1 : 0));
   const tr = rows.map((e) => e.bench
     ? `<tr class="bench"><td class="rk"><span class="rank" aria-hidden="true">·</span></td><td>${esc(e.name)}<span class="badge">${esc(e.tag)}</span></td><td class="num score">${e.score}</td></tr>`
@@ -216,7 +215,7 @@ async function leaderboardPage(env) {
   const today = utcDay(), yesterday = utcDay(Date.now() - 864e5);
   const [t, y] = await Promise.all([today, yesterday].map((d) => env.DAY_BOARD.get(env.DAY_BOARD.idFromName(d)).summary(d, null)));
   const yest = y.best.length
-    ? `${boardTable(y.best.slice(0, 3), false)}<p class="note">${y.count.toLocaleString('en-US')} played Daily #${dayNumber(yesterday)} (${esc(shortDay(yesterday))}), average ${y.average}.</p>`
+    ? `${boardTable(y.best.slice(0, 3), null)}<p class="note">${y.count.toLocaleString('en-US')} played Daily #${dayNumber(yesterday)} (${esc(shortDay(yesterday))}), average ${y.average}.</p>`
     : '<p class="empty">No scores yesterday.</p>';
   const body = `
 <p class="lede">Everyone plays the same two-minute drill spot today. These are the best play-callers so far, scored on the game's Performance rating (0–100): every call graded against every option.</p>
@@ -228,8 +227,8 @@ async function leaderboardPage(env) {
   <div class="stat"><b>${t.best[0]?.score ?? '–'}</b><span>top score</span></div>
 </div>
 <h2>Today's board</h2>
-${boardTable(t.best, true)}
-<p class="note">${t.count ? '' : 'No scores yet today: be the first on the board. Play the Daily, then post your name. '}Rows marked <span class="badge" style="margin:0">Top 10%</span> and <span class="badge" style="margin:0">Average</span> are benchmarks from simulated play-callers, shown to beat. They are not players and are not ranked.</p>
+${boardTable(t.best, today)}
+<p class="note">${t.count ? '' : 'No scores yet today: be the first on the board. Play the Daily, then post your name. '}Rows marked <span class="badge" style="margin:0">AI</span> are the day's AI rivals: computer play-callers whose scores come from the game's simulated play-callers, a different group each day. They are not players, are not ranked, and don't count in the numbers above.</p>
 ${t.count ? `<h2>How today's scores spread out</h2>${bandBars(t.bands)}` : ''}
 <h2>Yesterday's best</h2>
 ${yest}

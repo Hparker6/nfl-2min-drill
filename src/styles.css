@@ -1038,3 +1038,21 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .tempo-why b { color: var(--ink-2); }
 .tbtn { position: relative; }
 .tbtn .tbtn-auto { position: absolute; top: -8px; right: 6px; margin: 0; padding: 1px 5px; background: var(--accent); color: var(--accent-ink); vertical-align: 0; }
+
+/* your call on defense, drawn on the field (field.ts drawDefCall): zones, man assignments, blitz lanes */
+.f-zone { fill: rgba(45, 212, 191, .08); stroke: rgba(45, 212, 191, .55); stroke-width: .16; }
+.f-man { fill: none; stroke: rgba(45, 212, 191, .85); stroke-width: .2; stroke-dasharray: .55 .4; }
+.f-rush { fill: none; stroke: #ff6a6a; stroke-width: .42; stroke-linecap: round; }
+.f-rush.under { stroke: rgba(20, 6, 6, .55); stroke-width: .7; }
+.f-dot.blitz .f-ring { stroke: #ff6a6a !important; stroke-width: .5; }
+
+/* AI rivals on the Daily board (game/rivals.ts): labeled, unranked, a lighter bar */
+.vs-ai { margin: 6px 0 10px; font-size: 14px; color: var(--ink-2); }
+.vs-ai b { color: var(--ink); }
+.hist-bar em { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--def) 45%, transparent) 0 4px, color-mix(in srgb, var(--def) 25%, transparent) 4px 8px); border-radius: 0 4px 4px 0; }
+.hist-bar b small { font-weight: 600; color: var(--def); margin-left: 3px; }
+.best .k em { font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.best li.ai { color: var(--ink-2); }
+.best li.ai b { color: var(--def); }
+.best li small { display: block; color: var(--muted); font-size: 11px; }
+.ai-badge { margin-left: 6px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, var(--def) 22%, transparent); color: var(--def); font: 700 10px/1.6 var(--body); font-style: normal; letter-spacing: .06em; vertical-align: 1px; }

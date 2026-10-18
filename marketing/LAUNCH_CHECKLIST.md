@@ -93,7 +93,7 @@ on the scoreboard have low contrast. It's cosmetic and isn't in this change.
 |---|---|---|
 | B1 | **Commit** the SEO, accessibility, README and marketing changes | `git add -A && git commit -m "SEO metadata, noindex thin pages, a11y labels, README, marketing kit"` |
 | B2 | **Push = deploy** to Cloudflare | `git push origin main`, then watch the build in Cloudflare → Workers & Pages → nfl-2min-drill → Deployments |
-| B2a | **Fair-daily start date** | The new Daily rules start on the date in `FAIR_FROM` (`src/engine/scenario.ts`, now `2026-10-19`). Deploy before that UTC date, or move it to a date after the deploy, so nobody's in-progress Daily changes mid-day |
+| B2a | **Daily rule start dates** | New Daily rules start on dated constants in `src/engine/scenario.ts`: `FAIR_FROM` (`2026-10-19`, fair clocks) and `COV_FROM` (`2026-10-20`, coverage schemes). Deploy before those UTC dates, or move them to dates after the deploy, so nobody's in-progress Daily changes mid-day |
 | B3 | **Always Use HTTPS** (the HTTP homepage currently returns 200, not a redirect) | Cloudflare dashboard → nfl-2min-drill.com → SSL/TLS → Edge Certificates → **Always Use HTTPS: On** |
 | B4 | **Real team and player names in marketing videos** | Decide, ideally after a short consult with an IP lawyer. Until then, record Career mode (see CONTENT_PLAYBOOK.md section 3) |
 | B5 | Any other **production setting** (DNS, caching rules, Worker settings) | Not needed for launch. Make no changes |

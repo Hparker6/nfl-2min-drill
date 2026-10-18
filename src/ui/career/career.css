@@ -534,3 +534,95 @@
 .dn-welcome .cr-chip, .tm-hero .cr-chip { justify-self: start; }
 .dn-phone .btn.big { justify-self: center; min-width: min(320px, 100%); }
 .pg-stats-head h3 { justify-content: center; margin: 0; }
+
+/* ---------- create your quarterback (Career.tsx NewCareer): steps on the left, his card on the right ---------- */
+.nc { gap: 22px; }
+.nc-hero { display: grid; gap: 8px; padding: 22px 2px 0; }
+.nc-hero h1 { margin: 0; font-size: clamp(36px, 6.4vw, 64px); line-height: .95; }
+.nc-hero h1 em { font-style: normal; color: var(--accent); }
+.nc-hero p { margin: 4px 0 0; max-width: 62ch; color: var(--ink-2); font-size: 17px; line-height: 1.5; }
+
+.nc-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px; align-items: start; }
+.nc-steps { display: grid; gap: 14px; min-width: 0; }
+.nc-step { display: grid; gap: 12px; padding: 18px; border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--line); }
+.nc-step h2 { display: flex; align-items: center; gap: 10px; margin: 0; font: 800 20px/1 var(--display); text-transform: uppercase; letter-spacing: .03em; }
+.nc-step h2 i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 800 14px var(--display); font-style: normal; }
+
+.nc-id { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.nc-name input { width: 100%; box-sizing: border-box; padding: 14px 16px; border-radius: var(--r-sm); border: 2px solid var(--line-2); background: var(--panel-2); color: var(--ink); font: 700 20px var(--body); transition: border-color .15s; }
+.nc-name input:focus { outline: none; border-color: var(--accent); }
+.nc-name input::placeholder { color: var(--muted); font-weight: 500; }
+.nc-num { display: grid; grid-template-columns: 38px 64px 38px; align-items: center; border-radius: var(--r-sm); border: 2px solid var(--line-2); background: var(--panel-2); overflow: hidden; }
+.nc-num button { height: 100%; border: 0; background: none; color: var(--ink-2); font: 700 22px var(--body); cursor: pointer; }
+.nc-num button:hover { color: var(--accent); background: var(--panel-3); }
+.nc-num b { text-align: center; font: 800 24px var(--display); }
+
+.nc-styles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.nc-style { display: grid; gap: 3px; align-content: start; text-align: left; padding: 12px; border-radius: var(--r-sm); border: 2px solid var(--line); background: var(--panel-2); color: var(--ink); cursor: pointer; transition: border-color .15s, transform .12s, background .15s; }
+.nc-style:hover { border-color: var(--line-2); transform: translateY(-1px); }
+.nc-style b { font: 800 17px/1.05 var(--display); text-transform: uppercase; }
+.nc-style span { font-size: 12px; color: var(--muted); }
+.nc-style em { margin-top: 6px; justify-self: start; padding: 2px 7px; border-radius: 999px; background: var(--panel-3); font: 700 11px var(--body); font-style: normal; color: var(--ink-2); }
+.nc-style.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--panel-2)); }
+.nc-style.on em { background: var(--accent); color: var(--accent-ink); }
+.nc-blurb { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+
+.nc-colleges { display: flex; flex-wrap: wrap; gap: 8px; }
+.nc-col { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 2px solid var(--line); background: var(--panel-2); color: var(--ink); font: 600 14px var(--body); cursor: pointer; transition: border-color .15s; }
+.nc-col i { display: grid; place-items: center; min-width: 34px; height: 26px; padding: 0 4px; border-radius: 999px; background: var(--tc); color: var(--tc2); font: 800 11px var(--display); font-style: normal; letter-spacing: .03em; }
+.nc-col:hover { border-color: var(--line-2); }
+.nc-col.on { border-color: var(--tc2); box-shadow: 0 0 0 2px var(--tc); }
+
+.nc-settings > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+.nc-settings > summary::-webkit-details-marker { display: none; }
+.nc-settings > summary span { color: var(--muted); font-size: 13px; }
+.nc-settings > summary span::after { content: ' ▸'; }
+.nc-settings[open] > summary span::after { content: ' ▾'; }
+.nc-set { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.nc-set label { display: grid; gap: 6px; font: 700 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.nc-set select { font: 600 15px var(--body); text-transform: none; letter-spacing: 0; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 10px 12px; }
+
+/* the card */
+.nc-card { position: sticky; top: 16px; display: grid; gap: 14px; padding: 18px; border-radius: 18px; overflow: hidden;
+  background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--tc) 70%, var(--bg)) 0%, color-mix(in srgb, var(--tc) 18%, var(--panel)) 55%, var(--panel) 100%);
+  border: 1px solid color-mix(in srgb, var(--tc2) 30%, var(--line-2)); box-shadow: 0 24px 60px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 255, 255, .06); transition: background .35s; }
+.nc-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.nc-school { font: 800 15px var(--display); text-transform: uppercase; letter-spacing: .06em; color: #fff; }
+.nc-school small { display: block; font: 600 12px var(--body); letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, .7); }
+.nc-ovr { display: grid; justify-items: center; padding: 6px 10px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); }
+.nc-ovr b { font: 800 28px/1 var(--display); }
+.nc-ovr small { font: 800 10px var(--body); letter-spacing: .12em; }
+.nc-jersey { justify-self: center; display: grid; justify-items: center; width: 170px; padding: 18px 0 14px; border-radius: 26px 26px 14px 14px; background: var(--tc); color: var(--tc2); border: 3px solid var(--tc2);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .4); position: relative; }
+.nc-jersey::before, .nc-jersey::after { content: ''; position: absolute; top: 14px; width: 34px; height: 54px; background: var(--tc); border: 3px solid var(--tc2); border-radius: 10px; z-index: -1; }
+.nc-jersey::before { left: -24px; transform: rotate(18deg); } .nc-jersey::after { right: -24px; transform: rotate(-18deg); }
+.nc-jersey span { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 800 15px var(--display); letter-spacing: .14em; }
+.nc-jersey b { font: 800 78px/1 var(--display); }
+.nc-who { display: grid; justify-items: center; text-align: center; gap: 2px; }
+.nc-who b { font: 800 28px/1.05 var(--display); text-transform: uppercase; color: #fff; overflow-wrap: anywhere; }
+.nc-who b.empty { color: rgba(255, 255, 255, .35); }
+.nc-who span { font: 600 13px var(--body); color: rgba(255, 255, 255, .75); }
+.nc-bars { display: grid; gap: 7px; padding: 12px; border-radius: 12px; background: rgba(8, 12, 10, .45); }
+.nc-bar { display: grid; grid-template-columns: 74px 1fr 28px; gap: 8px; align-items: center; }
+.nc-bar em { font: 700 11px var(--body); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: rgba(255, 255, 255, .7); }
+.nc-bar i { height: 7px; border-radius: 4px; background: rgba(255, 255, 255, .12); overflow: hidden; }
+.nc-bar i b { display: block; height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s var(--ease); }
+.nc-bar strong { font: 800 16px var(--display); text-align: right; color: #fff; }
+.nc-sig { margin: 0; font-size: 13px; line-height: 1.4; color: rgba(255, 255, 255, .78); }
+.nc-sig b { display: block; color: var(--accent); font: 800 13px var(--display); letter-spacing: .08em; text-transform: uppercase; }
+.nc-go { width: 100%; }
+.nc-foot { margin: 0; }
+
+@media (max-width: 900px) {
+  .nc-layout { grid-template-columns: 1fr; }
+  .nc-card { position: relative; top: 0; }
+  .nc-styles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .nc-step { padding: 14px; }
+  .nc-id { grid-template-columns: 1fr; }
+  .nc-num { justify-self: start; }
+  .nc-jersey { width: 140px; } .nc-jersey b { font-size: 62px; }
+}
+@media (prefers-reduced-motion: reduce) { .nc-style, .nc-card, .nc-bar i b { transition: none; } }
+.nc-card { isolation: isolate; }   /* keeps the jersey sleeves (z-index -1) above the card background on every layout */

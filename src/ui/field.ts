@@ -12,6 +12,7 @@
  */
 import { CALL, DEF_POS, OFF_POS, POS_LABEL, RECEIVERS, ROUTES } from '../engine/data';
 import { CX, DESIGN, W, defAlign, formation, type Pt } from '../engine/formation';
+import { defShapes } from './defShapes';
 import { hash, rng } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
@@ -38,6 +39,7 @@ export interface Preview {
   mods?: PassMods;             // play action, roll out, sideline
   look?: Look | null;          // the defense drawn (shown look, or your call on defense)
   routes?: boolean;            // draw routes / run arrows
+  defCall?: boolean;           // your call on defense: draw it (blitz arrows, zones, man assignments), as the play card does
 }
 
 /** What the play came to, fired when it happens on the field (not after the hold). */
@@ -91,7 +93,7 @@ export class FieldRenderer {
     this.gPlayers = this.el('g', { class: 'f-players' }) as SVGGElement;
     const defs = this.el('defs', {});
     const head = (id: string, fill: string, size: number) => `<marker id="${id}" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="${size}" markerHeight="${size}" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="${fill}"/></marker>`;
-    defs.innerHTML = head('ah-tgt', '#f5c518', 3.2) + head('ah-dec', '#ffffff', 3.6) + head('ah-run', '#f0a43a', 3) + head('ah-dir', 'rgba(255,255,255,.7)', 3.4);
+    defs.innerHTML = head('ah-tgt', '#f5c518', 3.2) + head('ah-dec', '#ffffff', 3.6) + head('ah-run', '#f0a43a', 3) + head('ah-dir', 'rgba(255,255,255,.7)', 3.4) + head('ah-rush', '#ff6a6a', 3.2);
     this.shadow = this.el('ellipse', { rx: 0.5, ry: 0.3, class: 'f-ball-sh' }) as SVGEllipseElement;
     this.ball = this.el('ellipse', { rx: 0.42, ry: 0.7, class: 'f-ball' }) as SVGEllipseElement;
     this.ballLace = this.el('line', { class: 'f-lace' }) as SVGLineElement;
@@ -341,13 +343,15 @@ export class FieldRenderer {
       targets.set(`o:${pos}`, map(p));
     }
     const ds = defAlign(pv.look ?? null);
+    const blitzing = pv.defCall && pv.look ? defShapes(pv.look).rush : [];
     for (const pos of DEF_POS) {
       const p = ds[pos];
       const d = this.dots.get(`d:${pos}`)!;
       const pl = T[def].players[pos];
       this.paint(d, 'd', pl, pos);
       d.g.classList.remove('tgt', 'tappable', 'carrier');
-      d.g.querySelector('title')!.textContent = `${pl?.name} · ${pos} · rated ${pl?.rating}`;
+      d.g.classList.toggle('blitz', blitzing.includes(pos));
+      d.g.querySelector('title')!.textContent = `${pl?.name} · ${pos} · rated ${pl?.rating}${blitzing.includes(pos) ? ' · blitzing' : ''}`;
       targets.set(`d:${pos}`, map([p[0], Math.min(p[1], yt + 9)]));
     }
     // ball, line of scrimmage, line to gain
@@ -394,6 +398,31 @@ export class FieldRenderer {
     if (instant) { this.cam = this.camTarget; this.applyCam(); } else this.pan();
   }
 
+  /**
+   * Your call on defense, drawn on the field where your players line up: zones as circles where they drop, man
+   * assignments as dashed lines to their receivers, and the blitzers' lanes to the quarterback. The same shapes as
+   * the play card (defShapes.ts), and the blitzers are the ones who rush in the snap's animation.
+   */
+  private drawDefCall(s: State, look: Look) {
+    const map = this.frame(s.off, s.yl);
+    const yt = 100 - s.yl;
+    const sh = defShapes(look);
+    const da = defAlign(look === 'soft' ? 'prevent' : look);
+    const fm = formation('gun');
+    const d = (k: string, deeper = 0): Pt => map([da[k][0], Math.min(da[k][1], yt + 9) + deeper]);
+    const o = (k: string): Pt => map([fm[k][0], Math.max(fm[k][1], -s.yl - 8)]);
+    const pathOf = (pts: Pt[]) => pts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
+    for (const k of sh.zones) { const c = d(k, 1.2); this.el('circle', { cx: c[0].toFixed(2), cy: c[1].toFixed(2), r: sh.zoneR, class: 'f-zone' }, this.gRoutes); }
+    for (const [k, r] of sh.man) this.el('path', { d: pathOf([d(k), o(r)]), class: 'f-man' }, this.gRoutes);
+    const qb = map([CX, -4.6]);
+    for (const k of sh.rush) {
+      const a = d(k);
+      const b: Pt = [qb[0] + (a[0] - qb[0]) * 0.2, qb[1] + (a[1] - qb[1]) * 0.12];
+      this.el('path', { d: pathOf([a, b]), class: 'f-rush under' }, this.gRoutes);
+      this.el('path', { d: pathOf([a, b]), class: 'f-rush', 'marker-end': 'url(#ah-rush)' }, this.gRoutes);
+    }
+  }
+
   /** Offense and defense look the same for every team: blue circles and light diamonds, for an instant read. */
   private paint(d: Dot, side: 'o' | 'd', pl: { name: string; number?: number; rating?: number } | undefined, pos: string) {
     const rated = this.byRating && pl?.rating != null;
@@ -423,6 +452,7 @@ export class FieldRenderer {
 
   private drawPreview(s: State, pv: Preview) {
     this.gRoutes.innerHTML = '';
+    if (pv.defCall && pv.look) { this.drawDefCall(s, pv.look); return; }
     if (!pv.routes || !pv.play) return;
     const map = this.frame(s.off, s.yl);
     const c = CALL[pv.play];

@@ -22,7 +22,7 @@
  * Deterministic: the same snap and seed always give the same timeline, so a replay shows exactly the same play.
  */
 import { CALL, ROUTES } from './data';
-import { famOf } from './defense';
+import { DEF_PLAYS, famOf } from './defense';
 import { CX, DESIGN, W, defAlign, formation, type Design, type Pt } from './formation';
 import { clip, rng, type Rng } from './rng';
 import { flight } from './sim';
@@ -62,10 +62,8 @@ const DEF = ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1', 'CB2', 
 const LINE = ['LT', 'LG', 'C', 'RG', 'RT'];
 const FRONT = ['EDGE1', 'DL1', 'DL2', 'EDGE2'];
 const RCV: Rcv[] = ['WR1', 'WR2', 'WR3', 'TE', 'RB'];
-/** Who rushes besides the front four, by call. */
-const BLITZERS: Partial<Record<Look, string[]>> = {
-  blitz: ['LB1', 'LB3'], firezone: ['LB1', 'LB3'], mike: ['LB2'], cblitz: ['CB1', 'LB3'], sblitz: ['S1', 'LB1'], glblitz: ['LB1', 'LB2', 'LB3'], runblitz: ['LB1', 'LB2'],
-};
+/** Who rushes besides the front four, by call: the same list the play card and the field preview draw (defense.ts). */
+const blitzers = (look: Look): string[] => DEF_PLAYS[look === 'soft' ? 'prevent' : look]?.rush ?? [];
 
 const sub = (a: Pt, b: Pt): Pt => [a[0] - b[0], a[1] - b[1]];
 const add = (a: Pt, b: Pt): Pt => [a[0] + b[0], a[1] + b[1]];
@@ -312,7 +310,7 @@ export function choreograph(inp: ChoreoInput): Timeline {
     }
 
     // ---- the pass rush: lanes to the quarterback, slowed by blockers; the winner (on a sack) gets home on time
-    const extra = (BLITZERS[call0] ?? []).map((k) => 'd:' + k);
+    const extra = blitzers(call0).map((k) => 'd:' + k);
     const sacker = sack ? (extra.length && look === 'blitz' && r() < 0.35 ? extra[0] : r() < 0.5 ? 'd:EDGE1' : 'd:EDGE2') : '';
     const rushers = [...FRONT.map((k) => 'd:' + k), ...extra];
     const proUnit = pro, rushUnit = rush;

@@ -20,7 +20,7 @@ export function kickoffState(rat: [Ratings, Ratings], o: GameOpts): State {
   return {
     t: qLen, off: rec, score: [0, 0], to: [3, 3], down: 1, dist: 10, yl: 25, running: false, stage: 'kick', warned: true,
     adj: 0, kicker: other(rec), safetyKick: false, pendLook: null, shownLook: null, pendPlay: null, k: 0,
-    rat, weather: o.weather ?? 'clear', mix: true, q: 1, qLen, po: !!o.po, rec,
+    rat, weather: o.weather ?? 'clear', mix: true, cov: true, q: 1, qLen, po: !!o.po, rec,
   };
 }
 

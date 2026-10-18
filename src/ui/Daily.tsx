@@ -9,6 +9,7 @@ import { streak, type Store, type SpotResult } from '../game/storage';
 import { track } from '../game/analytics';
 import { GameScreen } from './GameScreen';
 import percentiles from '../data/percentiles.json';
+import { rivalsFor, versusRivals } from '../game/rivals';
 
 interface Props {
   store: Store;
@@ -150,7 +151,13 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
     else if (r === 'failed') toast('Could not share. Try again.');
   };
   const save = () => { if (card) { download(card.blob, `the-4th-call-${dayNumber(date)}.png`); track('share', { what: 'daily', method: 'download' }); } };
-  const maxBand = board ? Math.max(1, ...board.bands) : 1;
+  // the day's AI rivals: on the board with a badge, never in the human count, rank or bars
+  const rivals = useMemo(() => rivalsFor(date), [date]);
+  const vs = versusRivals(rt.performance, rivals);
+  const aiBands = BAND_LABELS.map((_, i) => rivals.filter((x) => bandOf(x.score) === i).length);
+  const maxBand = Math.max(1, ...(board?.bands ?? []).map((n, i) => n + aiBands[i]), ...aiBands);
+  const bestRows = [...(board?.best ?? []).map((b, i) => ({ name: b.name, score: b.score, rank: i + 1, ai: false, style: '' })), ...rivals.map((x) => ({ name: x.name, score: x.score, rank: 0, ai: true, style: x.style }))]
+    .sort((a, b) => b.score - a.score || (a.ai ? 1 : 0) - (b.ai ? 1 : 0)).slice(0, 10);
 
   return (
     <section className="score">
@@ -184,6 +191,7 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
 
       <div className="board">
         <div className="board-head"><span className="k">Everyone today</span><button className="link" onClick={() => location.hash = 'everyone'}>All days ›</button></div>
+        <p className="vs-ai"><b>You beat {vs.beat} of {vs.of} AI rivals today.</b> {rivals[0].name} set the bar at {rivals[0].score}{vs.beat === vs.of ? ', and you cleared it.' : '.'}</p>
         {!on ? (
           <p className="muted small">The live leaderboard isn't connected on this site yet. Your score is compared with simulated play-callers above.</p>
         ) : (
@@ -209,17 +217,21 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
                   {board.bands.map((n, i) => (
                     <div key={i} className={`hist-row${bandOf(rt.performance) === i ? ' mine' : ''}`}>
                       <span className="hist-k">{BAND_LABELS[i]}</span>
-                      <span className="hist-bar"><i style={{ width: `${(n / maxBand) * 100}%` }} /><b>{n.toLocaleString()}</b></span>
+                      <span className="hist-bar"><i style={{ width: `${(n / maxBand) * 100}%` }} />{aiBands[i] > 0 && <em style={{ left: `${(n / maxBand) * 100}%`, width: `${(aiBands[i] / maxBand) * 100}%` }} />}<b>{n.toLocaleString()}{aiBands[i] > 0 ? <small> +{aiBands[i]} AI</small> : null}</b></span>
                     </div>
                   ))}
                 </div>
                 <p className="muted small">Today's average: {board.average} · yours: {rt.performance}</p>
-                {board.best.length > 0 && (
-                  <ol className="best">
-                    <span className="k">Today's best</span>
-                    {board.best.map((b, i) => <li key={i}><span>{i + 1}</span><span>{b.name}</span><b>{b.score}</b></li>)}
-                  </ol>
-                )}
+                <ol className="best">
+                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked</em></span>
+                  {bestRows.map((b, i) => (
+                    <li key={i} className={b.ai ? 'ai' : ''}>
+                      <span>{b.ai ? '·' : b.rank}</span>
+                      <span>{b.name}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
+                      <b>{b.score}</b>
+                    </li>
+                  ))}
+                </ol>
               </>
             )}
           </>
