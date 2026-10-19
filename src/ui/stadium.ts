@@ -74,15 +74,17 @@ export function drawNumberArrow(el: El, g: SVGElement, x: number, u: number) {
   el('path', { d: `M${x - 0.42},${base} L${x + 0.42},${base} L${x},${tip} Z`, class: 'f-arrow' }, g);
 }
 
-/** The midfield emblem: the home team's name in its colors, in a ring at the 50. */
+/**
+ * The midfield mark: the home team's name painted faintly on the turf in a thin double ring, the way a stadium paints
+ * its logo at the 50 (names only, no logos). Faint enough that the players and lines read over it.
+ */
 export function drawMidfield(el: El, g: SVGElement, home: TeamInfo, W: number) {
   const cx = W / 2, cy = 60;
-  const ac = accentOn(home.color, home.color2);
-  el('circle', { cx, cy, r: 4.9, fill: home.color, stroke: ac, 'stroke-width': 0.42, class: 'f-mid' }, g);
-  el('circle', { cx, cy, r: 4.2, fill: 'none', stroke: inkOn(home.color), 'stroke-width': 0.1, opacity: 0.5, class: 'f-mid' }, g);
-  const t = el('text', { x: cx, y: cy + 0.1, class: 'f-midt', fill: inkOn(home.color), stroke: ac, 'stroke-width': 0.14, 'paint-order': 'stroke' }, g);
+  el('circle', { cx, cy, r: 6.4, 'stroke-width': 0.32, class: 'f-mid' }, g);
+  el('circle', { cx, cy, r: 5.7, 'stroke-width': 0.12, class: 'f-mid' }, g);
+  const t = el('text', { x: cx, y: cy + 0.1, class: 'f-midt' }, g);
   t.textContent = home.name.toUpperCase();
-  t.setAttribute('textLength', String(Math.min(7.6, home.name.length * 1.05)));
+  t.setAttribute('textLength', String(Math.min(10.4, home.name.length * 1.5)));
   t.setAttribute('lengthAdjust', 'spacingAndGlyphs');
 }
 

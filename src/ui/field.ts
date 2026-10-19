@@ -122,8 +122,8 @@ export class FieldRenderer {
   resize(w: number, h: number) {
     if (w <= 0 || h <= 0) return;
     this.viewH = Math.max(26, Math.min(80, (W * h) / w));
-    // about 12 pixels a yard is where a marker's number and name read; narrower fields draw markers larger
-    const k = Math.round(Math.min(1.7, Math.max(1, 12 / (w / W))) * 100) / 100;
+    // about 13 pixels a yard is where a marker's number and name read; narrower fields draw markers larger
+    const k = Math.round(Math.min(1.75, Math.max(1, 13 / (w / W))) * 100) / 100;
     if (k !== this.mkScale) {
       this.mkScale = k;
       this.dots.forEach((d, key) => this.scaleMarker(d, key));
@@ -309,7 +309,7 @@ export class FieldRenderer {
     d.g.setAttribute('transform', `translate(${xy[0].toFixed(2)} ${xy[1].toFixed(2)})`);
   }
 
-  private camLead() { return Math.max(4, this.viewH / 2 - 13); }   // keep ~13 yards behind the line in view
+  private camLead() { return Math.max(4, this.viewH / 2 - Math.max(13, this.viewH * 0.25)); }   // keep 13 yards (a tall view: a quarter of it) behind the line in view
   // the camera may look a few yards past either end line, at the post, the squad and the front rows
   private clampCam(u: number) { return Math.max(-10 - BEHIND_VIEW + this.viewH / 2, Math.min(110 + BEHIND_VIEW - this.viewH / 2, u)); }
   private applyCam() {

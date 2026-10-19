@@ -224,8 +224,48 @@ export class KickCam {
     const lineN = nums(K, ['TE', 'LT', 'LG', 'C', 'RG', 'RT', 'WR3']);
     [-4.6, -2.9, -1.45, 0, 1.45, 2.9, 4.6].forEach((x, i) => body(x, 7.2, K.color, lineN[i] ?? null));
     body(-0.95, 0.4, K.color, String(K.players.P?.number ?? ''), { kneel: true });   // the holder (the punter, as most teams use)
-    const kicker = body(-2.6, -1.6, K.color, String(K.players.K?.number ?? ''));
-    kicker.classList.add('kc-kicker');
+    // the kicker, seen from behind: drawn at his feet in yards (the frame scales him), the kicking leg on its own hinge
+    const kicker = this.el('g', {}, people);
+    const kc = K.color, kd = K.color2;   // pants in the second color, so the swing reads against any jersey
+    const plant = this.el('g', {}, kicker), kickLeg = this.el('g', {}, kicker);
+    const legRect = (g: SVGElement) => { this.el('rect', { x: -0.14, y: 0, width: 0.28, height: 0.8, rx: 0.1, fill: kd }, g); this.el('rect', { x: -0.16, y: 0.68, width: 0.32, height: 0.16, rx: 0.07, fill: '#111' }, g); };
+    legRect(plant); legRect(kickLeg);
+    const torso = this.el('g', {}, kicker);
+    this.el('rect', { x: -0.41, y: -2.05, width: 0.82, height: 1.27, rx: 0.25, fill: kc }, torso);
+    { const t = this.el('text', { x: 0, y: -1.42, class: 'kc-numb', fill: inkOn(kc), 'font-size': '0.5' }, torso); t.textContent = String(K.players.K?.number ?? ''); }
+    this.el('circle', { cx: 0, cy: -2.28, r: 0.3, fill: shade(kc, -0.15) }, torso);
+    const armL = this.el('line', { x1: -0.36, y1: -1.85, x2: -0.5, y2: -1.2, stroke: kc, 'stroke-width': 0.18, 'stroke-linecap': 'round' }, torso);
+    const armR = this.el('line', { x1: 0.36, y1: -1.85, x2: 0.5, y2: -1.2, stroke: kc, 'stroke-width': 0.18, 'stroke-linecap': 'round' }, torso);
+    const puff = this.el('circle', { r: 0, fill: 'rgba(255,255,255,.75)', opacity: 0 }, cam);
+    /** Where he is and what his body is doing at time t: the approach, the plant, the swing, the follow-through. */
+    const pose = (t: number, KICK: number) => {
+      const t0 = KICK - 0.62;                       // three steps in, from the left and behind
+      const a = Math.max(0, Math.min(1, (t - t0) / 0.62));
+      const x = -2.9 + (-0.78 + 2.9) * ease(a), z = -2.3 + (-0.32 + 2.3) * ease(a);
+      const stride = a > 0 && a < 1 ? Math.sin(a * Math.PI * 3) : 0;
+      let kick = 0, lift = 0, lean = 0;           // kick: the leg's hinge, degrees; lift: how far up it has swung (0-1)
+      if (t >= KICK - 0.16 && t < KICK) kick = 38 * ((t - (KICK - 0.16)) / 0.16);          // the backswing
+      else if (t >= KICK) { const f = Math.min(1, (t - KICK) / 0.28); lift = ease(f); kick = 38 * (1 - f) - 14 * f; lean = 7 * f; }
+      if (t >= KICK + 0.75) { const f = Math.min(1, (t - KICK - 0.75) / 0.35); lift *= 1 - f; kick *= 1 - f; lean *= 1 - f; }
+      const sc = scaleAt(z), [px, py] = project(x, z, 0);
+      const hop = lift * 0.18;
+      kicker.setAttribute('transform', `translate(${px.toFixed(2)} ${(py - hop * sc).toFixed(2)}) scale(${sc.toFixed(3)}) rotate(${(-lean).toFixed(1)})`);
+      plant.setAttribute('transform', `translate(-0.17 -0.82) rotate(${(stride * -14).toFixed(1)})`);
+      // the kicking leg swings through and up: from behind it shortens, then rises past the hip
+      const sy = 1 - lift * 1.6;
+      kickLeg.setAttribute('transform', `translate(0.19 -0.82) rotate(${(kick + stride * 14).toFixed(1)}) scale(1 ${sy.toFixed(3)})`);
+      // arms out for balance as he plants
+      const out = t >= KICK - 0.2 ? Math.min(1, (t - KICK + 0.2) / 0.2) * (t > KICK + 0.9 ? Math.max(0, 1 - (t - KICK - 0.9) / 0.3) : 1) : 0;
+      armL.setAttribute('x2', String(-0.5 - out * 0.55)); armL.setAttribute('y2', String(-1.2 - out * 0.45));
+      armR.setAttribute('x2', String(0.5 + out * 0.35)); armR.setAttribute('y2', String(-1.2 - out * 0.2));
+      // contact: a puff at the ball
+      const p = (t - KICK) / 0.3;
+      if (p >= 0 && p <= 1) {
+        const [bx, by] = project(-0.5, 0.4, 0.15), bs = scaleAt(0.4);
+        puff.setAttribute('cx', bx.toFixed(2)); puff.setAttribute('cy', by.toFixed(2));
+        puff.setAttribute('r', (bs * (0.15 + p * 0.5)).toFixed(2)); puff.setAttribute('opacity', (0.8 * (1 - p)).toFixed(2));
+      } else puff.setAttribute('opacity', '0');
+    };
 
     // ---- the ball and its shadow
     const shadow = this.el('ellipse', { rx: 0.5, ry: 0.18, fill: 'rgba(0,0,0,.35)' }, cam);
@@ -296,7 +336,7 @@ export class KickCam {
         place(-0.5 + x, 0.4 + z, h, (t - KICK) * 9);
         if (!decided && t >= decideT) decide();
       }
-      kicker.classList.toggle('swing', t >= KICK - 0.25 && t < KICK + 0.35);
+      pose(t, KICK);
       host.classList.toggle('kc-live', t >= KICK);
     };
 

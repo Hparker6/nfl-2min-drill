@@ -91,7 +91,8 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 
 /* ---------- game layout ---------- */
 .game { display: grid; gap: 12px; }
-.arena { display: grid; grid-template-columns: minmax(0, 1fr) clamp(380px, 29vw, 500px); gap: 16px; height: clamp(520px, calc(100dvh - var(--top-h) - 256px), 1000px); }
+/* desktop: a tall field, portrait like a broadcast all-22 shot, so most of the field is in view; the panel beside it */
+.arena { --arena-h: clamp(560px, calc(100dvh - var(--top-h) - 240px), 1000px); display: grid; grid-template-columns: minmax(0, calc(var(--arena-h) * .72)) clamp(380px, 36vw, 580px); justify-content: center; gap: 16px; height: var(--arena-h); }
 .stage { position: relative; min-width: 0; min-height: 0; }
 .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .side > section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; }
@@ -524,7 +525,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .cp-sel-mini { display: none; }
 /* compact desktops (1000-1279): the panel is narrow, so trim what it carries */
 @media (min-width: 1000px) and (max-width: 1279px) {
-  .arena { grid-template-columns: minmax(0, 1fr) 360px; }
+  .arena { grid-template-columns: minmax(0, calc(var(--arena-h) * .66)) minmax(360px, 1fr); }
   .cp-tip { display: none; }
   .tab5-name i { display: none; }
   .prow { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; min-height: 64px; }
@@ -846,7 +847,7 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .sb-q-short, .tab5-short { display: none; }
 @media (max-width: 999px) {
   /* field: more of the screen, names back on (they scale with the markers; linemen stay unnamed) */
-  .stage { height: clamp(240px, 40svh, 420px); }
+  .stage { height: clamp(260px, 48svh, 480px); }
   .f-name { display: block; font-size: .62px; }
   .f-name-line { display: none; }
   .legend { display: none; }
@@ -1091,8 +1092,9 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 /* ---------- the stadium around the field (stadium.ts) ---------- */
 .f-pylon { fill: #ff7a1a; stroke: rgba(0, 0, 0, .35); stroke-width: .06; }
 .f-arrow { fill: var(--chalk); opacity: .42; }
-.f-mid { opacity: .9; }
-.f-midt { font: 800 1.9px var(--display); letter-spacing: .06px; text-anchor: middle; dominant-baseline: central; }
+/* the midfield mark: painted on the turf, faint, under the players */
+.f-mid { fill: none; stroke: #ffffff; opacity: .16; }
+.f-midt { font: 800 2.6px var(--display); letter-spacing: .3px; text-anchor: middle; dominant-baseline: central; fill: #ffffff; opacity: .17; }
 .f-ezt { font-size: 6.2px; letter-spacing: 1px; opacity: 1; }
 .f-behind { fill: #1a4a2d; }
 .f-stands { fill: #14191e; }
