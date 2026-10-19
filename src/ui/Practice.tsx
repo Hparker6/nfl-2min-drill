@@ -32,7 +32,7 @@ export function Practice({ store, update }: Props) {
     const meta = (
       <div className="meta">
         <div className="meta-l">
-          <h1 className="meta-title">Practice</h1>
+          <h2 className="meta-title">Practice</h2>
           <span className="meta-sub">{hints ? 'Coach mode: win chance shown on every option' : 'Not scored or saved'}</span>
         </div>
       </div>
@@ -46,7 +46,7 @@ export function Practice({ store, update }: Props) {
   const yourSide = p.side === 'off';
   return (
     <div className="page">
-      <div className="meta"><div className="meta-l"><h1 className="meta-title">Practice</h1><span className="meta-sub">Build any late-game spot and play it out. Not scored or saved.</span></div></div>
+      <div className="meta"><div className="meta-l"><h2 className="meta-title">Practice</h2><span className="meta-sub">Build any late-game spot and play it out. Not scored or saved.</span></div></div>
       <section className="summary builder">
         <div className="form">
           <label>You<select value={p.you} onChange={(e) => set('you', e.target.value)}>{NFL_IDS.map((id) => { const t = realTeam(id); return <option key={id} value={id} disabled={id === p.them}>{t.city} {t.name}</option>; })}</select></label>

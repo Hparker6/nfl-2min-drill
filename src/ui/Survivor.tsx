@@ -54,7 +54,7 @@ export function Survivor({ store, update, toast }: Props) {
   const meta = (
     <div className="meta">
       <div className="meta-l">
-        <h1 className="meta-title">Survivor</h1>
+        <h2 className="meta-title">Survivor</h2>
         <span className="meta-sub">One loss ends the run · best {store.surv.best}</span>
       </div>
       {run && <div className="streak-pips" aria-label={`${survived} survived`}>{run.results.map((r, i) => <i key={i} className={r.win ? 'w' : 'l'} />)}<b>{survived}</b></div>}

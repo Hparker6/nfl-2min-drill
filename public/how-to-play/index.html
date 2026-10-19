@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>How to Play The 4th Call: Controls &amp; 2-Minute Drill Strategy</title>
-  <meta name="description" content="How to play The 4th Call, a free football play-calling game: controls, clock management, defense, how every call is graded, and how to run a two-minute drill." />
+  <meta name="description" content="How to play The 4th Call, a free football play-calling game: controls, clock management, what each of the 19 defenses stops, a graded drive play by play, Career mode, and how to run a two-minute drill." />
   <link rel="canonical" href="https://nfl-2min-drill.com/how-to-play/" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="theme-color" content="#0a0e0c" />
@@ -32,8 +32,10 @@
       { "@type": "FAQPage", "mainEntity": [
         { "@type": "Question", "name": "Is The 4th Call free?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. It is free in your browser, on phones and computers, with no account and no download." } },
         { "@type": "Question", "name": "Does everyone play the same daily game?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. The Daily is the same game for everyone, new at midnight UTC, so scores can be compared on the leaderboard. Your own plays are saved only in your browser." } },
-        { "@type": "Question", "name": "How are play calls graded?", "acceptedAnswer": { "@type": "Answer", "text": "Before the result is shown, the game plays out the rest of the game thousands of times for every option you had, and compares the win chance of your call with the best one." } },
+        { "@type": "Question", "name": "Are the players real?", "acceptedAnswer": { "@type": "Answer", "text": "Teams and rosters are real NFL teams and players, with ratings computed from season statistics (nflverse). The game situations are made up." } },
         { "@type": "Question", "name": "What happens if the game is tied at the end?", "acceptedAnswer": { "@type": "Answer", "text": "It goes to overtime by the NFL's rules. You call the coin toss, and the winner chooses to receive or kick. Both teams get the ball at least once, unless the kicking team scores a safety on the first possession; after that, the next score wins. Daily, Survivor and Practice games use the playoff format, 15-minute periods until someone wins. In Career, regular-season overtime is one 10-minute period and can end in a tie." } },
+        { "@type": "Question", "name": "How is this different from other two-minute drill games?", "acceptedAnswer": { "@type": "Answer", "text": "You call the defense as well as the offense, from 19 coverages and blitzes. Every call is graded against every other option you had, by simulation, so you learn why a call was right rather than only whether it worked. The Daily rotates through goal-line stands, fourth-down decisions and protecting a lead, not only two-minute drills, with Practice to build any spot and a Career mode on top. No account is needed." } },
+        { "@type": "Question", "name": "Is there a career mode?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, in beta. Create a quarterback, play one college game, get drafted and play a full season in a fictional league, with XP, skill points and abilities between games. Every team, player and college in it is made up." } },
         { "@type": "Question", "name": "Is it affiliated with the NFL?", "acceptedAnswer": { "@type": "Answer", "text": "No. The 4th Call is an independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics come from nflverse." } }
       ] }
     ]
@@ -70,7 +72,9 @@
       <li><a href="#clock">The clock</a></li>
       <li><a href="#defense">Defense</a></li>
       <li><a href="#grades">Grades &amp; score</a></li>
+      <li><a href="#example">A graded drive</a></li>
       <li><a href="#modes">Modes</a></li>
+      <li><a href="#career">Career</a></li>
       <li><a href="#strategy">How to run a 2-minute drill</a></li>
       <li><a href="#faq">FAQ</a></li>
     </ul>
@@ -123,6 +127,32 @@
       <div class="card"><h3>Blitz</h3><p>Cover 0, Fire Zone, Mike, Corner and Safety blitzes. Sacks and hurried throws, but someone is left open.</p></div>
       <div class="card"><h3>Goal Line</h3><p>Goal Line 6-5, Goal Line Blitz, Goal Line Man, Bear 46, Run Blitz. Stop the run.</p></div>
     </div>
+    <h3>What each defense stops, and what it gives up</h3>
+    <p>The same trade-offs the game uses. Pick the defense that takes away what the offense needs right now: deep shots when they need a touchdown, the sideline when they need to stop the clock, the run when a first down ends it.</p>
+    <table>
+      <thead><tr><th>Defense</th><th>Tab</th><th>Stops</th><th>Gives up</th></tr></thead>
+      <tbody>
+        <tr><td><b>Cover 3</b><br><small>Base defense: three deep, four underneath</small></td><td>Zone</td><td>Nothing gets a free pass</td><td>Nothing is taken away either</td></tr>
+        <tr><td><b>Cover 2</b><br><small>Two deep safeties; rally and read the quarterback</small></td><td>Zone</td><td>Yards after the catch; more interceptions</td><td>Digs and seams sitting in the holes</td></tr>
+        <tr><td><b>Cover 4 Quarters</b><br><small>Four deep, each with a quarter of the field</small></td><td>Zone</td><td>Deep shots: posts, seams and go routes</td><td>Flats, outs, hitches and slants underneath</td></tr>
+        <tr><td><b>Tampa 2</b><br><small>Cover 2 with the middle linebacker running deep</small></td><td>Zone</td><td>Seams and digs over the middle</td><td>Corners and outs on the sideline; runs</td></tr>
+        <tr><td><b>Prevent</b><br><small>Everyone deep; keep it in front</small></td><td>Zone</td><td>Deep shots and long touchdowns</td><td>Short completions, runs and the clock</td></tr>
+        <tr><td><b>Cover 1 Man</b><br><small>A defender on every receiver, one safety deep</small></td><td>Man</td><td>Easy throws underneath to hitches and digs</td><td>Crossers, slants and wheels that get separation</td></tr>
+        <tr><td><b>2-Man Under</b><br><small>Man underneath, two safeties over the top</small></td><td>Man</td><td>Deep throws and contested catches underneath</td><td>Runs and draws: only six in the box</td></tr>
+        <tr><td><b>Press Man</b><br><small>Jam the receivers at the line</small></td><td>Man</td><td>Quick throws: slants, hitches, timing routes</td><td>The go route and anything over the top</td></tr>
+        <tr><td><b>Cover 1 Robber</b><br><small>Man coverage with a safety lurking in the middle</small></td><td>Man</td><td>Crossers, slants and digs over the middle</td><td>Deep outside throws: corners and go routes</td></tr>
+        <tr><td><b>Cover 0 Blitz</b><br><small>Send six or seven; nobody deep</small></td><td>Blitz</td><td>Sacks on deep drops and slow-developing throws</td><td>Quick throws, screens and draws find open grass</td></tr>
+        <tr><td><b>Fire Zone</b><br><small>Five rush, a lineman drops into coverage</small></td><td>Blitz</td><td>Hot routes and screens into the blitz</td><td>Fewer sacks than an all-out blitz; seams between zones</td></tr>
+        <tr><td><b>Mike Blitz</b><br><small>The middle linebacker shoots the A-gap</small></td><td>Blitz</td><td>Inside runs and long drops</td><td>Crossers and digs where he left</td></tr>
+        <tr><td><b>Corner Blitz</b><br><small>A corner comes off the edge</small></td><td>Blitz</td><td>Screens and runs to his side</td><td>Outs, hitches and fades to the receiver he left</td></tr>
+        <tr><td><b>Safety Blitz</b><br><small>A safety comes downhill at the snap</small></td><td>Blitz</td><td>Runs and play-action</td><td>Seams and posts with no one in the middle</td></tr>
+        <tr><td><b>Goal Line 6-5</b><br><small>Heavy front for the last few yards</small></td><td>Goal Line</td><td>Runs at the goal line and on short yardage</td><td>Away from the goal line, anything that gets past it goes far</td></tr>
+        <tr><td><b>Goal Line Blitz</b><br><small>Everyone shoots a gap at the snap</small></td><td>Goal Line</td><td>Runs, sneaks and slow throws</td><td>Quick throws, screens and play-action</td></tr>
+        <tr><td><b>Goal Line Man</b><br><small>Heavy front, every receiver covered</small></td><td>Goal Line</td><td>Play-action and fades</td><td>Rubs, crossers and slants; a gap in the run fit</td></tr>
+        <tr><td><b>Bear 46</b><br><small>Eight in the box to stop the run</small></td><td>Goal Line</td><td>Runs, especially between the tackles</td><td>Play-action and passes over the top</td></tr>
+        <tr><td><b>Run Blitz</b><br><small>The box shoots its gaps at the snap</small></td><td>Goal Line</td><td>Runs at the line, before they start</td><td>Screens and play-action behind it; a missed gap goes far</td></tr>
+      </tbody>
+    </table>
     <p>Every defense stops something and gives something up; none is best against everything. You also decide when to burn your timeouts to save clock for your own drive.</p>
 
     <h2 id="reading">Reading their defense</h2>
@@ -143,12 +173,52 @@
     </ul>
     <p>Your <b>Performance</b> score (0–100) is 55% Decisions (how much win chance you gave up over the game) and 45% Result (a win scores 75–100, a loss 0–25, higher inside its band the harder the spot). The Daily score goes on the <a href="/leaderboard/">leaderboard</a>.</p>
 
+    <h2 id="example">A graded drive, play by play</h2>
+    <p>This is a Practice spot played the way the game's own AI coach calls it, with every call graded the way yours are: for each decision the game played the rest of the game out 3,000 times for every option and compared the chosen call's win chance with the best one. Down 3, 1:45 left, first and 10 at your own 25, two timeouts each. The numbers are rounded; your grades use more simulations near a grade boundary.</p>
+    <table>
+      <thead><tr><th>Clock, spot</th><th>Call</th><th>What happened</th><th>Win chance</th><th>Best option</th><th>Grade</th></tr></thead>
+      <tbody>
+        <tr><td>1:45, 1st &amp; 10, own 25</td><td>Go route</td><td>Incomplete</td><td>32%</td><td>Toss sweep, 34%</td><td>Close</td></tr>
+        <tr><td>1:41, 2nd &amp; 10</td><td>Corner</td><td>Incomplete</td><td>29%</td><td>Draw, 31%</td><td>Close</td></tr>
+        <tr><td>1:37, 3rd &amp; 10</td><td>Tight end seam</td><td>Complete, 16 yards, first down</td><td>24%</td><td>Dig, 28%</td><td>Costly</td></tr>
+        <tr><td>1:32, 1st &amp; 10, own 41</td><td>No-huddle</td><td>Snapped in about 13 seconds</td><td>38%</td><td>No-huddle, 38%</td><td>Great call</td></tr>
+        <tr><td>1:17, 1st &amp; 10</td><td>Comeback</td><td>Complete, 13 yards, first down</td><td>38%</td><td>Slant read, 40%</td><td>Close</td></tr>
+        <tr><td>1:13, 1st &amp; 10, their 46</td><td>Timeout</td><td>Clock stopped, one timeout left</td><td>42%</td><td>No-huddle, 45%</td><td>Close</td></tr>
+        <tr><td>1:13, 1st &amp; 10</td><td>Deep post</td><td>Incomplete</td><td>43%</td><td>Read option, 47%</td><td>Costly</td></tr>
+        <tr><td>1:09, 2nd &amp; 10</td><td>Deep post</td><td>Complete, 23 yards, first down</td><td>34%</td><td>Dig, 44%</td><td>Big miss</td></tr>
+        <tr><td>1:03, 1st &amp; 10, their 23</td><td>No-huddle</td><td>Snapped fast</td><td>61%</td><td>Huddle, 65%</td><td>Costly</td></tr>
+        <tr><td>0:47, 1st &amp; 10</td><td>Corner</td><td>Incomplete</td><td>61%</td><td>Draw, 65%</td><td>Costly</td></tr>
+        <tr><td>0:43, 2nd &amp; 10</td><td>Slants</td><td>Complete, 6 yards</td><td>58%</td><td>Read option, 61%</td><td>Costly</td></tr>
+        <tr><td>0:40, 3rd &amp; 4, their 17</td><td>Timeout</td><td>Clock stopped, no timeouts left</td><td>56%</td><td>No-huddle, 59%</td><td>Costly</td></tr>
+        <tr><td>0:40, 3rd &amp; 4</td><td>Slants</td><td>Incomplete</td><td>62%</td><td>Draw, 63%</td><td>Close</td></tr>
+        <tr><td>0:37, 4th &amp; 4, their 17</td><td>Field goal</td><td>34-yard kick is good: tied</td><td>39%</td><td>Read option, 49%</td><td>Big miss</td></tr>
+      </tbody>
+    </table>
+    <p>The game went to overtime and was won there, but three calls on this drive gave away real win chance, and they are the ones people argue about every Sunday:</p>
+    <ul>
+      <li><b>The deep post on 2nd and 10 at 1:09</b> gained 23 yards and still graded a big miss. A dig over the middle offered about 10 points more win chance: a deep post is incomplete far more often than it connects, and down 3 with a minute left you need a completion on every snap more than you need one big one. The result was good; the call was not.</li>
+      <li><b>The timeouts at 1:13 and 0:40</b> each cost about 3 points. With the clock running and more than a minute left, a no-huddle snap keeps the timeout for the end of the drive, when a stopped clock is worth the most.</li>
+      <li><b>The field goal on 4th and 4 at 0:37</b>, down 3, tied the game and graded a big miss: going for it was worth about 10 points more. A tie only earns a coin flip in overtime, and 4th and 4 from the 17 converts often enough that keeping the drive alive, with the touchdown and the kick both still in play, beats settling for the tie.</li>
+    </ul>
+    <p>That is what the grade measures: the win chance of the call you made against the best call available, not whether the play worked. The pattern across the drive is the same one the <a href="#strategy">two-minute drill section</a> teaches: throw to the middle when you have timeouts or the clock is stopped, save the timeouts for the end, and know what a field goal is worth before you kick it.</p>
+
     <h2 id="modes">Game modes</h2>
     <div class="cards">
       <div class="card"><h3>Daily</h3><p>One game a day, the same for everyone, new at midnight UTC. The situation rotates: a two-minute drill, a goal-line stand, a fourth-down call, closing out a lead…</p></div>
       <div class="card"><h3>Survivor</h3><p>Random late-game spots back to back. Win to keep going; one loss ends the run.</p></div>
       <div class="card"><h3>Practice</h3><p>Build any spot (score, clock, field position, timeouts, weather) and play it with Coach mode, which shows every option's win chance first.</p></div>
+      <div class="card"><h3>Career (beta)</h3><p>Create a quarterback and take him from one college game through draft night and a full season in a fictional league. <a href="#career">How Career works</a>.</p></div>
     </div>
+
+    <h2 id="career">Career mode</h2>
+    <p>Career is a fictional league: 32 made-up teams in two conferences, made-up players and made-up colleges, so nothing in it is a real person. You create one quarterback and play his career.</p>
+    <div class="cards">
+      <div class="card"><h3>Four archetypes</h3><p><b>Pocket Passer</b> (accuracy and timing), <b>Scrambler</b> (legs and improvisation), <b>Game Manager</b> (smart and safe) and <b>Gunslinger</b> (big arm, big risks). Each starts with different attributes and his own signature ability: Quick Release, Escape Artist, Film Room or Deep Ball.</p></div>
+      <div class="card"><h3>College to the draft</h3><p>You play one college game first. How you play it sets your draft stock: a sharp game in a win goes in the top five, a bad one slides you into the second round. Then draft night, and the team that picks you is yours for the season.</p></div>
+      <div class="card"><h3>Play, moments or sim</h3><p>Each week you can play the whole game, play only your drives (the moments) with the rest simulated, or sim it. Quarters default to two minutes; you can lengthen them in the settings. Simulated games earn less XP than games you play.</p></div>
+      <div class="card"><h3>Getting better</h3><p>Weekly goals and your play earn XP. Every 150 XP is a skill point; raising an attribute costs 1 point below 80, 2 below 88, 3 below 94 and 4 above that, so the last few points are the hardest. Six abilities unlock by level, from Film Room (read the defense right 85% of the time instead of 70%) to Ironman (your attributes decline three years later).</p></div>
+    </div>
+    <p>The season runs 18 weeks with the playoffs after it, then an offseason with contracts, aging and offers from other teams. Career saves in your browser only.</p>
 
     <h2 id="strategy">How to run a two-minute drill</h2>
     <p>The two-minute drill is the hurry-up offense at the end of a half: move the ball fast while saving the clock. The same principles win in the game.</p>
@@ -175,6 +245,8 @@
     <details><summary>Does everyone play the same daily game?</summary><p>Yes. The Daily is the same game for everyone, new at midnight UTC, so scores compare on the <a href="/leaderboard/">leaderboard</a>. Your own plays are saved only in your browser.</p></details>
     <details><summary>Are the players real?</summary><p>Teams and rosters are real NFL teams and players, with ratings computed from season statistics (nflverse). The game situations are made up.</p></details>
     <details><summary>What happens if the game is tied at the end?</summary><p>It goes to overtime by the NFL's rules. You call the coin toss, and the winner chooses to receive or kick. Both teams get the ball at least once, unless the kicking team scores a safety on the first possession; after that, the next score wins. Daily, Survivor and Practice games use the playoff format, 15-minute periods until someone wins. In Career, regular-season overtime is one 10-minute period and can end in a tie.</p></details>
+    <details><summary>How is this different from other two-minute drill games?</summary><p>Three things. You call the defense as well as the offense, from 19 coverages and blitzes. Every call is graded against every other option you had, by simulation, so you learn why a call was right rather than only whether it worked. And the Daily rotates through goal-line stands, fourth-down decisions and protecting a lead, not only two-minute drills, with Practice to build any spot and a Career mode on top. No account is needed for any of it.</p></details>
+    <details><summary>Is there a career mode?</summary><p>Yes, in beta. Create a quarterback, play one college game, get drafted and play a full season in a fictional league, with XP, skill points and abilities between games. Every team, player and college in it is made up.</p></details>
     <details><summary>Is it affiliated with the NFL?</summary><p>No. The 4th Call is an independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA.</p></details>
   </main>
 

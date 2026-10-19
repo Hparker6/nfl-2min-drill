@@ -56,7 +56,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
   const meta = (
     <div className="meta">
       <div className="meta-l">
-        <h1 className="meta-title">Daily <span>#{dayNumber(today)}</span></h1>
+        <h2 className="meta-title">Daily <span>#{dayNumber(today)}</span></h2>
         <span className="meta-sub">{new Date(today + 'T12:00:00Z').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })}{kind ? ` · ${kind.name}` : ''} · one game, the same for everyone</span>
       </div>
       {result && <span className={`tile ${result.win ? 'won' : 'lost'}`} title={`${result.win ? 'Win' : 'Loss'} ${result.score.join('–')}`}>{result.win ? 'W' : 'L'}</span>}

@@ -126,6 +126,8 @@ async function api(request, env, url) {
 // leave them out of results. Once a page has enough real history to be useful, set it to true here and add it back to
 // PAGES (the sitemap) in vite.config.ts.
 const INDEXABLE = { '/leaderboard/': false, '/stats/': false };
+// listed in wrangler.jsonc run_worker_first, so the Worker answers them before the asset layer does
+const PERMANENT = { '/how-to-play': '/how-to-play/', '/index.html': '/' };
 
 const SITE = 'https://nfl-2min-drill.com';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -286,6 +288,9 @@ async function pages(request, env, url) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // the asset layer redirects these with a temporary 307; search engines want a permanent one
+    const to = PERMANENT[url.pathname];
+    if (to) return Response.redirect(`${url.origin}${to}${url.search}`, 301);
     if (['/leaderboard', '/leaderboard/', '/stats', '/stats/'].includes(url.pathname)) {
       try { return await pages(request, env, url); } catch { return new Response('The leaderboard is unavailable right now. Try again in a minute.', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '60' } }); }
     }

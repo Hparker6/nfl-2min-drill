@@ -7,7 +7,7 @@ const NAME = 'The 4th Call';
 // /leaderboard/ and /stats/ pages are noindex while thin (INDEXABLE in server/site/worker.js) and so stay out of the
 // sitemap; add them back here when that flag turns on.
 const PAGES: [string, string][] = [['/', 'daily'], ['/how-to-play/', 'weekly']];
-const ABOUT = 'A free American football strategy game. Run the two-minute drill at the end of a close game: call every play, manage the clock, and see each call graded against every option you had. New game every day.';
+const ABOUT = 'A free American football play-calling game. Run the two-minute drill at the end of a close game, manage the clock and call the defense too. Every call is graded against every option you had. New game every day.';
 
 /**
  * Social previews, the canonical link, structured data and the sitemap need absolute URLs. Set VITE_SITE_URL
@@ -23,7 +23,7 @@ function siteMeta(site: string): Plugin {
       {
         '@type': ['VideoGame', 'WebApplication'],
         name: NAME,
-        alternateName: ['4th Call', '2-Minute Drill Football Play-Calling Game'],
+        alternateName: ['4th Call', 'NFL 2-Minute Drill Play-Calling Game'],
         description: ABOUT,
         genre: ['Sports', 'Strategy'],
         gamePlatform: 'Web browser',

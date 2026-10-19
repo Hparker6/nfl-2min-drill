@@ -108,7 +108,7 @@ export default function App() {
         </div>
       </header>
       <main className="shell">
-        <h1 className="sr-only">The 4th Call: free 2-minute drill football play-calling game</h1>
+        {mode !== 'career' && <h1 className="sr-only">The 4th Call: a free 2-minute drill play-calling game</h1>}   {/* career screens carry their own H1 */}
         {mode === 'daily' && <Daily store={store} update={update} toast={toast} go={go} onboarded={onboarded} openHelp={() => setModal('help')} />}
         {mode === 'survivor' && <Survivor store={store} update={update} toast={toast} />}
         {mode === 'practice' && <Practice store={store} update={update} />}
@@ -128,8 +128,17 @@ export default function App() {
           {SUPPORT_URL && <a href={SUPPORT_URL} target="_blank" rel="noopener">Support the developer</a>}
         </nav>
         {mode !== 'career' && <section className="foot-about" aria-labelledby="foot-about-h">
-          <h2 id="foot-about-h">Play the 2-minute drill</h2>
-          <p>The 4th Call is a free football strategy game that puts you on the sideline for the end of a close game: run the two-minute drill, go for it on fourth down, protect a lead or make a goal-line stand. Call every play, manage the clock and your timeouts, and call the defense when they have the ball. Teams use real pro rosters and season stats, and every call is graded against every option you had by playing the rest of the game out thousands of times. Free in your browser, no sign-up, a new game every day.</p>
+          {/* what the game is, for a first visit and for search engines; every number here comes from the engine */}
+          <h2 id="foot-about-h">What is The 4th Call?</h2>
+          <p>A free football play-calling game in your browser. You're the coach for the end of a close game: run the two-minute drill, go for it on fourth down, protect a lead or make a goal-line stand. Pick every play, manage the clock and your timeouts, and win it. No account, no download, and a new game every day. To start, tap the button above the field and call your first play.</p>
+          <h2>Four ways to play</h2>
+          <p><b>Daily</b> is one game, the same for everyone, new at midnight UTC, with a <a href="/leaderboard/">leaderboard</a>. <b><a href="#survivor" onClick={(e) => { e.preventDefault(); go('survivor'); }}>Survivor</a></b> deals random late-game spots back to back until you lose one. <b><a href="#practice" onClick={(e) => { e.preventDefault(); go('practice'); }}>Practice</a></b> lets you build any situation (score, clock, field position, timeouts, weather) and shows every option's win chance in Coach mode. <b><a href="#career" onClick={(e) => { e.preventDefault(); go('career'); }}>Career</a></b> (beta) takes a quarterback you create, a pocket passer, scrambler, game manager or gunslinger, through one college game, draft night and a full season in a fictional league.</p>
+          <h2>Offense and defense</h2>
+          <p>On offense you choose from 27 calls in five tabs (runs, short passes, deep passes, RPOs and trick plays), pick the receiver and his route on the field, and set the tempo: no-huddle, huddle, or milk the clock. When they have the ball you <a href="/how-to-play/#defense">call the defense</a> from 19 coverages and blitzes, from Cover 3 to a corner blitz, and decide when to spend your timeouts. Teams use real NFL rosters with ratings computed from season statistics.</p>
+          <h2>What makes it different</h2>
+          <p>You call <b>both sides</b>: 19 defenses when they have the ball, not just the offense. Every call is <b>graded against every alternative</b>, so you learn why a call was right, not just whether it worked. The Daily is not always a two-minute drill: it rotates through goal-line stands, fourth-down decisions and protecting a lead. Practice lets you build any spot and see every option's win chance before you call it, and Career turns the same play-calling into a season. Nothing to install and no account, on a phone or a computer.</p>
+          <h2>How calls are graded</h2>
+          <p>Before each result is shown, the game plays the rest of the game out thousands of times for every option you had and compares your call's win chance with the best one: a <b>great call</b> is within 0.75 points, <b>close</b> within 2.5, <b>costly</b> within 6, and a <b>big miss</b> beyond that. A good call that fails still counts as good. Your Daily performance score is 55% decisions and 45% result. The <a href="/how-to-play/">how-to-play guide</a> walks through <a href="/how-to-play/#example">a graded drive play by play</a>, the controls, the clock and <a href="/how-to-play/#strategy">how to run a two-minute drill</a>.</p>
         </section>}
         {mode === 'career'
           ? <p>Career mode is a fictional league: every team, player and college is made up. An independent game, not affiliated with or endorsed by the NFL.</p>

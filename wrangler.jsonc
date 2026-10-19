@@ -8,7 +8,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/v1/*", "/leaderboard", "/leaderboard/", "/stats", "/stats/"]
+    "run_worker_first": ["/v1/*", "/leaderboard", "/leaderboard/", "/stats", "/stats/", "/how-to-play", "/index.html"]
   },
   // leaderboard storage: created by the migration on the next deploy, nothing to set up by hand
   "durable_objects": {
