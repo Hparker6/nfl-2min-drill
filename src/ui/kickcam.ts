@@ -1,10 +1,13 @@
 /**
- * The kick cam: a field goal or extra point from behind the kicker, the way a broadcast shows it. The line set, the
- * snap, the hold, the kick, the ball end over end over the rush, and through the uprights (or not) into the net.
+ * The kick cam: a field goal, extra point or kickoff from behind the kicker, the way a broadcast shows it. For a field
+ * goal: the line set, the snap, the hold, the kick, the ball end over end over the rush, and through the uprights (or
+ * not) into the net. For a kickoff: the ball on the tee, the coverage team on the line, the run-up, the kick, the hang
+ * time while the coverage sprints down the field, and the returner settling under it (or a touchback in the end zone);
+ * the return itself is played on the field once the cam cuts away.
  *
- * The result is the engine's (good or no good). This only decides how it looks, seeded by the play so a replay looks
- * the same: where a make crosses, whether a miss is wide (which way), short, or clanks off an upright, and whether a
- * make kisses one on the way in. kickPath() is the flight, pure and testable; KickCam draws it.
+ * The result is the engine's. This only decides how it looks, seeded by the play so a replay looks the same: where a
+ * make crosses, whether a miss is wide (which way), short, or clanks off an upright, and whether a make kisses one on
+ * the way in. kickPath() is the flight, pure and testable; KickCam draws it.
  *
  * The camera: a long lens high behind the kicker (35 yards back, 8 up), so the posts and the whole flight fit the
  * frame. Ground and heights in yards; the frame is 100 x 64 units (the overlay crops it to fit the field's box).
@@ -38,23 +41,23 @@ export function kickPath(dist: number, good: boolean, seed: number): KickPath {
     // long ones come up short more often; most misses are wide
     const shortP = Math.min(0.45, Math.max(0.06, (D - 40) * 0.025));
     const x = r();
-    flight = x < shortP ? 'short' : x < shortP + 0.07 ? 'doinkOut' : r() < 0.5 ? 'left' : 'right';
+    flight = x < shortP ? 'short' : x < shortP + 0.1 ? 'doinkOut' : r() < 0.5 ? 'left' : 'right';
   }
+  // where it crosses the plane: makes inside the posts, misses outside, doinks on one
   const side = r() < 0.5 ? -1 : 1;
-  const cross = flight === 'through' ? (r() * 2 - 1) * POST * 0.72
-    : flight === 'doinkIn' || flight === 'doinkOut' ? side * POST
-      : flight === 'left' ? -(POST + 0.5 + r() * 3.2)
-        : flight === 'right' ? POST + 0.5 + r() * 3.2
-          : (r() * 2 - 1) * 2.4;
-  // a parabola that would come down at zLand: well over the bar at the plane, or (short) down before it
-  const zLand = flight === 'short' ? D - 2.5 + r() * 2 : D + 14 + r() * 12;
-  const apex = flight === 'short' ? 7 + r() * 3 : 10.5 + r() * 5 + Math.max(0, D - 45) * 0.08;
-  const hAt = (z: number) => Math.max(0, 4 * apex * (z / zLand) * (1 - z / zLand));
-  // a doink hits the upright: the plane height must sit between the bar and the top
-  const hD = hAt(D);
-  const lift = (flight === 'doinkIn' || flight === 'doinkOut') && hD > TOP - 1 ? (TOP - 1.5) / hD : 1;
-  const xAt = (z: number) => cross * Math.pow(Math.max(0, Math.min(z, D)) / D, 1.35);
-  return { flight, D, cross, hAt: lift === 1 ? hAt : (z) => hAt(z) * lift, xAt };
+  const cross = flight === 'through' ? (r() - 0.5) * 2 * (POST - 0.6)
+    : flight === 'doinkIn' ? side * (POST - 0.25) : flight === 'doinkOut' ? side * (POST + 0.05)
+    : flight === 'left' ? -(POST + 0.8 + r() * 2.2) : flight === 'right' ? POST + 0.8 + r() * 2.2 : (r() - 0.5) * 3;
+  // the arc: a parabola that clears the bar with room for a make, and comes down at the bar (or before it) short
+  const apexZ = D * (0.52 + r() * 0.08);
+  const peak = flight === 'short' ? Math.max(5, D * 0.19) : Math.max(BAR + 4.5 + r() * 4, D * 0.21 + 2);
+  const endH = flight === 'short' ? 0 : BAR + 2.5 + r() * 5;
+  // h(z) through (0,0), (apexZ, peak), (D, endH): a quadratic in z
+  const a = ((endH - 0) / D - (peak - 0) / apexZ) / (D - apexZ);
+  const b = (peak - 0) / apexZ - a * apexZ;
+  const hAt = (z: number) => Math.max(0, a * z * z + b * z);
+  const xAt = (z: number) => cross * Math.min(1, z / D);
+  return { flight, D, cross, hAt, xAt };
 }
 
 export interface KickShot {
@@ -67,6 +70,18 @@ export interface KickShot {
   home: TeamInfo;
 }
 
+export interface KickoffShot {
+  kind: 'kickoff' | 'free';
+  D: number;                 // yards from the tee to the receiving goal line (65 from the 35, 80 for a free kick)
+  catch: { x: number; z: number };   // where the ball comes down: yards from the middle, yards from the tee
+  touchback: boolean;
+  spot: number;              // where the receiving team starts after a touchback (their yard line)
+  seed: number;
+  kicking: TeamInfo;
+  receiving: TeamInfo;
+  home: TeamInfo;
+}
+
 const NS = 'http://www.w3.org/2000/svg';
 const ZC = -35, CAMH = 8, HORIZON = 21, F = 157.5, CX = 50;
 const scaleAt = (z: number) => F / (z - ZC);
@@ -76,6 +91,21 @@ const project = (x: number, z: number, h = 0): [number, number] => { const s = s
 const SKIN = ['#f1c9a5', '#e0ac85', '#c68c5f', '#a5673f', '#7c4a2a', '#5a3620'];
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const ease = (f: number) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+
+interface Scene {
+  svg: SVGSVGElement; cam: SVGElement; gp: SVGElement; people: SVGElement; r: () => number;
+  /** A player standing at (x, z), drawn once; the frame scales him. */
+  body: (x: number, z: number, color: string, num: string | null, opts?: { kneel?: boolean; arms?: boolean }) => SVGElement;
+  /** A player who moves: built in yard units at the origin, placed with placeFig(). */
+  figure: (color: string, num: string | null) => SVGElement;
+  placeFig: (g: SVGElement, x: number, z: number, lean?: number) => void;
+  nums: (t: TeamInfo, keys: string[]) => string[];
+}
+
+/** The kicker's approach: where he starts (yards from the kick spot), how long it takes, and how many strides. */
+interface Approach { x0: number; z0: number; dur: number; strides: number }
+const FG_APPROACH: Approach = { x0: -2.9, z0: -2.3, dur: 0.62, strides: 3 };
+const KO_APPROACH: Approach = { x0: -3.4, z0: -9, dur: 1.25, strides: 6 };
 
 /** Draws the kick cam into a host element (an overlay over the field) and plays one kick. */
 export class KickCam {
@@ -92,14 +122,13 @@ export class KickCam {
   }
 
   /**
-   * Play a kick. speed: 1 normal, higher faster, lower slower (replays). onOutcome fires when the ball reaches the
-   * uprights (or comes down short): the moment the kick is decided.
+   * The stadium from behind the kick spot: night sky, lights, the stands rising behind the end zone in the home
+   * colors, the defending team's wall and end zone D yards away, the turf with its lines and numbers, the goal post,
+   * and (for a field goal) the net raised behind it.
    */
-  async play(k: KickShot, speed: number, onOutcome?: () => void): Promise<void> {
-    this.alive = true;
+  private scene(K: TeamInfo, E: TeamInfo, H: TeamInfo, D: number, seed: number, net: boolean): Scene {
     const host = this.host;
     host.innerHTML = '';
-    const path = kickPath(k.dist, k.good, k.seed);
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('viewBox', '0 0 100 64');
     svg.setAttribute('preserveAspectRatio', 'xMidYMid slice');
@@ -107,7 +136,6 @@ export class KickCam {
     svg.setAttribute('aria-hidden', 'true');
     host.appendChild(svg);
     const cam = this.el('g', { class: 'kc-cam' }, svg);
-    const D = path.D, E = k.defending, K = k.kicking, H = k.home;
 
     // ---- the far end: night sky, lights, the stands rising behind the end zone, the net
     const defs = this.el('defs', {}, svg);
@@ -118,7 +146,7 @@ export class KickCam {
     this.el('rect', { x: -10, y: -10, width: 120, height: 84, fill: 'url(#kc-sky)' }, cam);
     for (const lx of [12, 88]) this.el('ellipse', { cx: lx, cy: 3, rx: 9, ry: 4, fill: 'url(#kc-glow)', class: 'kc-light' }, cam);
     // the stands: tiers stepping up and back from the end line, mostly the home colors
-    const r = rng(hash('kc-crowd', k.seed));
+    const r = rng(hash('kc-crowd', seed));
     const shirts = [H.color, H.color, H.color2, K === H ? E.color : K.color, '#e9ecef', '#2a2f35', shade(H.color, 0.3)];
     const stands = this.el('g', { class: 'kc-stands' }, cam);
     for (let tier = 11; tier >= 0; tier--) {
@@ -153,7 +181,7 @@ export class KickCam {
       }
     }
     // the net, raised behind the uprights for the kick
-    {
+    if (net) {
       const [x0, y0] = project(-9, D + NET, 17), [x1, y1] = project(9, D + NET, 4);
       this.el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill: 'url(#kc-mesh)', stroke: 'rgba(255,255,255,.35)', 'stroke-width': 0.12, class: 'kc-net' }, cam);
     }
@@ -203,9 +231,9 @@ export class KickCam {
       }
     }
 
-    // ---- the players: the rush (defending colors), the line (kicking colors), the holder and the kicker
+    // ---- the players
     const people = this.el('g', {}, cam);
-    const body = (x: number, z: number, color: string, num: string | null, opts: { kneel?: boolean; arms?: boolean } = {}) => {
+    const body: Scene['body'] = (x, z, color, num, opts = {}) => {
       const s = scaleAt(z);
       const [px, py] = project(x, z, 0);
       const h = (opts.kneel ? 1.25 : 2.05) * s, w = 0.82 * s;
@@ -218,14 +246,28 @@ export class KickCam {
       if (opts.arms) for (const sx of [-1, 1]) this.el('line', { x1: px + sx * w * 0.42, y1: py - h * 0.95, x2: px + sx * w * 0.6, y2: py - h * 1.5, stroke: color, 'stroke-width': (w * 0.22).toFixed(2), 'stroke-linecap': 'round', class: 'kc-arm' }, g);
       return g;
     };
-    const nums = (t: TeamInfo, keys: string[]) => keys.map((key) => String(t.players[key]?.number ?? ''));
-    const rushN = nums(E, ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'CB1', 'CB2']);
-    [-5.2, -3.8, -2.4, -1, 1, 2.4, 3.8, 5.2].forEach((x, i) => body(x + (r() - 0.5) * 0.4, 8.6 + r() * 0.6, E.color, rushN[i] ?? null, { arms: true }));
-    const lineN = nums(K, ['TE', 'LT', 'LG', 'C', 'RG', 'RT', 'WR3']);
-    [-4.6, -2.9, -1.45, 0, 1.45, 2.9, 4.6].forEach((x, i) => body(x, 7.2, K.color, lineN[i] ?? null));
-    body(-0.95, 0.4, K.color, String(K.players.P?.number ?? ''), { kneel: true });   // the holder (the punter, as most teams use)
-    // the kicker, seen from behind: drawn at his feet in yards (the frame scales him), the kicking leg on its own hinge
-    const kicker = this.el('g', {}, people);
+    // a mover: the same figure in yard units at the origin, so placing him is one transform
+    const figure: Scene['figure'] = (color, num) => {
+      const g = this.el('g', { class: 'kc-fig' }, people);
+      const h = 2.05, w = 0.82;
+      this.el('rect', { x: -w / 2, y: -h, width: w, height: h * 0.62, rx: w * 0.3, fill: color }, g);
+      this.el('rect', { x: -w * 0.42, y: -h * 0.4, width: w * 0.36, height: h * 0.4, rx: w * 0.12, fill: shade(color, -0.35), class: 'kc-leg' }, g);
+      this.el('rect', { x: w * 0.06, y: -h * 0.4, width: w * 0.36, height: h * 0.4, rx: w * 0.12, fill: shade(color, -0.35), class: 'kc-leg' }, g);
+      this.el('circle', { cx: 0, cy: -h - w * 0.28, r: w * 0.36, fill: shade(color, -0.15) }, g);
+      if (num) { const t = this.el('text', { x: 0, y: -h * 0.66, class: 'kc-numb', fill: inkOn(color), 'font-size': (w * 0.62).toFixed(2) }, g); t.textContent = num; }
+      return g;
+    };
+    const placeFig: Scene['placeFig'] = (g, x, z, lean = 0) => {
+      const s = scaleAt(z), [px, py] = project(x, z, 0);
+      g.setAttribute('transform', `translate(${px.toFixed(2)} ${py.toFixed(2)}) scale(${s.toFixed(3)}) rotate(${lean.toFixed(1)})`);
+    };
+    const nums: Scene['nums'] = (t, keys) => keys.map((key) => String(t.players[key]?.number ?? ''));
+    return { svg, cam, gp, people, r, body, figure, placeFig, nums };
+  }
+
+  /** The kicker, seen from behind: drawn at his feet in yards (the frame scales him), the kicking leg on its own hinge. */
+  private kicker(K: TeamInfo, sc: Scene, approach: Approach) {
+    const kicker = this.el('g', {}, sc.people);
     const kc = K.color, kd = K.color2;   // pants in the second color, so the swing reads against any jersey
     const plant = this.el('g', {}, kicker), kickLeg = this.el('g', {}, kicker);
     const legRect = (g: SVGElement) => { this.el('rect', { x: -0.14, y: 0, width: 0.28, height: 0.8, rx: 0.1, fill: kd }, g); this.el('rect', { x: -0.16, y: 0.68, width: 0.32, height: 0.16, rx: 0.07, fill: '#111' }, g); };
@@ -236,20 +278,20 @@ export class KickCam {
     this.el('circle', { cx: 0, cy: -2.28, r: 0.3, fill: shade(kc, -0.15) }, torso);
     const armL = this.el('line', { x1: -0.36, y1: -1.85, x2: -0.5, y2: -1.2, stroke: kc, 'stroke-width': 0.18, 'stroke-linecap': 'round' }, torso);
     const armR = this.el('line', { x1: 0.36, y1: -1.85, x2: 0.5, y2: -1.2, stroke: kc, 'stroke-width': 0.18, 'stroke-linecap': 'round' }, torso);
-    const puff = this.el('circle', { r: 0, fill: 'rgba(255,255,255,.75)', opacity: 0 }, cam);
+    const puff = this.el('circle', { r: 0, fill: 'rgba(255,255,255,.75)', opacity: 0 }, sc.cam);
     /** Where he is and what his body is doing at time t: the approach, the plant, the swing, the follow-through. */
     const pose = (t: number, KICK: number) => {
-      const t0 = KICK - 0.62;                       // three steps in, from the left and behind
-      const a = Math.max(0, Math.min(1, (t - t0) / 0.62));
-      const x = -2.9 + (-0.78 + 2.9) * ease(a), z = -2.3 + (-0.32 + 2.3) * ease(a);
-      const stride = a > 0 && a < 1 ? Math.sin(a * Math.PI * 3) : 0;
+      const t0 = KICK - approach.dur;               // the steps in, from the left and behind
+      const a = Math.max(0, Math.min(1, (t - t0) / approach.dur));
+      const x = approach.x0 + (-0.78 - approach.x0) * ease(a), z = approach.z0 + (-0.32 - approach.z0) * ease(a);
+      const stride = a > 0 && a < 1 ? Math.sin(a * Math.PI * approach.strides) : 0;
       let kick = 0, lift = 0, lean = 0;           // kick: the leg's hinge, degrees; lift: how far up it has swung (0-1)
       if (t >= KICK - 0.16 && t < KICK) kick = 38 * ((t - (KICK - 0.16)) / 0.16);          // the backswing
       else if (t >= KICK) { const f = Math.min(1, (t - KICK) / 0.28); lift = ease(f); kick = 38 * (1 - f) - 14 * f; lean = 7 * f; }
       if (t >= KICK + 0.75) { const f = Math.min(1, (t - KICK - 0.75) / 0.35); lift *= 1 - f; kick *= 1 - f; lean *= 1 - f; }
-      const sc = scaleAt(z), [px, py] = project(x, z, 0);
+      const scl = scaleAt(z), [px, py] = project(x, z, 0);
       const hop = lift * 0.18;
-      kicker.setAttribute('transform', `translate(${px.toFixed(2)} ${(py - hop * sc).toFixed(2)}) scale(${sc.toFixed(3)}) rotate(${(-lean).toFixed(1)})`);
+      kicker.setAttribute('transform', `translate(${px.toFixed(2)} ${(py - hop * scl).toFixed(2)}) scale(${scl.toFixed(3)}) rotate(${(-lean).toFixed(1)})`);
       plant.setAttribute('transform', `translate(-0.17 -0.82) rotate(${(stride * -14).toFixed(1)})`);
       // the kicking leg swings through and up: from behind it shortens, then rises past the hip
       const sy = 1 - lift * 1.6;
@@ -266,32 +308,15 @@ export class KickCam {
         puff.setAttribute('r', (bs * (0.15 + p * 0.5)).toFixed(2)); puff.setAttribute('opacity', (0.8 * (1 - p)).toFixed(2));
       } else puff.setAttribute('opacity', '0');
     };
+    return pose;
+  }
 
-    // ---- the ball and its shadow
-    const shadow = this.el('ellipse', { rx: 0.5, ry: 0.18, fill: 'rgba(0,0,0,.35)' }, cam);
-    const ball = this.el('g', {}, cam);
+  /** The ball and its shadow; place() puts it at (x, z, h) spinning end over end. Past the posts it goes behind them. */
+  private ball(sc: Scene, D: number) {
+    const shadow = this.el('ellipse', { rx: 0.5, ry: 0.18, fill: 'rgba(0,0,0,.35)' }, sc.cam);
+    const ball = this.el('g', {}, sc.cam);
     const ballEl = this.el('ellipse', { rx: 0.6, ry: 0.38, fill: '#7a3b1c', stroke: '#4a220f', 'stroke-width': 0.08 }, ball);
     const lace = this.el('line', { stroke: '#f3efe6', 'stroke-width': 0.08, 'stroke-linecap': 'round' }, ball);
-
-    // ---- the graphics: a lower third, then the verdict
-    const lower = document.createElement('div');
-    lower.className = 'kc-lower';
-    const name = K.players.K?.name ?? 'The kicker';
-    lower.innerHTML = `<b>${k.xp ? 'Extra point' : `${k.dist}-yard field goal`}</b><span>${name}</span>`;
-    host.appendChild(lower);
-    const verdict = document.createElement('div');
-    verdict.className = 'kc-verdict';
-    host.appendChild(verdict);
-    host.classList.add('on');
-
-    // ---- the clock of it all (seconds at speed 1)
-    const SNAP = 0.45, HOLD = 0.8, KICK = 1.05;
-    const flightT = 1.15 + D * 0.019;
-    const stopZ = path.flight === 'short' ? D - 0.5 : path.flight === 'doinkOut' ? D : D + NET;
-    const total = KICK + flightT * (stopZ / (D + NET)) + 1.3;
-    const decideT = KICK + flightT * (Math.min(D, stopZ) / (D + NET));
-    const dur = speed > 0 ? total / speed : 0;
-    let decided = false;
     const place = (x: number, z: number, h: number, spin: number) => {
       const [sx, sy] = project(x, z, h);
       const [gx, gy] = project(x, z, 0);
@@ -303,8 +328,76 @@ export class KickCam {
       shadow.setAttribute('rx', (0.45 * scaleAt(z)).toFixed(2)); shadow.setAttribute('ry', (0.14 * scaleAt(z)).toFixed(2));
       shadow.setAttribute('opacity', String(Math.max(0, 1 - h / 9).toFixed(2)));
       // past the plane of the uprights the ball is behind them
-      if (z > D && ball.nextSibling !== gp) cam.insertBefore(ball, gp);
+      if (z > D && ball.nextSibling !== sc.gp) sc.cam.insertBefore(ball, sc.gp);
     };
+    return place;
+  }
+
+  /** The broadcast graphics: a lower third now, and a verdict box to show later. */
+  private graphics(title: string, sub: string) {
+    const lower = document.createElement('div');
+    lower.className = 'kc-lower';
+    lower.innerHTML = `<b>${title}</b><span>${sub}</span>`;
+    this.host.appendChild(lower);
+    const verdict = document.createElement('div');
+    verdict.className = 'kc-verdict';
+    this.host.appendChild(verdict);
+    this.host.classList.add('on');
+    return verdict;
+  }
+
+  /** Runs frame(t) from 0 to total seconds at the given speed (0: the final frame at once), then fades the cam out. */
+  private async run(total: number, speed: number, frame: (t: number) => void, atEnd: () => void) {
+    const dur = speed > 0 ? total / speed : 0;
+    if (!dur) { frame(total); atEnd(); await sleep(900); }
+    else {
+      const t0 = performance.now();
+      await new Promise<void>((done) => {
+        const step = (now: number) => {
+          if (!this.alive) return done();
+          const t = ((now - t0) / 1000 / dur) * total;
+          frame(Math.min(t, total));
+          if (t < total) requestAnimationFrame(step); else done();
+        };
+        requestAnimationFrame(step);
+      });
+    }
+    atEnd();
+    this.host.classList.add('out');
+    await sleep(speed > 0 ? 260 : 0);
+    this.host.classList.remove('on', 'out', 'kc-live', 'kc-cheer');
+    this.host.innerHTML = '';
+  }
+
+  /**
+   * Play a field goal or extra point. speed: 1 normal, higher faster, lower slower (replays). onOutcome fires when the
+   * ball reaches the uprights (or comes down short): the moment the kick is decided.
+   */
+  async play(k: KickShot, speed: number, onOutcome?: () => void): Promise<void> {
+    this.alive = true;
+    const host = this.host;
+    const path = kickPath(k.dist, k.good, k.seed);
+    const D = path.D, E = k.defending, K = k.kicking;
+    const sc = this.scene(K, E, k.home, D, k.seed, true);
+    const r = sc.r;
+
+    // ---- the players: the rush (defending colors), the line (kicking colors), the holder and the kicker
+    const rushN = sc.nums(E, ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'CB1', 'CB2']);
+    [-5.2, -3.8, -2.4, -1, 1, 2.4, 3.8, 5.2].forEach((x, i) => sc.body(x + (r() - 0.5) * 0.4, 8.6 + r() * 0.6, E.color, rushN[i] ?? null, { arms: true }));
+    const lineN = sc.nums(K, ['TE', 'LT', 'LG', 'C', 'RG', 'RT', 'WR3']);
+    [-4.6, -2.9, -1.45, 0, 1.45, 2.9, 4.6].forEach((x, i) => sc.body(x, 7.2, K.color, lineN[i] ?? null));
+    sc.body(-0.95, 0.4, K.color, String(K.players.P?.number ?? ''), { kneel: true });   // the holder (the punter, as most teams use)
+    const pose = this.kicker(K, sc, FG_APPROACH);
+    const place = this.ball(sc, D);
+    const verdict = this.graphics(k.xp ? 'Extra point' : `${k.dist}-yard field goal`, K.players.K?.name ?? 'The kicker');
+
+    // ---- the clock of it all (seconds at speed 1)
+    const SNAP = 0.45, HOLD = 0.8, KICK = 1.05;
+    const flightT = 1.15 + D * 0.019;
+    const stopZ = path.flight === 'short' ? D - 0.5 : path.flight === 'doinkOut' ? D : D + NET;
+    const total = KICK + flightT * (stopZ / (D + NET)) + 1.3;
+    const decideT = KICK + flightT * (Math.min(D, stopZ) / (D + NET));
+    let decided = false;
     const decide = () => {
       if (decided) return;
       decided = true;
@@ -339,24 +432,72 @@ export class KickCam {
       pose(t, KICK);
       host.classList.toggle('kc-live', t >= KICK);
     };
+    await this.run(total, speed, frame, decide);
+  }
 
-    if (!dur) { frame(total); decide(); await sleep(900); }
-    else {
-      const t0 = performance.now();
-      await new Promise<void>((done) => {
-        const step = (now: number) => {
-          if (!this.alive) return done();
-          const t = ((now - t0) / 1000 / dur) * total;
-          frame(Math.min(t, total));
-          if (t < total) requestAnimationFrame(step); else done();
-        };
-        requestAnimationFrame(step);
-      });
-    }
-    if (!decided) decide();
-    host.classList.add('out');
-    await sleep(speed > 0 ? 260 : 0);
-    host.classList.remove('on', 'out', 'kc-live', 'kc-cheer');
-    host.innerHTML = '';
+  /**
+   * Play a kickoff: the tee, the coverage team on the line, the run-up, the kick, the hang time, the catch (or a
+   * touchback in the end zone). onCatch fires the moment the ball comes down: the field takes over the return from
+   * there, so the cam cuts away right after it.
+   */
+  async playKickoff(k: KickoffShot, speed: number, onCatch?: () => void): Promise<void> {
+    this.alive = true;
+    const host = this.host;
+    const D = k.D, K = k.kicking, E = k.receiving;
+    const sc = this.scene(K, E, k.home, D, k.seed, false);
+    const r = sc.r;
+
+    // ---- the coverage team on the line either side of the tee; the return team's front and wedge; the returner
+    const laneN = sc.nums(K, ['LT', 'LG', 'C', 'RG', 'RT', 'WR1', 'WR2', 'WR3', 'TE', 'RB']);
+    // the line stands a couple of yards ahead of the tee, tight enough for the lens; it fans out as it runs
+    const lanesX = [-9.6, -7.6, -5.6, -3.7, -1.9, 1.9, 3.7, 5.6, 7.6, 9.6];
+    const cover = lanesX.map((x, i) => ({ g: sc.figure(K.color, laneN[i] ?? null), x, z0: 1.6 + r() * 0.9, v: 0.86 + r() * 0.22, lean: 0 }));
+    const frontN = sc.nums(E, ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1']);
+    [-22, -15, -8, 0, 8, 15, 22].forEach((x, i) => sc.body(x + (r() - 0.5) * 1.5, D - 40 + (r() - 0.5) * 2, E.color, frontN[i] ?? null));
+    [-9, 0, 9].forEach((x, i) => sc.body(x, D - 24 + (r() - 0.5) * 2, E.color, frontN[7 - i] ?? null));
+    const retN = String(E.players.S1?.number ?? '');
+    const returner = sc.figure(E.color, retN);
+    const ret0 = { x: k.catch.x * 0.35, z: D - 1.5 };
+    const pose = this.kicker(K, sc, KO_APPROACH);
+    const place = this.ball(sc, D);
+    const verdict = this.graphics(k.kind === 'free' ? 'Free kick' : 'Kickoff', K.players.K?.name ?? 'The kicker');
+    // the tee
+    { const [tx, ty] = project(-0.5, 0.4, 0), s = scaleAt(0.4); this.el('rect', { x: tx - 0.22 * s, y: ty - 0.12 * s, width: 0.44 * s, height: 0.14 * s, rx: 0.04 * s, fill: '#e8762c' }, sc.cam); }
+
+    // ---- the clock of it all (seconds at speed 1): the whistle, the run-up, the kick, the hang time
+    const KICK = 1.65;
+    const flightT = 2.2 + D * 0.016;
+    const CATCH = KICK + flightT;
+    const total = CATCH + (k.touchback ? 1.1 : 0.35);
+    const peak = 10;   // the visual arc: a real kickoff's hang would leave the frame
+    let caught = false;
+    const land = () => {
+      if (caught) return;
+      caught = true;
+      if (k.touchback) { verdict.className = 'kc-verdict show neutral'; verdict.innerHTML = `<b>Touchback</b><span>Out to the ${k.spot}</span>`; }
+      onCatch?.();
+    };
+    const frame = (t: number) => {
+      const f = Math.max(0, Math.min(1, (t - KICK) / flightT));
+      if (t < KICK) place(-0.5, 0.4, 0.15, 1.5);
+      else {
+        const z = 0.4 + f * k.catch.z, x = -0.5 + f * (k.catch.x + 0.5), h = peak * 4 * f * (1 - f);
+        place(x, z, Math.max(h, f >= 1 ? 0.2 : 0), (t - KICK) * 7);
+        if (!caught && t >= CATCH) land();
+      }
+      // the coverage sprints once the ball is away, each man at his own pace, and keeps going past the catch
+      const run = Math.max(0, t - KICK);
+      for (const c of cover) {
+        const z = c.z0 + Math.min(D - 10, run * 8.2 * c.v);
+        const stride = run > 0 && z < D - 10 ? Math.sin(run * 11 * c.v) * 6 : 0;
+        sc.placeFig(c.g, Math.max(-24, Math.min(24, c.x * (1 + run * 0.42))), z, stride);
+      }
+      // the returner settles under the ball
+      const g = ease(Math.min(1, f / 0.9));
+      sc.placeFig(returner, ret0.x + (k.catch.x - ret0.x) * g, ret0.z + (k.catch.z - ret0.z) * g);
+      pose(t, KICK);
+      host.classList.toggle('kc-live', t >= KICK);
+    };
+    await this.run(total, speed, frame, land);
   }
 }

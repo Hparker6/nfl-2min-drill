@@ -1138,7 +1138,7 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 @keyframes cheer-jump { from { transform: translateY(0); } to { transform: translateY(-.6px); } }
 @keyframes crowd-jump { from { transform: translateY(0); } to { transform: translateY(-.32px); } }
 
-/* ---------- the kick cam (kickcam.ts): field goals and extra points from behind the kicker ---------- */
+/* ---------- the kick cam (kickcam.ts): field goals, extra points and kickoffs from behind the kicker ---------- */
 .kickcam { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .18s; }
 .kickcam.on { opacity: 1; }
 .kickcam.out { opacity: 0; transition-duration: .25s; }
@@ -1167,6 +1167,7 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .kc-verdict.show { opacity: 1; transform: translateX(-50%) scale(1); }
 .kc-verdict.good { background: rgba(31, 122, 64, .96); }
 .kc-verdict.bad { background: rgba(176, 44, 36, .96); }
+.kc-verdict.neutral { background: rgba(28, 34, 42, .96); }
 .kc-verdict b { font: 800 32px/1 var(--display); text-transform: uppercase; letter-spacing: .04em; }
 .kc-verdict span { font: 600 13px var(--body); opacity: .92; }
 @media (max-width: 600px) { .kc-verdict b { font-size: 22px; } .kc-lower { left: 8px; bottom: 8px; } .kc-lower b { font-size: 14px; } }

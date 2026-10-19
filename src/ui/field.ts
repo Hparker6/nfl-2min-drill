@@ -23,7 +23,7 @@ import { choreograph, routePoints, type BallKey, type Key, type Timeline } from 
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
 import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo, PassMods, Weather } from '../engine/types';
 import { BEHIND, BEHIND_VIEW, drawEnd, drawEndZone, drawMidfield, drawNumberArrow } from './stadium';
-import { KickCam } from './kickcam';
+import { KickCam, type KickoffShot } from './kickcam';
 
 const NS = 'http://www.w3.org/2000/svg';
 
@@ -605,7 +605,7 @@ export class FieldRenderer {
   }
 
   /** A kickoff, free kick or onside kick, drawn in the kicking team's frame. */
-  playKick(ev: Extract<Ev, { type: 'kick' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
+  async playKick(ev: Extract<Ev, { type: 'kick' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
     if (!this.teams) { onOutcome?.('none'); return Promise.resolve(); }
     this.ensureDots();
     this.interrupt();
@@ -617,7 +617,27 @@ export class FieldRenderer {
     for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.kicker].players[k], k);
     for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.kicker === 0 ? 1 : 0].players[k], k);
     const fake = { type: 'snap', off: ev.kicker, yl0, down0: 1, dist0: 10, t0: ev.t, t: ev.t, res, first: false } as Extract<Ev, { type: 'snap' }>;
-    return this.runTimeline(tl, fake, this.frame(ev.kicker, yl0), 'kick', speed, onOutcome);
+    const map = this.frame(ev.kicker, yl0);
+    const catchEv = tl.events.find((e) => e.kind === 'catch');
+    if (ev.kind !== 'onside' && catchEv?.at && this.kickCam && speed > 0) {
+      // the kick cam shows the kick and the hang time; at the catch the field takes over the return (or shows the
+      // touchback's final picture). The outcome is reported once: by the return's decisive moment, or at a touchback.
+      const shot: KickoffShot = {
+        kind: ev.kind, D: 100 - yl0, catch: { x: catchEv.at[0] - CX, z: catchEv.at[1] }, touchback: ev.touchback, spot: ev.yl, seed,
+        kicking: T[ev.kicker], receiving: T[ev.kicker === 0 ? 1 : 0], home: T[this.home],
+      };
+      let field: Promise<void> | null = null;
+      const cam = this.kickCam.playKickoff(shot, speed, () => {
+        if (ev.touchback) { onOutcome?.('kick'); field = this.runTimeline(tl, fake, map, 'kick', 0, undefined, tl.end); }
+        else field = this.runTimeline(tl, fake, map, 'kick', speed, onOutcome, catchEv.t);
+      });
+      this.finish = () => { this.kickCam?.stop(); };
+      await cam;
+      this.finish = null;
+      if (!field) { onOutcome?.('kick'); field = this.runTimeline(tl, fake, map, 'kick', 0, undefined, tl.end); }   // cut off before the catch
+      return field;
+    }
+    return this.runTimeline(tl, fake, map, 'kick', speed, onOutcome);
   }
 
   /** The try after a touchdown: an extra point from the 15, or a two-point snap from the 2. */
@@ -650,7 +670,8 @@ export class FieldRenderer {
     if (!called) onOutcome?.('kick');
   }
 
-  private runTimeline(tl: Timeline, ev: Extract<Ev, { type: 'snap' }>, map: (p: Pt) => Pt, outcome: Outcome, speed: number, onOutcome?: (o: Outcome) => void): Promise<void> {
+  /** startAt: begin the timeline part-way (a kickoff's return after the kick cam): everyone starts where they are then. */
+  private runTimeline(tl: Timeline, ev: Extract<Ev, { type: 'snap' }>, map: (p: Pt) => Pt, outcome: Outcome, speed: number, onOutcome?: (o: Outcome) => void, startAt = 0): Promise<void> {
     const res = ev.res;
     // a kick or a try is set up from a between-plays (dimmed) picture: once the ball is live, everyone is at full strength
     this.gPlayers.classList.remove('dim');
@@ -659,7 +680,7 @@ export class FieldRenderer {
     if (res.kind !== 'kickoff') this.el('line', { x1: 0, x2: W, y1: los[1], y2: los[1], class: 'f-los' }, this.gMarks);
 
     const PRE = 0.35, HOLD = 0.5;
-    const total = PRE + tl.end + HOLD;
+    const total = PRE + Math.max(0, tl.end - startAt) + HOLD;
     const T = this.teams!;
     void T;
     // a long return or breakaway plays faster, like a broadcast cut: no play takes more than ~9 s of real time
@@ -675,7 +696,8 @@ export class FieldRenderer {
     this.gFx.innerHTML = '';
 
     const fired = new Set<number>();
-    let decided = false, trail = false;
+    tl.events.forEach((e, i) => { if (e.t < startAt - 1e-6) fired.add(i); });   // already happened on the cam
+    let decided = startAt > tl.decisive, trail = false;
     const carrierAt = (t: number) => { let k: string | null = null; for (const c of tl.carrier) if (c.t <= t) k = c.key; return k; };
     const dropAt = tl.events.find((e) => e.kind === 'incomplete')?.t;
 
@@ -685,7 +707,7 @@ export class FieldRenderer {
       const t0 = performance.now();
       const step = (now: number) => {
         const f = dur > 0 ? Math.min(1, (now - t0) / 1000 / dur) : 1;
-        const t = Math.max(0, f * total - PRE);
+        const t = startAt + Math.max(0, f * total - PRE);
         for (const k in tl.tracks) this.place(k, map(trackAt(tl.tracks[k], t)));
         const ck = t >= 0.12 ? carrierAt(t) : null;
         this.dots.forEach((d, k) => d.g.classList.toggle('carrier', k === ck && k !== 'o:C'));
