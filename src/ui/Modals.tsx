@@ -1,4 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
+import { BadgeCase } from './Badges';
+import { LOOKS_FIELD, type FieldLook } from '../game/badges';
 import { NFL_SEASON } from '../engine/nfl';
 import { ARCHETYPES } from '../engine/data';
 import { SPOTS_PER_DAY, utcDate } from '../engine/scenario';
@@ -124,6 +126,7 @@ export function Stats({ store, onClose }: { store: Store; onClose: () => void })
           {arch && <div className="arch"><div className="k">You call it like</div><div className="arch-name">{arch.name}</div><div className="muted small">{arch.blurb}</div></div>}
         </>
       )}
+      <BadgeCase store={store} />
     </Modal>
   );
 }
@@ -156,6 +159,11 @@ export function SettingsModal({ store, update, onClose }: { store: Store; update
         <label className="check"><input type="checkbox" checked={st.hints} onChange={(e) => set('hints', e.target.checked)} /> Coach mode in Practice (show win chances before you call)</label>
         <label className="check"><input type="checkbox" checked={st.sound !== false} onChange={(e) => set('sound', e.target.checked)} /> Sound effects</label>
         <label className="check"><input type="checkbox" checked={st.music !== false} onChange={(e) => set('music', e.target.checked)} /> Background music</label>
+        <label className="field-look"><span>Field look</span>
+          <select value={st.fieldLook ?? 'classic'} onChange={(e) => set('fieldLook', e.target.value as FieldLook)}>
+            {LOOKS_FIELD.map((l) => { const open = Object.keys(store.badges ?? {}).length >= l.need; return <option key={l.id} value={l.id} disabled={!open}>{l.name}{open ? '' : ` (${l.need} badges)`}</option>; })}
+          </select>
+        </label>
         <label className="check"><input type="checkbox" checked={!st.plainDots} onChange={(e) => set('plainDots', !e.target.checked)} /> Color players by rating (red to green)</label>
       </div>
       <button className="btn danger" onClick={reset}>Erase my data</button>

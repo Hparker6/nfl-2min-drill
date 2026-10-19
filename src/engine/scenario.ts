@@ -6,7 +6,7 @@
 import { DEF_POS, FIRST, FRANCHISES, LAST, OFF_POS, TEMPO } from './data';
 import { evaluate } from './evaluate';
 import { clip, hash, pickWeighted, rng, type Rng } from './rng';
-import type { Player, Ratings, State, Team, TeamInfo, Weather } from './types';
+import type { DcStyle, Player, Ratings, State, Team, TeamInfo, Weather } from './types';
 import { GROUP_ATTRS, SLOT_GROUP, units, type Attr, type PosGroup, type RosterMeta, type RosterPlayer } from './roster';
 import { NFL_IDS, hasRealTeam, realTeam, rosterSetFor } from './nfl';
 import { DEF_AMP } from './defense';
@@ -271,7 +271,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
-    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; }
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.dc = dcFor(seedStr); s.mo = 0; }
     if (fair && checkSpot(s, { daily: true }).length) continue;   // never keep a spot that breaks the rules
     const wp = quickWp(s, hash(seedStr, tries));
     if (fair ? wp >= FAIR_WP[0] && wp <= FAIR_WP[1] : wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
@@ -293,7 +293,7 @@ function repairDaily(p0: SpotParams, teams: [TeamInfo, TeamInfo], seedStr: strin
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
-    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; }
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.dc = dcFor(seedStr); s.mo = 0; }
     if (checkSpot(s, { daily: true }).length) continue;
     const wp = quickWp(s, hash(seedStr, 'repair', step));
     if (wp >= FAIR_WP[0] && wp <= FAIR_WP[1]) return { s, wp, p };
@@ -352,6 +352,13 @@ function covOn(seedStr: string): boolean {
  * that ships this, so nobody's daily changes rules mid-day.
  */
 export const OT_FROM = '2026-10-21';
+
+/** Their defensive coordinator, seeded by the game: the family he leans on in his spot, and how hard (1.6x to 2.4x). */
+export function dcFor(seedStr: string): DcStyle {
+  const r = rng(hash('dc', seedStr));
+  const styles: DcStyle['style'][] = ['blitz', 'zone', 'man', 'load'];
+  return { style: styles[Math.floor(r() * styles.length)], k: Math.round((1.6 + r() * 0.8) * 100) / 100 };
+}
 function otOn(seedStr: string): boolean {
   const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
   return !m || m[1] >= OT_FROM;
@@ -375,5 +382,7 @@ export function customScenario(p: SpotParams, seedStr: string): Scenario {
   s.otPlay = true;
   s.toss = true;
   s.twoPlay = true;
+  s.dc = dcFor(seedStr);
+  s.mo = 0;
   return { id: seedStr, seed: hash(seedStr), mode: 'practice', teams, home: p.home, start: s, baseWp: quickWp(s, hash(seedStr)) };
 }

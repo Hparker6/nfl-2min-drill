@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { announce, awardBadges } from '../game/badges';
 import { ARCHETYPES } from '../engine/data';
 import { DAILY_KINDS, dailyScenarios, dayNumber, utcDate } from '../engine/scenario';
 import { archetype, dailyShare, profileFacts, shareText } from '../game/share';
@@ -47,6 +48,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
       delete d.cur;
       s.history.push(r);
       if (s.history.length > 300) s.history.splice(0, s.history.length - 300);
+      { const fresh = awardBadges(s, today); setTimeout(() => announce(fresh), 900); }
       track('daily_complete', { win: r.win, performance: rateSpot(r).performance });
     });
   };

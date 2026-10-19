@@ -93,7 +93,14 @@ export interface State {
   otPlay?: boolean;       // a late-game spot that ends tied plays overtime (the playoff rules); absent on older dailies, where a weighted coin settles it
   twoPlay?: boolean;      // a two-point try is a snap from the 2 that someone calls; absent on older games, where it's a weighted coin
   tryTwo?: boolean;       // a two-point try is on: the next snap is it (no clock, in for two or nothing)
+  // ---- the game within the game (absent on older games): their coordinator, his adjustments, momentum
+  dc?: DcStyle;           // their defensive coordinator's tendency (the defense you face)
+  rep?: { call: string; n: number };   // your offense's run of the same call: at 3 in a row their defense adjusts
+  mo?: number;            // momentum, -3 to 3, positive yours: it sharpens (or clouds) your pre-snap read
 }
+
+/** A defensive coordinator's tendency: the family he leans on, in the spot he leans on it, and how hard. */
+export interface DcStyle { style: 'blitz' | 'zone' | 'man' | 'load'; k: number }
 
 /** A decision. Only the fields for the stage being decided are read; the rest fall to the AI. */
 export interface Choice {
@@ -153,6 +160,8 @@ export type Ev =
   | { type: 'kick'; kind: 'kickoff' | 'onside' | 'free'; kicker: Team; recover: Team; touchback: boolean; td: boolean; yl: number; t: number }
   | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number; played?: boolean; def2?: boolean }   // played: the try was a snap (already drawn); def2: the defense returned it for two
   | { type: 'twotry'; off: Team; t: number }   // going for two: the try is a snap from the 2
+  | { type: 'adjust'; call: string; counter: Look; t: number }   // their defense adjusts to the call you keep running
+  | { type: 'momentum'; team: Team; t: number }   // momentum swings hard to one side
   | { type: 'period'; q: number; t: number }       // full games: a new quarter, halftime (q 3) or overtime (q 5+)
   | { type: 'toss'; call: Coin; face: Coin; won: Team; t: number }   // overtime's coin toss (team 0 calls it)
   | { type: 'otpick'; team: Team; recv: boolean; q: number; t: number }   // overtime: the team with the choice receives or kicks

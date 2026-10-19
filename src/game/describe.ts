@@ -178,6 +178,12 @@ export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
       return tellSnap(ev, teams);
     case 'twotry':
       return { text: `${teams[ev.off].city} goes for two.`, banner: 'Going for two', tone: 'neutral' };
+    case 'adjust':
+      return { text: `${teams[1].city} adjusts: three straight ${(CALL[ev.call]?.name ?? 'calls').toLowerCase()}, and they're answering with ${LOOKS[ev.counter].label.toLowerCase()}. Time to change it up.`, banner: 'They adjust', tone: 'bad' };
+    case 'momentum':
+      return ev.team === 0
+        ? { text: 'Momentum is yours: the sideline is up, and your reads come easier.', banner: 'Momentum', tone: 'good' }
+        : { text: `Momentum swings to ${teams[1].city}: it gets harder to read them.`, banner: 'Momentum shift', tone: 'bad' };
     case 'period':
       return ev.q === 3 ? { text: 'Halftime.', banner: 'Halftime', tone: 'neutral' }
         : ev.q >= 5 ? { text: ev.q === 5 ? 'Tied at the end of regulation: overtime.' : `End of the ${OT_ORD[ev.q - 6] ?? `${ev.q - 5}th`} overtime period.`, banner: 'Overtime', tone: 'neutral' }

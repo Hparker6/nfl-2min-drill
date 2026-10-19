@@ -3,6 +3,7 @@
  * the player does not. The same engine as the late-game spots (sim.ts): a full game is a State with q and qLen set.
  */
 import { advance, clone, other } from './sim';
+import { dcFor } from './scenario';
 import { hash, rng } from './rng';
 import type { Choice, Ev, Ratings, State, Team, Weather } from './types';
 
@@ -21,7 +22,7 @@ export function kickoffState(rat: [Ratings, Ratings], o: GameOpts): State {
   return {
     t: qLen, off: rec, score: [0, 0], to: [3, 3], down: 1, dist: 10, yl: 25, running: false, stage: 'kick', warned: true,
     adj: 0, kicker: other(rec), safetyKick: false, pendLook: null, shownLook: null, pendPlay: null, k: 0,
-    rat, weather: o.weather ?? 'clear', mix: true, cov: true, q: 1, qLen, po: !!o.po, rec, ...(o.toss ? { toss: true, twoPlay: true } : {}),
+    rat, weather: o.weather ?? 'clear', mix: true, cov: true, q: 1, qLen, po: !!o.po, rec, ...(o.toss ? { toss: true, twoPlay: true, dc: dcFor(String(o.seed)), mo: 0 } : {}),
   };
 }
 

@@ -4,6 +4,7 @@ import type { Session } from '../game/session';
 import { rateSpot } from '../game/rating';
 import type { SpotResult } from '../game/storage';
 import { Spark } from './Scoreboard';
+import { keyMoments } from '../game/recap';
 
 interface Props {
   result: SpotResult;
@@ -18,6 +19,7 @@ export function SpotReview({ result, session, trail, onContinue, continueLabel, 
   const graded = session.records.filter((r) => r.grade);
   const beatAi = result.aiLost - result.lost;
   const rt = rateSpot(result);
+  const moments = keyMoments(session.records);
   return (
     <section className={`review ${result.win ? 'win' : 'loss'}`}>
       <div className="rv-head">
@@ -34,6 +36,19 @@ export function SpotReview({ result, session, trail, onContinue, continueLabel, 
       </div>
       <p className="rv-how">Performance blends your decisions (55%) with the result (45%). You gave up {result.lost.toFixed(1)} points of win chance across {graded.length} call{graded.length === 1 ? '' : 's'}.</p>
       {trail.length > 1 && <div className="rv-spark"><span className="k">Your win chance, call by call</span><Spark values={trail} h={36} /></div>}
+      {moments.length > 0 && (
+        <div className="rv-key">
+          <span className="k">Key moments</span>
+          {moments.map((m) => (
+            <div key={m.kind} className={`rv-moment ${m.kind}`}>
+              <span className="rv-m-k">{m.title}</span>
+              <b>{m.call}</b>
+              <small>{m.when}</small>
+              <p>{m.text}</p>
+            </div>
+          ))}
+        </div>
+      )}
       <ol className="rv-calls">
         {graded.map((rec, i) => {
           const g = rec.grade!;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { BadgeToast } from './ui/Badges';
 import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
 import { Survivor } from './ui/Survivor';
@@ -136,6 +137,7 @@ export default function App() {
       </footer>
       {modal === 'help' && <Help onClose={closeModal} />}
       {modal === 'stats' && <Stats store={store} onClose={closeModal} />}
+      <BadgeToast />
       {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} />}
       {modal === 'about' && <About onClose={closeModal} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}

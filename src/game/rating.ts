@@ -24,6 +24,8 @@
  */
 import type { Session } from './session';
 import type { SpotResult } from './storage';
+import type { GameFacts } from './badges';
+import type { Ev } from '../engine/types';
 import { tagsOf } from './share';
 
 export const DECISION_SCALE = 40;   // points of total win chance given up that cut Decisions to 1/e (37)
@@ -74,5 +76,24 @@ export function spotResult(session: Session, date: string): SpotResult {
     lost: recs.reduce((a, x) => a + x.grade!.lost, 0), aiLost: recs.reduce((a, x) => a + x.grade!.aiLost, 0),
     tags: tagsOf(session.records),
     baseWp: sc.baseWp,
+    facts: factsOf(session),
+  };
+}
+
+/** The facts of a finished game that badges read. */
+export function factsOf(session: Session): GameFacts {
+  const st = session.sc.start;
+  const evs = session.log.map((l) => l.ev);
+  const snaps = evs.filter((e): e is Extract<Ev, { type: 'snap' }> => e.type === 'snap' && !e.try);
+  const recs = session.records.filter((x) => x.grade);
+  return {
+    lead0: st.score[0] - st.score[1],
+    t0: st.t,
+    perfect: recs.length >= 3 && recs.every((x) => x.grade!.g === 'g'),
+    fourth: snaps.filter((e) => e.off === 0 && e.down0 === 4 && (e.first || e.res.td) && e.res.kind !== 'fg' && e.res.kind !== 'punt' && !e.res.penalty).length,
+    two: evs.filter((e) => e.type === 'pat' && e.off === 0 && e.two && e.good).length,
+    takeaways: snaps.filter((e) => e.off === 1 && e.res.turnover && e.res.kind !== 'punt').length,
+    long: Math.max(0, ...snaps.filter((e) => e.off === 0 && !e.res.penalty && !e.res.turnover && (e.res.kind !== 'pass' || e.res.complete)).map((e) => e.res.yards)),
+    clutchGreen: recs.some((x) => x.clutch && x.grade!.g === 'g'),
   };
 }

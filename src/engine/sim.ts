@@ -24,7 +24,7 @@ export const WEATHER: Record<Weather, { catch: number; deepCatch: number; fumble
   wind: { catch: 0, deepCatch: -0.05, fumble: 1, int: 1.1, run: 0, yac: 1, fgYards: 8, punt: -6, name: 'Wind', blurb: 'Gusting wind: field goals and deep balls are a gamble.' },
 };
 const wx = (s: State) => WEATHER[s.weather ?? 'clear'];
-import type { Choice, Coin, DefClock, Ev, KickChoice, Look, OffClock, PassMods, PatChoice, PlayResult, Rcv, RouteId, Stage, State, StChoice, Team, Weather } from './types';
+import type { Choice, Coin, DcStyle, DefClock, Ev, KickChoice, Look, OffClock, PassMods, PatChoice, PlayResult, Rcv, RouteId, Stage, State, StChoice, Team, Weather } from './types';
 
 export const ytg = (s: State) => 100 - s.yl;
 export const leadOf = (s: State, team: Team) => s.score[team] - s.score[1 - team];
@@ -566,9 +566,39 @@ function snap(s: State, r: Rng, play: string, look: Look, ch: Choice | null | un
   const wasTry = !!s.tryTwo;
   const first = applySnap(s, res);
   ev?.push({ type: 'snap', ...before, t: s.t, res, first, ...(wasTry ? { try: true } : {}) });
+  if (s.dc && !wasTry) {
+    // you keep calling the same play: at three in a row their coordinator adjusts (and says so)
+    if (before.off === 0 && CALL[play]) {
+      s.rep = s.rep?.call === play ? { call: play, n: s.rep.n + 1 } : { call: play, n: 1 };
+      if (s.rep.n === 3) ev?.push({ type: 'adjust', call: play, counter: counterOf(play), t: s.t });
+    }
+    swing(s, before.off, before.down0, res, first, ev);
+  }
   if (wasTry && !s.tryTwo) ev?.push({ type: 'pat', off: before.off, two: true, good: !!res.td && !res.turnover, t: s.t, played: true, ...(res.defTd ? { def2: true } : {}) });
   // the play crossed 2:00: the clock stops dead for the two-minute warning
   if (!warned && s.warned) ev?.push({ type: 'warning', t: s.t });
+}
+
+/**
+ * Momentum, from your side (-3 to 3): big plays, first downs, stops, scores and turnovers move it, and it fades a
+ * little every snap. Its edge is small and visible: it sharpens your pre-snap read (or, the other way, clouds it).
+ */
+function swing(s: State, off: Team, down0: number, res: PlayResult, first: boolean, ev?: Ev[]) {
+  const sign = off === 0 ? 1 : -1;
+  let d = 0;
+  if (res.turnover) d -= res.defTd ? 3 : 2;
+  else if (res.td) d += 2;
+  else if (res.safety) d -= 2;
+  else if (res.kind === 'fg') d += res.good ? 0.5 : -0.75;
+  else if (res.kind === 'sack') d -= 1;
+  else if (res.kind !== 'punt' && res.yards >= 20) d += 1;
+  else if (first) d += 0.5;
+  else if (down0 >= 3 && res.kind !== 'punt') d -= 0.75;
+  const was = s.mo ?? 0;
+  const now = clip(Math.round((was * 0.85 + d * sign) * 100) / 100, -3, 3);
+  s.mo = now;
+  // it swings hard: the stadium feels it
+  if (Math.abs(now) >= 2 && Math.abs(was) < 2) ev?.push({ type: 'momentum', team: now > 0 ? 0 : 1, t: s.t });
 }
 
 /** Stage 'pre': the clock decision between snaps (tempo, timeout, spike, kneel) for both sides. */
@@ -899,14 +929,34 @@ export function aiDefLook(s: State, r: Rng): Look {
   return pickWeighted<Look>(r, v as Record<Look, number>);
 }
 
+/** What their defense does against a call you keep running: runs meet a loaded box, quick throws press man, deep shots a deep shell. */
+export function counterOf(call: string): Look {
+  const c = CALL[call];
+  if (!c || c.kind !== 'pass') return 'load';
+  return c.drop === 'quick' || c.drop === 'std' ? 'man' : c.drop === 'screen' ? 'zone' : 'zone';
+}
+/** Where a coordinator's tendency kicks in. */
+export const dcSpot = (s: State, style: DcStyle['style']) =>
+  style === 'blitz' ? s.down >= 3 && s.dist >= 4 : style === 'zone' ? s.dist >= 7 : style === 'man' ? 100 - s.yl <= 20 : s.dist <= 3 && s.down <= 3;
+/** The AI defense's weights, tilted by its coordinator's tendency and by an adjustment to your repeated call. */
+function tilted(r: Rng, s: State, w: Partial<Record<Look, number>>): Look {
+  if (s.off === 0 && s.dc && !s.tryTwo) {
+    const out: Partial<Record<Look, number>> = { ...w };
+    if (dcSpot(s, s.dc.style)) out[s.dc.style] = (out[s.dc.style] ?? 0.08) * s.dc.k + 0.06;
+    if (s.rep && s.rep.n >= 3) { const c = counterOf(s.rep.call); out[c] = (out[c] ?? 0.08) * 2.4 + 0.1; }
+    return pickWeighted<Look>(r, out as Record<Look, number>);
+  }
+  return pickWeighted<Look>(r, w as Record<Look, number>);
+}
+
 function aiBaseLook(s: State, r: Rng): Look {
   const od = leadOf(s, s.off), E = early(s);
-  if (100 - s.yl <= 5) return pickWeighted<Look>(r, { goal: 0.4, man: 0.25, blitz: 0.15, zone: 0.1, load: 0.1 });
+  if (100 - s.yl <= 5) return tilted(r, s, { goal: 0.4, man: 0.25, blitz: 0.15, zone: 0.1, load: 0.1 });
   const runish = E ? s.dist <= 2 || (od >= 14 && s.q === 3) : od > 0 || (s.dist <= 2 && s.t > 60);
   const passish = E ? halfEnd(s) || (s.down >= 3 && s.dist >= 7) || od <= -14 : od < 0 && s.t <= 300;
-  if (runish) return pickWeighted<Look>(r, goalLineSituation(s) ? { goal: 0.3, load: 0.35, blitz: 0.2, man: 0.15 } : { load: 0.45, blitz: 0.2, balanced: 0.15, man: 0.1, zone: 0.1 });
-  if (passish) return pickWeighted<Look>(r, { prevent: 0.3, zone: 0.25, man: 0.15, blitz: 0.2, balanced: 0.1 });
-  return pickWeighted<Look>(r, { balanced: 0.25, zone: 0.2, man: 0.15, blitz: 0.15, load: 0.15, prevent: 0.1 });
+  if (runish) return tilted(r, s, goalLineSituation(s) ? { goal: 0.3, load: 0.35, blitz: 0.2, man: 0.15 } : { load: 0.45, blitz: 0.2, balanced: 0.15, man: 0.1, zone: 0.1 });
+  if (passish) return tilted(r, s, { prevent: 0.3, zone: 0.25, man: 0.15, blitz: 0.2, balanced: 0.1 });
+  return tilted(r, s, { balanced: 0.25, zone: 0.2, man: 0.15, blitz: 0.15, load: 0.15, prevent: 0.1 });
 }
 
 export function aiPat(s: State): PatChoice {

@@ -10,6 +10,7 @@ export interface FieldHandle {
   play(ev: Ev, speed: number, onOutcome?: (o: Outcome) => void): Promise<void>;
   playKick(ev: Extract<Ev, { type: 'kick' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void>;
   playPat(ev: Extract<Ev, { type: 'pat' }>, speed: number, onOutcome?: (o: Outcome) => void): Promise<void>;
+  hype(): void;
 }
 
 export interface Banner { id: number; text: string; sub?: string; tone: string }
@@ -23,9 +24,10 @@ interface Props {
   weather?: Weather;         // tints the field
   byRating?: boolean;        // markers colored by overall rating
   home?: 0 | 1;              // whose stadium: the midfield emblem and most of the crowd
+  look?: string;             // the field's look (badges unlock them): a class on the field
 }
 
-export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather, byRating = true, home = 0 }, ref) {
+export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ teams, onTap, banner, children, offense = 0, weather, byRating = true, home = 0, look }, ref) {
   const [inspect, setInspect] = useState<{ side: 'o' | 'd'; pos: string } | null>(null);
   // touch screens and narrow windows get the one-line card: the full table would cover the field
   const compact = typeof matchMedia === 'function' && matchMedia('(pointer: coarse), (max-width: 999px)').matches;
@@ -67,10 +69,11 @@ export const FieldView = forwardRef<FieldHandle, Props>(function FieldView({ tea
     play: (ev, speed, onOutcome) => rRef.current?.play(ev, speed, onOutcome) ?? Promise.resolve(),
     playKick: (ev, speed, onOutcome) => rRef.current?.playKick(ev, speed, onOutcome) ?? Promise.resolve(),
     playPat: (ev, speed, onOutcome) => rRef.current?.playPat(ev, speed, onOutcome) ?? Promise.resolve(),
+    hype: () => rRef.current?.hype(),
   }), []);
 
   return (
-    <div className={`field-wrap wx-${weather ?? 'clear'}`} ref={wrapRef}>
+    <div className={`field-wrap wx-${weather ?? 'clear'}${look && look !== 'classic' ? ` look-${look}` : ''}`} ref={wrapRef}>
       <WeatherLayer weather={weather} />
       <svg ref={svgRef} className="field" role="img" aria-label="Field: your end zone at the bottom, theirs at the top" />
       <div ref={kickRef} className="kickcam" aria-hidden />

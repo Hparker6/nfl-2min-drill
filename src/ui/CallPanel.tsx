@@ -8,6 +8,7 @@ import type { Decision, Opt } from '../game/session';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import type { Look, LookFam, PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
 import { MiniPlay } from './MiniPlay';
+import type { ScoutNote } from '../game/scout';
 
 /** What the play-caller changed about the selected call: the side, the receiver, the routes, the quarterback's action. */
 export interface Edits {
@@ -20,6 +21,8 @@ export const NO_EDITS: Edits = { target: null, routes: {}, side: 1, mods: {} };
 
 interface Props {
   dec: Decision;                            // the call on the board: play / look / st / pat / kick, or a clock-only step
+  scout?: ScoutNote[];                      // what their defense has shown, the scouting report, their adjustment
+  read?: { p: number; crowd: boolean };     // how often the pre-snap read is right now (momentum, a road crowd)
   clock: Decision | null;                   // the clock decision that goes with it (tempo on offense, timeout on defense)
   clockSel: Opt | null;
   s: State;
@@ -177,7 +180,7 @@ function ClockRow({ clock, clockSel, hints, s, onClock, onMajor, auto }: { clock
 }
 
 export function CallPanel(p: Props) {
-  const { dec, clock, clockSel, s, teams, selected, edits, hints, prev, onSelect, onSnap, onEdit } = p;
+  const { dec, clock, clockSel, s, teams, selected, edits, hints, prev, onSelect, onSnap, onEdit, scout = [], read } = p;
   const isPlay = dec.step === 'play';
   const isLook = dec.step === 'look';
   const [tab, setTab] = useState<Tab>('short');
@@ -405,10 +408,14 @@ export function CallPanel(p: Props) {
         <div className="cp-flags"><span className="off-flag">Your call</span><WeatherChip s={s} /></div>
         <Title text={dec.title} />
         {s.shownLook && (
-          <div className="read" title="Your pre-snap read is right about 7 times in 10">
+          <div className="read" title={`Your pre-snap read is right about ${Math.round((read?.p ?? 0.7) * 100)}% of the time${read?.crowd ? ' (a road crowd on third down makes it harder)' : ''}`}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
             <span><b>Defense:</b> {LOOK_READ[s.shownLook]}</span>
+            {read && <em className={`read-p${read.p >= 0.75 ? ' hi' : read.p < 0.65 ? ' lo' : ''}`}>{Math.round(read.p * 100)}% read</em>}
           </div>
+        )}
+        {isPlay && scout.length > 0 && (
+          <ul className="scout" aria-label="Scouting">{scout.map((n, i) => <li key={i} className={`sc-${n.kind}`}>{n.text}</li>)}</ul>
         )}
       </header>
       {clockRow}

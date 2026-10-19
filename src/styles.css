@@ -1159,3 +1159,88 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .kc-verdict span { font: 600 13px var(--body); opacity: .92; }
 @media (max-width: 600px) { .kc-verdict b { font-size: 22px; } .kc-lower { left: 8px; bottom: 8px; } .kc-lower b { font-size: 14px; } }
 .f-mascn { font: 800 .5px var(--display); text-anchor: middle; dominant-baseline: central; }
+
+/* ---------- the game within the game: tells, the chains, the gain, momentum, clutch, scouting ---------- */
+/* a defender giving the look away: a pulsing amber halo around his marker */
+.f-dot.tell .f-ring { stroke: #ffb347 !important; stroke-width: .5; }
+.f-dot.tell .f-mk { animation: tell-pulse 1.1s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes tell-pulse { from { filter: drop-shadow(0 0 0 rgba(255, 179, 71, 0)); } to { filter: drop-shadow(0 0 .45px rgba(255, 179, 71, .95)); } }
+.fchip-tell { position: absolute; top: 46px; left: 12px; z-index: 2; padding: 5px 10px; border-radius: 6px; background: rgba(40, 24, 4, .85); border: 1px solid #ffb347; color: #ffcf87; font: 800 13px var(--display); letter-spacing: .08em; text-transform: uppercase; }
+/* the down box the chain crew holds at the line */
+.f-downbox rect { fill: #ff8a1f; stroke: #1b1b1b; stroke-width: .12; }
+.f-downbox text { font: 800 1.35px var(--display); fill: #1b1b1b; text-anchor: middle; dominant-baseline: central; }
+/* the gain (or loss) after a play: a band from the line to the spot */
+.f-gain rect { opacity: .22; animation: gain-in .35s ease-out; }
+.f-gain.up rect { fill: #3fbf6a; } .f-gain.down rect { fill: #ec5a50; }
+.f-gain line { stroke-width: .22; stroke-dasharray: .6 .4; }
+.f-gain.up line { stroke: #7be29c; } .f-gain.down line { stroke: #ff8b80; }
+.f-gain text { font: 800 1.7px var(--display); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: rgba(0, 0, 0, .65); stroke-width: .3; }
+.f-gain.up text { fill: #b6f5c8; } .f-gain.down text { fill: #ffc2bc; }
+@keyframes gain-in { from { opacity: 0; } }
+/* momentum: a bar on the field that leans to whoever has it */
+.mom { position: absolute; top: 46px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 999px; background: rgba(8, 12, 10, .78); color: #dfe7e2; font: 600 12px var(--body); pointer-events: auto; transition: box-shadow .3s; }
+.mom-k { font: 700 11px var(--display); letter-spacing: .08em; text-transform: uppercase; color: #9fb0a6; }
+.mom-bar { position: relative; width: 84px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+.mom-bar::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(255, 255, 255, .5); }
+.mom-bar i { position: absolute; top: 0; bottom: 0; background: var(--muted); transition: left .45s var(--ease), width .45s var(--ease); }
+.mom.yours .mom-bar i { background: var(--good); } .mom.theirs .mom-bar i { background: var(--bad); }
+.mom.yours { box-shadow: 0 0 0 1px color-mix(in srgb, var(--good) 55%, transparent); } .mom.theirs { box-shadow: 0 0 0 1px color-mix(in srgb, var(--bad) 55%, transparent); }
+.mom-who { font: 800 12px var(--display); letter-spacing: .04em; min-width: 3ch; }
+/* the road crowd, and the game on the line */
+.fchip-crowd { position: absolute; top: 80px; right: 12px; z-index: 2; padding: 4px 10px; border-radius: 999px; background: rgba(176, 44, 36, .88); color: #fff; font: 700 12px var(--body); pointer-events: none; animation: crowd-buzz .18s steps(2) infinite; }
+@keyframes crowd-buzz { 50% { transform: translateX(1px); } }
+.fchip-clutch { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(8, 12, 10, .85); border: 1px solid var(--accent); color: var(--accent); font: 800 15px var(--display); letter-spacing: .1em; text-transform: uppercase; pointer-events: none; }
+.fchip-clutch i { width: 10px; height: 10px; border-radius: 50%; background: #ff4d4d; animation: clutch-beat .8s ease-in-out infinite; }
+@keyframes clutch-beat { 0%, 60%, 100% { transform: scale(1); } 15% { transform: scale(1.35); } 30% { transform: scale(1.05); } 45% { transform: scale(1.22); } }
+.game.clutch .field-wrap { box-shadow: inset 0 0 0 2px var(--accent); }
+.game.clutch .field-wrap::after { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55) 100%); animation: clutch-breathe 1.6s ease-in-out infinite alternate; }
+@keyframes clutch-breathe { from { opacity: .55; } to { opacity: 1; } }
+/* the read and the scouting notes in the call panel */
+.read-p { margin-left: auto; flex: none; padding: 2px 7px; border-radius: 999px; background: rgba(255, 255, 255, .07); color: var(--ink-2); font: 700 11px var(--body); font-style: normal; }
+.read-p.hi { color: var(--good); } .read-p.lo { color: var(--bad); }
+.scout { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.scout li { position: relative; padding: 5px 10px 5px 26px; border-radius: var(--r-sm); background: var(--panel-2); font-size: 13px; color: var(--ink-2); line-height: 1.35; }
+.scout li::before { position: absolute; left: 9px; top: 5px; font: 800 12px var(--display); }
+.scout .sc-record::before { content: '▸'; color: var(--los); }
+.scout .sc-report::before { content: '★'; color: var(--accent); }
+.scout .sc-adjust { background: color-mix(in srgb, var(--bad) 14%, var(--panel-2)); color: var(--ink); }
+.scout .sc-adjust::before { content: '!'; color: var(--bad); }
+.brief-dc { display: grid; gap: 3px; padding: 9px 12px; border-radius: var(--r-sm); background: var(--panel-2); border-left: 3px solid var(--accent); font-size: 14px; color: var(--ink-2); }
+.brief-dc .k { font: 700 11px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+@media (max-width: 999px) { .mom { top: 40px; right: 8px; padding: 4px 8px; } .mom-bar { width: 52px; } .mom-k { display: none; } .fchip-clutch { top: auto; bottom: 8px; font-size: 12px; padding: 4px 10px; } .fchip-crowd { top: 72px; right: 8px; font-size: 11px; } .fchip-tell { top: 40px; left: 8px; font-size: 11px; } }
+
+/* ---------- badges, the recap, the field looks ---------- */
+.badge-toast { position: fixed; left: 50%; bottom: 22px; z-index: 80; display: flex; align-items: center; gap: 12px; max-width: min(420px, calc(100vw - 32px)); padding: 12px 18px 12px 12px; border-radius: 14px; background: #0f1512; border: 1px solid var(--accent); box-shadow: 0 16px 40px rgba(0, 0, 0, .5), 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent); transform: translateX(-50%); animation: bt-in .5s cubic-bezier(.2, 1.5, .4, 1); }
+.badge-toast div { display: grid; gap: 1px; }
+.bt-icon { display: grid; place-items: center; width: 46px; height: 46px; flex: none; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font: 800 24px var(--display); }
+.bt-k { font: 700 11px var(--display); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.badge-toast b { font: 800 20px/1.1 var(--display); text-transform: uppercase; color: #fff; }
+.badge-toast small { color: #b9c5be; font-size: 12px; }
+@keyframes bt-in { from { opacity: 0; transform: translate(-50%, 24px) scale(.9); } }
+.badges { display: grid; gap: 8px; margin-top: 18px; }
+.bc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.bc-title { padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font: 800 12px var(--display); letter-spacing: .08em; text-transform: uppercase; }
+.bc-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 8px; }
+.bc-grid li { display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: var(--r-sm); background: var(--panel-2); border: 1px solid var(--line); opacity: .62; }
+.bc-grid li.on { opacity: 1; border-color: color-mix(in srgb, var(--accent) 60%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--panel-2)); }
+.bc-grid li div { display: grid; gap: 2px; min-width: 0; }
+.bc-grid b { font: 800 15px/1.1 var(--display); text-transform: uppercase; }
+.bc-grid small { color: var(--muted); font-size: 12px; line-height: 1.35; }
+.bc-icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 50%; background: var(--panel-3); color: var(--muted); font: 800 17px var(--display); }
+.bc-grid li.on .bc-icon { background: var(--accent); color: var(--accent-ink); }
+.field-look { display: grid; gap: 6px; font: 700 12px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.field-look select { font: 600 15px var(--body); text-transform: none; letter-spacing: 0; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 9px 12px; }
+.rv-key { display: grid; gap: 8px; }
+.rv-moment { display: grid; gap: 2px; padding: 10px 12px; border-radius: var(--r-sm); background: var(--panel-2); border-left: 3px solid var(--line-2); }
+.rv-moment.best { border-left-color: var(--g); } .rv-moment.worst { border-left-color: var(--r); } .rv-moment.turn { border-left-color: var(--accent); }
+.rv-m-k { font: 700 11px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.rv-moment b { font: 800 17px/1.15 var(--display); text-transform: uppercase; }
+.rv-moment small { color: var(--muted); font-size: 12px; }
+.rv-moment p { font-size: 13px; color: var(--ink-2); line-height: 1.4; }
+/* field looks (badges unlock them) */
+.field-wrap.look-night .field { filter: brightness(.8) saturate(1.15) contrast(1.08); }
+.field-wrap.look-night::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: radial-gradient(60% 35% at 0% 0%, rgba(255, 250, 220, .16), transparent 70%), radial-gradient(60% 35% at 100% 0%, rgba(255, 250, 220, .16), transparent 70%); }
+.field-wrap.look-retro .field { filter: sepia(.28) saturate(.82) contrast(.96) brightness(1.04); }
+.field-wrap.look-gold .f-line, .field-wrap.look-gold .f-hash { stroke: #f2d36b; }
+.field-wrap.look-gold .f-num, .field-wrap.look-gold .f-arrow { fill: #f2d36b; opacity: .62; }
+.field-wrap.look-gold .f-border { stroke: #f2d36b; }

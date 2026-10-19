@@ -1,3 +1,4 @@
+import type { FieldLook, GameFacts } from './badges';
 /** Local persistence: settings, daily progress (resumable mid-spot), survivor runs, history and streaks. */
 import type { GradeKey } from './grade';
 import type { Pick } from './session';
@@ -10,6 +11,7 @@ export interface Settings {
   plainDots?: boolean;   // field markers in team colors instead of colored by rating
   sound?: boolean;       // sound effects (on unless set to false)
   music?: boolean;       // the light background music (on unless set to false)
+  fieldLook?: FieldLook; // the field's look (badges unlock more)
 }
 
 export interface SpotResult {
@@ -26,6 +28,7 @@ export interface SpotResult {
   aiLost: number;        // what the AI coach would have given up on the same decisions
   tags: string[];        // what kind of calls were made (for the coach profile)
   baseWp?: number;       // how often the simulated coach wins from the starting spot (absent on old saves)
+  facts?: GameFacts;     // what badges read: the spot you took over, fourth downs, takeaways… (absent on old saves)
 }
 
 export interface DayRecord {
@@ -47,6 +50,7 @@ export interface Store {
   surv: { best: number; runs: number; run?: SurvivorRun };
   history: SpotResult[];
   seenHelp: boolean;
+  badges?: Record<string, string>;   // badge id → the date it was earned
 }
 
 const KEY = 'the4thcall:v1';

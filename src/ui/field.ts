@@ -17,6 +17,7 @@
 import { CALL, DEF_POS, OFF_POS, POS_LABEL, RECEIVERS, ROUTES } from '../engine/data';
 import { CX, DESIGN, W, defAlign, formation, type Pt } from '../engine/formation';
 import { defShapes } from './defShapes';
+import { famOf as famOfLook } from '../engine/defense';
 import { hash, rng } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
@@ -39,6 +40,18 @@ export interface Preview {
   look?: Look | null;          // the defense drawn (shown look, or your call on defense)
   routes?: boolean;            // draw routes / run arrows
   defCall?: boolean;           // your call on defense: draw it (blitz arrows, zones, man assignments), as the play card does
+  tells?: boolean;             // on offense: mark the defenders giving the look away (the pre-snap read)
+}
+
+/** The defenders who give a look away before the snap, and what the tell is called. */
+export function tellsOf(look: Look): { who: string[]; tag: string } {
+  const fam = famOfLook(look);
+  if (fam === 'blitz') return { who: defShapes(look).rush, tag: 'Pressure look' };
+  if (fam === 'load') return { who: ['LB1', 'LB2', 'LB3', 'S2'], tag: 'Eight in the box' };
+  if (fam === 'man') return { who: ['CB1', 'CB2'], tag: 'Corners pressed' };
+  if (fam === 'zone') return { who: ['S1', 'S2'], tag: 'Two deep' };
+  if (fam === 'prevent') return { who: ['S1', 'S2', 'CB1', 'CB2'], tag: 'Deep shell' };
+  return { who: [], tag: '' };
 }
 
 /** What the play came to, fired when it happens on the field (not after the hold). */
@@ -364,6 +377,7 @@ export class FieldRenderer {
     }
     const ds = defAlign(pv.look ?? null);
     const blitzing = pv.defCall && pv.look ? defShapes(pv.look).rush : [];
+    const tell = pv.tells && pv.look && off === 0 && live ? tellsOf(pv.look) : { who: [] as string[], tag: '' };
     for (const pos of DEF_POS) {
       const p = ds[pos];
       const d = this.dots.get(`d:${pos}`)!;
@@ -371,6 +385,7 @@ export class FieldRenderer {
       this.paint(d, 'd', pl, pos);
       d.g.classList.remove('tgt', 'tappable', 'carrier');
       d.g.classList.toggle('blitz', blitzing.includes(pos));
+      d.g.classList.toggle('tell', tell.who.includes(pos));
       d.g.querySelector('title')!.textContent = `${pl?.name} · ${pos} · rated ${pl?.rating}${blitzing.includes(pos) ? ' · blitzing' : ''}`;
       targets.set(`d:${pos}`, map([p[0], Math.min(p[1], yt + 9)]));
     }
@@ -383,6 +398,12 @@ export class FieldRenderer {
       const fd = map([0, s.dist])[1];
       this.el('line', { x1: 0, x2: W, y1: fd, y2: fd, class: 'f-fd' }, this.gMarks);
       for (const x of [0, W]) this.el('rect', { x: x - 0.45, y: fd - 0.45, width: 0.9, height: 0.9, class: 'f-stick' }, this.gMarks);
+    }
+    // the down box on the near sideline at the line, as the chain crew holds it
+    if (s.stage === 'pre' || s.stage === 'call') {
+      const db = this.el('g', { class: 'f-downbox', transform: `translate(1.35 ${b[1].toFixed(2)})` }, this.gMarks);
+      this.el('rect', { x: -0.9, y: -0.9, width: 1.8, height: 1.8, rx: 0.25 }, db);
+      this.el('text', { x: 0, y: 0.05 }, db).textContent = s.tryTwo ? '2' : String(s.down);
     }
     // direction of attack: a chevron on the sideline behind the ball
     const a1 = map([W - 1.6, -3.5]), a2 = map([W - 1.6, -0.8]);
@@ -689,11 +710,25 @@ export class FieldRenderer {
         if (!decided && t >= tl.decisive) { decided = true; onOutcome?.(outcome); }
         if (dropAt != null && t > dropAt) { const o = String(Math.max(0.25, 1 - (t - dropAt) / 0.6)); this.ball.style.opacity = o; this.ballLace.style.opacity = o; }
         if (f < 1) this.raf = requestAnimationFrame(step);
-        else resolve();
+        else { this.gainBand(ev, map); resolve(); }
       };
       if (dur > 0) this.raf = requestAnimationFrame(step);
       else { this.cam = this.camTarget = this.clampCam(110 - map([ballAt(tl.ball, tl.end).x, ballAt(tl.ball, tl.end).dy])[1]); this.applyCam(); step(performance.now()); }
     });
+  }
+
+  /** After a play from scrimmage: a band from the line to where it ended, with the yards on it (a broadcast's gain line). */
+  private gainBand(ev: Extract<Ev, { type: 'snap' }>, map: (p: Pt) => Pt) {
+    const r = ev.res;
+    const counted = (r.kind === 'run' || r.kind === 'scramble' || r.kind === 'sack' || (r.kind === 'pass' && r.complete)) && !r.turnover && !r.penalty && !ev.try;
+    if (!counted || !r.yards) return;
+    const a = map([0, 0])[1], b = map([0, r.yards])[1];
+    const y = Math.min(a, b), h = Math.abs(b - a);
+    const g = this.el('g', { class: `f-gain ${r.yards > 0 ? 'up' : 'down'}` }, this.gMarks);
+    this.el('rect', { x: 0, y, width: W, height: h }, g);
+    this.el('line', { x1: 0, x2: W, y1: b, y2: b }, g);
+    const t = this.el('text', { x: W - 3.2, y: b + (b < a ? -1.1 : 1.3) }, g);
+    t.textContent = r.td ? 'TD' : `${r.yards > 0 ? '+' : '−'}${Math.abs(r.yards)}`;
   }
 
   /** What the viewer sees when something happens: a mark on the turf and a short call-out at the spot. */

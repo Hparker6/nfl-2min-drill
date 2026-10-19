@@ -7,7 +7,7 @@ import { CALLS, LOOKS, TEMPO } from '../engine/data';
 import {
   advance, endOfHalf, fullGamePace, aiDefClock, aiDefLook, aiKick, aiOffClock, aiOffPlay, aiPat, aiST, clone, fgDist, fgProb, leadOf, lookOther, otProb, ytg,
 } from '../engine/sim';
-import { hash, rng } from '../engine/rng';
+import { clip, hash, rng } from '../engine/rng';
 import { READ_ACCURACY } from '../engine/evaluate';
 import { DEF_CALLS, DEF_PLAYS, goalLineSituation } from '../engine/defense';
 import type { Scenario } from '../engine/scenario';
@@ -49,9 +49,35 @@ export interface Record_ {
   situation: string;
   t: number;
   grade?: Grade;
+  clutch?: boolean;      // made with the game on the line (isClutch)
 }
 
 export interface LogLine { ev: Ev; k: number }
+
+/**
+ * How often your pre-snap read of the defense is right: 7 in 10 (better with the Film Room ability), plus or minus
+ * momentum (3 points a step), and a road crowd on third and fourth down costs 8 more. Only games with momentum (the
+ * coordinator's games) move off the base.
+ */
+export function readChance(sc: Scenario, s: State): { p: number; crowd: boolean } {
+  const base = sc.readAcc ?? READ_ACCURACY;
+  if (s.mo == null) return { p: base, crowd: false };
+  const crowd = sc.home === 1 && s.off === 0 && s.down >= 3 && !s.tryTwo;
+  return { p: clip(base + s.mo * 0.03 - (crowd ? 0.08 : 0), 0.45, 0.92), crowd };
+}
+
+/**
+ * A snap with the game on the line: the last two minutes of a one-score game (or overtime) on third or fourth down,
+ * in the final 40 seconds, or a two-point try that decides it.
+ */
+export function isClutch(s: State): boolean {
+  if (s.stage !== 'call' && s.stage !== 'pre') return false;
+  const late = s.q == null ? s.t <= 120 : s.q >= 5 || (s.q === 4 && s.t <= 120);
+  const l = leadOf(s, 0);
+  if (s.tryTwo) return late && Math.abs(l) <= 8;
+  if (!late || Math.abs(l) > 8) return false;
+  return s.down >= 3 || s.t <= 40 || (s.q ?? 4) >= 5;
+}
 
 export class Session {
   s: State;
@@ -114,7 +140,7 @@ export class Session {
       if (s.off === 0) {
         if (!s.pendLook) {
           s.pendLook = aiDefLook(s, pre);
-          s.shownLook = pre() < (this.sc.readAcc ?? READ_ACCURACY) ? s.pendLook : lookOther(s.pendLook, pre, s.mix);
+          s.shownLook = pre() < readChance(this.sc, s).p ? s.pendLook : lookOther(s.pendLook, pre, s.mix);
         }
         return this.playCall(aiR);
       }
@@ -242,7 +268,7 @@ export class Session {
     if (!d) return this.auto();
     this.records.push({
       step: d.step, title: d.title, key: opt.key, label: optLabel(opt), choice: opt.choice, situation: situation(this.s, this.sc.teams),
-      t: this.s.t, grade,
+      t: this.s.t, grade, ...(isClutch(this.s) ? { clutch: true } : {}),
     });
     this.picks.push({ key: opt.key, choice: opt.choice, grade });
     const ev: Ev[] = [];

@@ -7,7 +7,8 @@ import type { Coin, Ev, Rcv, State } from '../engine/types';
 import { ballOn, defenseVerdict, downDist, fmtClock, headline, situation, tell, type Told } from '../game/describe';
 import { GRADE_INFO, type Grade } from '../game/grade';
 import { GradeJob } from '../game/grader';
-import { Session, isToss, type Decision, type Opt, type Pick, type Record_ } from '../game/session';
+import { Session, isClutch, isToss, readChance, type Decision, type Opt, type Pick, type Record_ } from '../game/session';
+import { DC_TEXT, scoutNotes } from '../game/scout';
 import { spotResult } from '../game/rating';
 import type { Settings, SpotResult } from '../game/storage';
 import { setContext, track } from '../game/analytics';
@@ -16,7 +17,7 @@ import { FieldView, type Banner, type FieldHandle } from './FieldView';
 import { MiniPlay } from './MiniPlay';
 import { Scoreboard } from './Scoreboard';
 import { SpotReview } from './Review';
-import type { Preview } from './field';
+import { tellsOf, type Preview } from './field';
 import { gameOnScreen } from './AdSlot';
 import { audio } from '../game/audio';
 import { cueFor, finalCue, type ImpactKind } from '../game/fx';
@@ -130,12 +131,16 @@ export function GameScreen(p: Props) {
     const c = cueFor(ev);
     if (c.sound) audio.play(c.sound);
     if (withImpact && c.impact) fire(c.impact);
+    // a big swing of momentum: the stadium feels it
+    if (ev.type === 'momentum') { field.current?.hype(); audio.play(ev.team === 0 ? 'cheer' : 'groan'); }
   }, [fire]);
+  /** The clutch snap plays in slow motion (set when it's snapped, cleared when it's drawn). */
+  const slowRef = useRef(1);
 
   const preview = useCallback((d: Decision | null, o: Opt | null, e: Edits): Preview => {
     const s = session.s;
     if (!d) return {};
-    if (d.step === 'play') return { play: o?.choice.play ?? null, target: e.target, edits: e.routes, side: e.side, mods: e.mods, look: s.shownLook, routes: true };
+    if (d.step === 'play') return { play: o?.choice.play ?? null, target: e.target, edits: e.routes, side: e.side, mods: e.mods, look: s.shownLook, routes: true, tells: true };
     if (d.step === 'look') return { look: o?.choice.look ?? null, defCall: !!o?.choice.look };
     return {};
   }, [session]);
@@ -196,13 +201,14 @@ export function GameScreen(p: Props) {
           if (speed) await sleep(650 / speed);
         }
         setBanner(null);
-        await field.current?.play(ev, speed, () => {
+        await field.current?.play(ev, speed * slowRef.current, () => {
           if (told.banner) setBanner({ id: ++uid, text: told.banner, tone: told.tone });
           react(ev);
           setView(clone(session.s));
           if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         });
         staleRef.current = true;
+        slowRef.current = 1;   // only the clutch snap itself is slowed
       } else if (ev.type === 'kick' || (ev.type === 'pat' && !ev.played)) {
         // kickoffs and tries are scenes too
         setBanner(null);
@@ -281,6 +287,7 @@ export function GameScreen(p: Props) {
     staleRef.current = false;
     setPhase('deciding');
     shownAt.current = Date.now();
+    if (liveRef.current && isClutch(session.s)) audio.play('drum');   // a heartbeat: the game is on the line
     track('decision_shown', { mode: sc.mode, step: d.step, options: d.options.length, n: session.records.length });
   }, [sc, session, hints, preview]);
 
@@ -428,6 +435,8 @@ export function GameScreen(p: Props) {
     const recIdx = session.records.length;
     const dStep = d.step;
     const pre = dStep === 'look' ? d.state : undefined;   // for the defense verdict on the result card
+    // the game on the line: this snap plays in slow motion
+    slowRef.current = speed && isClutch(session.s) ? 0.6 : 1;
     const gp = job.grade(o);
     const evs = session.choose(o);
     onPicks(session.picks);
@@ -524,6 +533,9 @@ export function GameScreen(p: Props) {
   });
 
   const T = sc.teams;
+  const clutchNow = phase === 'deciding' && !!dec && !isToss(dec.step) && isClutch(session.s);
+  const readNow = readChance(sc, session.s);
+  const tellNow = phase === 'deciding' && dec?.step === 'play' && session.s.shownLook ? tellsOf(session.s.shownLook).tag : '';
   let side: ReactNode = null;
   if (phase === 'brief') {
     const s0 = sc.start;
@@ -534,6 +546,7 @@ export function GameScreen(p: Props) {
         <div className="eyebrow">{p.label}</div>
         <h2 className="brief-head">{headline(s0)}</h2>
         <p className="brief-sit">{situation(s0, T)}{s0.weather && s0.weather !== 'clear' ? <> <b className={`wx-word wx-${s0.weather}`}>{WEATHER[s0.weather].blurb}</b></> : null}</p>
+        {s0.dc && <p className="brief-dc"><span className="k">Scouting report</span>Their defensive coordinator {DC_TEXT[s0.dc.style]}. Watch for it, and don't run the same play three times in a row: he adjusts.</p>}
         <div className="brief-odds">
           <div className="odds-bar"><i style={{ width: `${Math.round(sc.baseWp * 100)}%` }} /></div>
           <span>From here, our simulated coach wins <b>{Math.round(sc.baseWp * 100)}%</b> of the time. Can you do better?</span>
@@ -546,6 +559,7 @@ export function GameScreen(p: Props) {
     side = <CoinToss s={view} teams={T} onCall={onCall} onChoose={onChoose} onContinue={() => { setPhase('auto'); proceed(); }} />;
   } else if (phase === 'deciding' && dec) {
     side = <CallPanel dec={mainDec ?? dec} clock={mainDec && isClock ? dec : null} clockSel={clockSel} s={session.s} teams={T} selected={sel} edits={edits}
+      scout={scoutNotes(session.s, session.log.map((l) => l.ev))} read={readChance(sc, session.s)}
       hints={isClock && !mainDec ? clockHints : hintMap} clockHints={clockHints} prev={prev} autoTempo={defaultTempo(dec)?.key}
       onClock={(o) => { setClockSel(o); setHintMap(null); }} onMajor={onSnap} onSelect={onSelect} onEdit={setEdits} onSnap={onSnap} />;
   } else if (phase === 'snapping' && snapping) {
@@ -575,14 +589,18 @@ export function GameScreen(p: Props) {
     : phase === 'deciding' ? (sel ? ['sel', `Selected: ${sel.label}`] : ['ready', dec?.step === 'play' ? 'Pick a play' : 'Your call']) : ['ready', 'Pre-game'];
 
   return (
-    <div className="game" ref={gameRef}>
+    <div className={`game${clutchNow ? ' clutch' : ''}`} ref={gameRef}>
       {p.meta}
       <Scoreboard s={view} teams={T} wp={wp} trail={trail} />
       <div className="arena">
         <div className="stage" ref={stageRef}>
-          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots} home={sc.home}>
+          <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots} home={sc.home} look={settings.fieldLook}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
             {impact && <Impact key={impact.id} kind={impact.kind} onDone={() => setImpact((x) => (x?.id === impact.id ? null : x))} />}
+            {view.mo != null && <Momentum mo={view.mo} you={T[0].id} them={T[1].id} />}
+            {clutchNow && <div className="fchip-clutch" aria-live="polite"><i aria-hidden />Game on the line</div>}
+            {tellNow && <div className="fchip-tell" title={`What the defense shows before the snap. Your read is right about ${Math.round(readNow.p * 100)}% of the time.`}>Tell · {tellNow}</div>}
+            {phase === 'deciding' && readNow.crowd && <div className="fchip-crowd">Road crowd: harder read</div>}
             <div className="legend" aria-hidden>
               <span><i className="lg-o" />Offense: {T[view.off].name}</span>
               <span><i className="lg-d" />Defense: {T[view.off === 0 ? 1 : 0].name}</span>
@@ -670,5 +688,18 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLab
         <button className="btn next" onClick={onNext} disabled={(!g && !last.failed) || replaying}>{over ? overLabel ?? 'See the final' : 'Next play'}<kbd>Enter</kbd></button>
       </div>
     </section>
+  );
+}
+
+/** Momentum, from your side: a bar that leans to whoever has it (-3 to 3), with the team that does. */
+function Momentum({ mo, you, them }: { mo: number; you: string; them: string }) {
+  const f = Math.max(-1, Math.min(1, mo / 3));
+  const who = Math.abs(mo) < 0.75 ? 'Even' : mo > 0 ? you : them;
+  return (
+    <div className={`mom${mo >= 0.75 ? ' yours' : mo <= -0.75 ? ' theirs' : ''}`} title="Momentum: big plays, first downs, stops and turnovers move it. It sharpens (or clouds) your pre-snap read.">
+      <span className="mom-k">Momentum</span>
+      <span className="mom-bar"><i style={{ left: f < 0 ? `${50 + f * 50}%` : '50%', width: `${Math.abs(f) * 50}%` }} /></span>
+      <span className="mom-who">{who}</span>
+    </div>
   );
 }

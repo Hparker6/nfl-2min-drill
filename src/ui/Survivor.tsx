@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { survivorScenario } from '../engine/scenario';
+import { announce, awardBadges } from '../game/badges';
+import { survivorScenario, utcDate } from '../engine/scenario';
 import { hash } from '../engine/rng';
 import { shareText, survivorShare } from '../game/share';
 import { rateSpots } from '../game/rating';
@@ -39,6 +40,7 @@ export function Survivor({ store, update, toast }: Props) {
       delete R.cur;
       s.history.push(r);
       if (s.history.length > 300) s.history.splice(0, s.history.length - 300);
+      { const fresh = awardBadges(s, utcDate()); setTimeout(() => announce(fresh), 900); }
       if (!r.win) {
         R.over = true;
         const wins = R.results.length - 1;
