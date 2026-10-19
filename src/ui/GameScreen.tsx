@@ -203,7 +203,7 @@ export function GameScreen(p: Props) {
           if (told.text) setFeed((f) => [{ id: ++uid, t: ev.t, ...told }, ...f]);
         });
         staleRef.current = true;
-      } else if (ev.type === 'kick' || ev.type === 'pat') {
+      } else if (ev.type === 'kick' || (ev.type === 'pat' && !ev.played)) {
         // kickoffs and tries are scenes too
         setBanner(null);
         const land = () => {

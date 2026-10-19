@@ -711,7 +711,7 @@ export class FieldRenderer {
         const scorerTop = good !== !!res.defTd;
         this.fx('td', [0, scorerTop ? 0 : 110]);
         this.hype();
-        this.callout('TOUCHDOWN', at, good !== !!res.defTd ? 'good' : 'bad', 2.2);
+        this.callout(ev.try ? (res.defTd ? 'DEFENSIVE TWO' : 'TWO POINTS!') : 'TOUCHDOWN', at, good !== !!res.defTd ? 'good' : 'bad', 2.2);
         break;
       }
       case 'good': this.fx('td', [0, good ? 0 : 110]); this.hype(); this.callout(res.call === 'xp' || res.call === 'fg' ? "IT'S GOOD!" : 'GOOD · 2 POINTS', at, good ? 'good' : 'bad', 2.2); break;

@@ -91,6 +91,8 @@ export interface State {
   toss?: boolean;         // overtime opens with a called coin toss and the winner's choice (stage 'toss'); absent: a silent seeded toss, as older games had
   coin?: { call: Coin; face: Coin; won: Team; pick?: Team };   // overtime's toss: the call, how it landed, who won, and who chooses now
   otPlay?: boolean;       // a late-game spot that ends tied plays overtime (the playoff rules); absent on older dailies, where a weighted coin settles it
+  twoPlay?: boolean;      // a two-point try is a snap from the 2 that someone calls; absent on older games, where it's a weighted coin
+  tryTwo?: boolean;       // a two-point try is on: the next snap is it (no clock, in for two or nothing)
 }
 
 /** A decision. Only the fields for the stage being decided are read; the rest fall to the AI. */
@@ -147,9 +149,10 @@ export type Ev =
   | { type: 'timeout'; team: Team; t: number; left: number }
   | { type: 'warning'; t: number }
   | { type: 'expire'; t: number }
-  | { type: 'snap'; off: Team; yl0: number; down0: number; dist0: number; t0: number; t: number; res: PlayResult; first: boolean }
+  | { type: 'snap'; off: Team; yl0: number; down0: number; dist0: number; t0: number; t: number; res: PlayResult; first: boolean; try?: boolean }   // try: a two-point try's snap
   | { type: 'kick'; kind: 'kickoff' | 'onside' | 'free'; kicker: Team; recover: Team; touchback: boolean; td: boolean; yl: number; t: number }
-  | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number }
+  | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number; played?: boolean; def2?: boolean }   // played: the try was a snap (already drawn); def2: the defense returned it for two
+  | { type: 'twotry'; off: Team; t: number }   // going for two: the try is a snap from the 2
   | { type: 'period'; q: number; t: number }       // full games: a new quarter, halftime (q 3) or overtime (q 5+)
   | { type: 'toss'; call: Coin; face: Coin; won: Team; t: number }   // overtime's coin toss (team 0 calls it)
   | { type: 'otpick'; team: Team; recv: boolean; q: number; t: number }   // overtime: the team with the choice receives or kicks

@@ -140,14 +140,14 @@ export class Session {
       const options: Opt[] = calls.map((k) => ({ key: k, label: LOOKS[k].label, sub: LOOKS[k].sub, group: 'def', choice: { look: k }, risk: LOOKS[k].tilt }));
       const ai = aiDefLook(s, aiR);
       const goal = s.dist >= ytg(s) ? 'Goal' : String(s.dist);
-      const title = s.down === 4 ? `4th & ${goal}: they're going for it` : `${['1st', '2nd', '3rd'][s.down - 1]} & ${goal}: call the defense`;
+      const title = s.tryTwo ? 'Two-point try: call the defense' : s.down === 4 ? `4th & ${goal}: they're going for it` : `${['1st', '2nd', '3rd'][s.down - 1]} & ${goal}: call the defense`;
       return { step: 'look', title, options, aiKey: options.some((o) => o.key === ai) ? ai : 'balanced', state: clone(s) };
     }
     if (s.stage === 'pat') {
       if (s.off !== 0) return null;
       const options: Opt[] = [
         { key: 'xp', label: 'Kick it', sub: 'About 19 in 20 go through', group: 'pat', choice: { pat: 'xp' } },
-        { key: 'two', label: 'Go for two', sub: 'About half convert', group: 'pat', choice: { pat: 'two' } },
+        { key: 'two', label: 'Go for two', sub: s.twoPlay ? 'Call a play from the 2: about half convert' : 'About half convert', group: 'pat', choice: { pat: 'two' } },
       ];
       return { step: 'pat', title: 'Touchdown! The try', options, aiKey: aiPat(s), state: clone(s) };
     }
@@ -200,11 +200,16 @@ export class Session {
     const yt = ytg(s);
     const options: Opt[] = [];
     for (const c of CALLS) {
-      if (c.id === 'hail' && !(s.t <= 30 && yt >= 30)) continue;
+      if (c.id === 'hail' && (s.tryTwo || !(s.t <= 30 && yt >= 30))) continue;
       if (c.id === 'sneak' && s.dist > 3) continue;
       options.push({ key: c.id, label: c.name, sub: c.sub, group: c.fam, choice: { play: c.id }, risk: c.risk });
     }
     const fd = fgDist(s);
+    if (s.tryTwo) {
+      // a two-point try: plays only, from the 2
+      const ai = aiOffPlay(s, aiR);
+      return { step: 'play', title: 'Two-point try: call the play', options, aiKey: options.some((o) => o.key === ai) ? ai : 'power', state: clone(s) };
+    }
     if (fd <= 63) {
       const p = Math.round(fgProb(fd, s.rat[0].k) * 100);
       options.push({ key: 'fg', label: `Field goal`, sub: `${fd} yards, about ${p}% from there`, group: 'special', choice: { play: 'fg' } });

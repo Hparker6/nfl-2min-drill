@@ -432,6 +432,7 @@ function changePoss(s: State, yl: number) {
 
 /** Apply a resolved snap to the state. Returns whether it moved the chains. */
 export function applySnap(s: State, res: PlayResult): boolean {
+  if (s.tryTwo) return applyTry(s, res);
   const o = s.off, d = other(o);
   const warn = tick(s, res.dur);
   s.adj = 0;
@@ -517,6 +518,28 @@ export function applySnap(s: State, res: PlayResult): boolean {
 }
 
 /**
+ * A two-point try's snap: in the end zone for two, anything else for nothing, a turnover returned all the way for two
+ * to the defense. A penalty replays it (half the distance closer, or ten yards back). The clock doesn't run.
+ */
+function applyTry(s: State, res: PlayResult): boolean {
+  const o = s.off, d = other(o);
+  s.adj = 0;
+  s.pendLook = s.shownLook = s.pendPlay = null;
+  s.running = false;
+  if (res.penalty === 'hold') { s.yl = Math.max(80, s.yl - 10); s.dist = 100 - s.yl; s.stage = 'call'; return false; }
+  if (res.penalty === 'dpi' || res.penalty === 'rough') { s.yl = Math.min(99, s.yl + Math.ceil((100 - s.yl) / 2)); s.dist = 100 - s.yl; s.stage = 'call'; return false; }
+  if (res.td && !res.turnover) s.score[o] += 2;
+  else if (res.turnover && res.defTd) s.score[d] += 2;
+  s.tryTwo = undefined;
+  s.off = o;
+  s.stage = 'kick';
+  s.kicker = o;
+  s.safetyKick = false;
+  endCheck(s);
+  return false;
+}
+
+/**
  * Full games: a normal huddle runs the play clock down further than the late-game huddle (the NFL averages about 33
  * seconds from whistle to snap), and passes are picked off at the NFL's full-game rate rather than the late-game one.
  * Tuned against NFL season averages (see career/calibrate.test.ts).
@@ -540,8 +563,10 @@ function snap(s: State, r: Rng, play: string, look: Look, ch: Choice | null | un
   else if (play === 'punt') res = resolvePunt(s, ch?.st ?? 'return', r);
   else res = resolveSnap(s, play, look, r, ch);
   const warned = s.warned;
+  const wasTry = !!s.tryTwo;
   const first = applySnap(s, res);
-  ev?.push({ type: 'snap', ...before, t: s.t, res, first });
+  ev?.push({ type: 'snap', ...before, t: s.t, res, first, ...(wasTry ? { try: true } : {}) });
+  if (wasTry && !s.tryTwo) ev?.push({ type: 'pat', off: before.off, two: true, good: !!res.td && !res.turnover, t: s.t, played: true, ...(res.defTd ? { def2: true } : {}) });
   // the play crossed 2:00: the clock stops dead for the two-minute warning
   if (!warned && s.warned) ev?.push({ type: 'warning', t: s.t });
 }
@@ -599,6 +624,16 @@ function callStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
 
 function patStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
   const two = (ch?.pat ?? aiPat(s)) === 'two';
+  if (two && s.twoPlay) {
+    // going for two: a snap from the 2, called like any play (the next one), with no clock
+    s.tryTwo = true;
+    s.yl = 98; s.down = 1; s.dist = 2;
+    s.running = false; s.adj = 0;
+    s.pendLook = s.shownLook = s.pendPlay = null;
+    s.stage = 'call';
+    ev?.push({ type: 'twotry', off: s.off, t: s.t });
+    return;
+  }
   const R = s.rat[s.off], D = s.rat[other(s.off)];
   const p = two ? clip(0.47 + (R.off - D.def) * 0.006, 0.3, 0.65) : clip(0.94 + (R.k - 80) * 0.003, 0.85, 0.99);
   const good = r() < p;
@@ -748,6 +783,7 @@ export function aiDefClock(s: State, r: Rng): DefClock {
 }
 
 export function aiOffPlay(s: State, r: Rng, normalOnly = false): string {
+  if (s.tryTwo) return pickWeighted(r, aiOffWeights(s));   // a two-point try: a play from the 2, never a kick
   const o = s.off, d = leadOf(s, o), t = s.t, fd = fgDist(s);
   const fgWins = d >= -3 && d <= 0;
   const E = early(s);

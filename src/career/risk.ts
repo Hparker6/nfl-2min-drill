@@ -25,7 +25,7 @@ export function riskWins(evs: Ev[]): RiskWin[] {
       if (e.off === 0 && e.two && e.good) out.push({ kind: 'two', label: 'Went for two and got it', attr: 'accuracy' });
       continue;
     }
-    if (e.type !== 'snap' || e.off !== 0) continue;
+    if (e.type !== 'snap' || e.off !== 0 || e.try) continue;
     const r = e.res, c = CALL[r.call];
     if (!c || (r.turnover && !r.td)) continue;
     const gained = r.td || r.yards >= e.dist0;

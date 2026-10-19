@@ -35,7 +35,7 @@ export function drives(ev: Ev[]): Drive[] {
     if (e.type === 'final') { close('End of game'); continue; }
     if (e.type === 'expire') { close('End of game'); continue; }
     if (e.type === 'kick') { if (e.td) close('Kick return TD', true); continue; }
-    if (e.type !== 'snap') continue;
+    if (e.type !== 'snap' || e.try) continue;   // a two-point try isn't part of the drive
     const r = e.res;
     if (!cur || cur.done || cur.team !== e.off) {
       close('Turnover');

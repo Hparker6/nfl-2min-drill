@@ -12,6 +12,7 @@ export const ord = (n: number) => ['1st', '2nd', '3rd', '4th'][n - 1] || `${n}th
 const NUM = ['no', 'one', 'two', 'three'];
 
 export function downDist(s: State): string {
+  if (s.tryTwo) return 'Two-point try';
   const goal = s.dist >= ytg(s);
   return `${ord(s.down)} & ${goal ? 'Goal' : s.dist}`;
 }
@@ -156,6 +157,7 @@ export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
     case 'expire':
       return { text: 'The clock runs out.', banner: 'Final', tone: 'neutral' };
     case 'pat': {
+      if (ev.def2) return { text: `Turned over and returned all the way: two points for ${teams[ev.off === 0 ? 1 : 0].city}.`, banner: 'Defensive two', tone: tone(ev.off, false) };
       const what = ev.two ? 'Two-point try' : 'Extra point';
       return { text: `${what} is ${ev.good ? 'good' : ev.two ? 'no good' : 'missed'}.`, banner: ev.good ? (ev.two ? 'Two points' : undefined) : 'No good', tone: tone(ev.off, ev.good) };
     }
@@ -171,7 +173,11 @@ export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
       return { text: `${ev.kind === 'free' ? 'Free kick' : 'Kickoff'} returned to the ${spot}.`, tone: 'neutral' };
     }
     case 'snap':
+      // a two-point try's snap: what happened, and the try's own line (the 'pat' event after it) gives the verdict
+      if (ev.try) return { text: tellSnapText(ev, teams).text.replace(/TOUCHDOWN!?/g, 'in!').replace(/ for a in!/g, ': in!'), tone: 'neutral' };
       return tellSnap(ev, teams);
+    case 'twotry':
+      return { text: `${teams[ev.off].city} goes for two.`, banner: 'Going for two', tone: 'neutral' };
     case 'period':
       return ev.q === 3 ? { text: 'Halftime.', banner: 'Halftime', tone: 'neutral' }
         : ev.q >= 5 ? { text: ev.q === 5 ? 'Tied at the end of regulation: overtime.' : `End of the ${OT_ORD[ev.q - 6] ?? `${ev.q - 5}th`} overtime period.`, banner: 'Overtime', tone: 'neutral' }

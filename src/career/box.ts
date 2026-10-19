@@ -101,6 +101,7 @@ export function boxScore(events: Ev[], teams: [TeamInfo, TeamInfo], seed: number
       return;
     }
     if (ev.type === 'pat') {
+      if (ev.def2) { scored(ev.off === 0 ? 1 : 0, 2, ev.t, `${teams[ev.off === 0 ? 1 : 0].city}: defensive two-point return`); return; }
       if (!ev.two) { add(L(ev.off, 'K'), 'xpa', 1); if (ev.good) add(L(ev.off, 'K'), 'xpm', 1); }
       if (ev.good) {
         scored(ev.off, ev.two ? 2 : 1, ev.t, '');
@@ -114,7 +115,7 @@ export function boxScore(events: Ev[], teams: [TeamInfo, TeamInfo], seed: number
       lastT = ev.t; lastOff = null;
       return;
     }
-    if (ev.type !== 'snap') return;
+    if (ev.type !== 'snap' || ev.try) return;   // a two-point try counts as the try (above), not as a play
     const o = ev.off, d: Team = o === 0 ? 1 : 0, res = ev.res;
     const T = team[o];
     // time of possession: the play itself and the runoff before it, while this offense had the ball

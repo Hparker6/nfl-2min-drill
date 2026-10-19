@@ -91,8 +91,8 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 
 /* ---------- game layout ---------- */
 .game { display: grid; gap: 12px; }
-/* desktop: a tall field, portrait like a broadcast all-22 shot, so most of the field is in view; the panel beside it */
-.arena { --arena-h: clamp(560px, calc(100dvh - var(--top-h) - 240px), 1000px); display: grid; grid-template-columns: minmax(0, calc(var(--arena-h) * .72)) clamp(380px, 36vw, 580px); justify-content: center; gap: 16px; height: var(--arena-h); }
+/* desktop: a square-ish field, about 53 yards in view whatever the screen (a taller window doesn't zoom out); the panel beside it */
+.arena { --arena-h: clamp(560px, calc(100dvh - var(--top-h) - 240px), 820px); display: grid; grid-template-columns: minmax(0, var(--arena-h)) clamp(380px, 36vw, 580px); justify-content: center; gap: 16px; height: var(--arena-h); }
 .stage { position: relative; min-width: 0; min-height: 0; }
 .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 .side > section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 16px; }
@@ -525,7 +525,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .cp-sel-mini { display: none; }
 /* compact desktops (1000-1279): the panel is narrow, so trim what it carries */
 @media (min-width: 1000px) and (max-width: 1279px) {
-  .arena { grid-template-columns: minmax(0, calc(var(--arena-h) * .66)) minmax(360px, 1fr); }
+  .arena { grid-template-columns: minmax(0, calc(var(--arena-h) * .92)) minmax(360px, 1fr); }
   .cp-tip { display: none; }
   .tab5-name i { display: none; }
   .prow { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; min-height: 64px; }
