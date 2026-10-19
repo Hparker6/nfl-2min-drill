@@ -11,6 +11,7 @@ import { track } from '../game/analytics';
 import { GameScreen } from './GameScreen';
 import percentiles from '../data/percentiles.json';
 import { rivalsFor, versusRivals } from '../game/rivals';
+import { ANON, challengeText, challengeUrl, clearChallenge, loadChallenge, type Challenge } from '../game/challenge';
 
 interface Props {
   store: Store;
@@ -38,6 +39,13 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
   // the finished game stays on screen for its review until you move on to the score
   const [reviewing, setReviewing] = useState(false);
   const kind = sc.kind ? DAILY_KINDS[sc.kind] : null;
+  // a friend's challenge link: their score to beat, only while it is for today's Daily
+  const [challenge] = useState(loadChallenge);
+  const dare = challenge && challenge.date === today ? challenge : null;
+  useEffect(() => {
+    if (dare && !result) track('challenge_open', { score: dare.score });
+    if (challenge && !dare) clearChallenge();   // an old day's challenge: its note shows this once, then it is gone
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const done = (r: SpotResult) => {
     setReviewing(true);
@@ -64,7 +72,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
   );
 
   if (result && !reviewing) {
-    return <div className="page">{meta}<DayScore date={today} result={result} store={store} update={update} toast={toast} go={go} kind={kind?.name} /></div>;
+    return <div className="page">{meta}<DayScore date={today} result={result} store={store} update={update} toast={toast} go={go} kind={kind?.name} dare={dare} /></div>;
   }
   return (
     <GameScreen
@@ -77,7 +85,13 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
       label={`Daily #${dayNumber(today)}`}
       autoStart={!!day.cur}
       onStart={() => update((s) => { (s.days[today] ??= { spots: [] }).cur = { idx: 0, picks: [] }; s.seenHelp = true; })}
-      briefExtra={kind ? <p className="brief-kind">{kind.tagline}</p> : undefined}
+      briefExtra={(kind || dare || challenge) ? (
+        <>
+          {kind && <p className="brief-kind">{kind.tagline}</p>}
+          {dare && <p className="dare"><b>{dare.name}</b> scored <b>{dare.score}</b> on today's game{dare.win ? ' and won it' : ''}. Beat it.</p>}
+          {!dare && challenge && <p className="dare stale">{challenge.name}'s challenge was for Daily #{dayNumber(challenge.date)}, which is over. Play today's and send yours.</p>}
+        </>
+      ) : undefined}
       welcome={!store.seenHelp && !day.cur ? (
         <div className="welcome">
           <p className="welcome-lead"><b>You call the plays at the end of a close game.</b> Pick each play, run the clock, win it. Every call is graded against every other option you had.</p>
@@ -97,7 +111,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
   );
 }
 
-function DayScore({ date, result, store, update, toast, go, kind }: { date: string; result: SpotResult; store: Store; update: Props['update']; toast: (m: string) => void; go: Props['go']; kind?: string }) {
+function DayScore({ date, result, store, update, toast, go, kind, dare }: { date: string; result: SpotResult; store: Store; update: Props['update']; toast: (m: string) => void; go: Props['go']; kind?: string; dare: Challenge | null }) {
   const rt = rateSpot(result);
   const streakN = streak(store, date, 1);
   const arch = ARCHETYPES[archetype(result.tags)];
@@ -153,6 +167,15 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
     else if (r === 'failed') toast('Could not share. Try again.');
   };
   const save = () => { if (card) { download(card.blob, `the-4th-call-${dayNumber(date)}.png`); track('share', { what: 'daily', method: 'download' }); } };
+  // the challenge: the same game with your score to beat, in a link that needs no account
+  const challenge = async () => {
+    const url = challengeUrl({ date, score: rt.performance, win: result.win, name: store.settings.nickname ?? ANON });
+    const r = await shareText(challengeText({ date, score: rt.performance, win: result.win, name: store.settings.nickname ?? ANON }, dayNumber(date), url), 'challenge');
+    if (r === 'copied') toast('Challenge link copied. Send it to someone.');
+    else if (r === 'failed') toast('Could not copy the link. Try again.');
+  };
+  const beat = dare ? (rt.performance > dare.score ? 'you' : rt.performance < dare.score ? 'them' : 'tie') : null;
+  useEffect(() => { if (dare) track('challenge_result', { beat: beat === 'you', margin: rt.performance - dare.score }); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   // the day's AI rivals: on the board with a badge, never in the human count, rank or bars
   const rivals = useMemo(() => rivalsFor(date), [date]);
   const vs = versusRivals(rt.performance, rivals);
@@ -177,6 +200,14 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
         <div className="score-streak">{streakN > 1 ? `Day ${streakN} of your streak` : 'Day 1 of your streak'} · come back tomorrow</div>
       </div>
 
+      {dare && (
+        <div className={`dare-vs ${beat}`}>
+          <span className="k">The challenge</span>
+          <div className="dare-row"><span>You</span><b>{rt.performance}</b><em>vs</em><b>{dare.score}</b><span>{dare.name}</span></div>
+          <p>{beat === 'you' ? `You called it better than ${dare.name}.` : beat === 'them' ? `${dare.name} called it better. Send it back tomorrow.` : 'Dead even. Same calls, different bounces.'}</p>
+        </div>
+      )}
+
       <div className="coach">
         <span className="k">Today you coached like</span>
         <span className="coach-name">{arch.name}</span>
@@ -189,6 +220,7 @@ function DayScore({ date, result, store, update, toast, go, kind }: { date: stri
           <button className="btn primary big" onClick={share}>Share your score</button>
           {card && <button className="btn big" onClick={save}>Save image</button>}
         </div>
+        <button className="btn big dare-btn" onClick={challenge}>Challenge a friend: beat my {rt.performance}</button>
       </div>
 
       <div className="board">

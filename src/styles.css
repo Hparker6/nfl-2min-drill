@@ -681,6 +681,17 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .score-grades { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 .gsq { width: 14px; height: 14px; border-radius: 3px; background: var(--gc); }
 .brief-kind { font-size: 15px; color: var(--ink-2); margin-top: -6px; }
+/* a friend's challenge: their score to beat, in the brief and on the score */
+.dare { margin: 4px 0 0; padding: 10px 12px; border-radius: var(--r-sm); font-size: 15px; color: var(--ink); background: color-mix(in srgb, var(--accent) 12%, var(--panel-2)); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.dare.stale { color: var(--ink-2); background: var(--panel-2); border-color: var(--line); }
+.dare-vs { display: grid; justify-items: center; gap: 4px; padding: 12px 14px; border-radius: var(--r-sm); background: var(--panel-2); border: 1px solid var(--line); text-align: center; }
+.dare-vs.you { border-color: color-mix(in srgb, var(--g) 50%, transparent); }
+.dare-vs p { margin: 0; font-size: 14px; color: var(--ink-2); }
+.dare-row { display: flex; align-items: baseline; gap: 10px; font-family: var(--display); }
+.dare-row b { font-size: 30px; line-height: 1; }
+.dare-row em { font-style: normal; color: var(--muted); font-size: 13px; text-transform: uppercase; }
+.dare-row span { font-size: 13px; color: var(--ink-2); max-width: 9ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dare-btn { width: 100%; margin-top: 8px; }
 @media (max-width: 999px) { .score { padding: 16px; } .score-big { font-size: 96px; } }
 
 /* ---------- everyone's stats ---------- */
