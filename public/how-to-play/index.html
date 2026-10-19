@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>How to Play The 4th Call: Controls &amp; 2-Minute Drill Strategy</title>
-  <meta name="description" content="How to play The 4th Call, a free football play-calling game: controls, clock management, what each of the 19 defenses stops, a graded drive play by play, Career mode, and how to run a two-minute drill." />
+  <meta name="description" content="How to play The 4th Call, a free football play-calling game: controls, clock management, what each of the 19 defenses stops, a graded drive play by play, a fourth-down table (kick, punt or go), Career mode, and how to run a two-minute drill." />
   <link rel="canonical" href="https://nfl-2min-drill.com/how-to-play/" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="theme-color" content="#0a0e0c" />
@@ -35,6 +35,7 @@
         { "@type": "Question", "name": "Are the players real?", "acceptedAnswer": { "@type": "Answer", "text": "Teams and rosters are real NFL teams and players, with ratings computed from season statistics (nflverse). The game situations are made up." } },
         { "@type": "Question", "name": "What happens if the game is tied at the end?", "acceptedAnswer": { "@type": "Answer", "text": "It goes to overtime by the NFL's rules. You call the coin toss, and the winner chooses to receive or kick. Both teams get the ball at least once, unless the kicking team scores a safety on the first possession; after that, the next score wins. Daily, Survivor and Practice games use the playoff format, 15-minute periods until someone wins. In Career, regular-season overtime is one 10-minute period and can end in a tie." } },
         { "@type": "Question", "name": "How is this different from other two-minute drill games?", "acceptedAnswer": { "@type": "Answer", "text": "You call the defense as well as the offense, from 19 coverages and blitzes. Every call is graded against every other option you had, by simulation, so you learn why a call was right rather than only whether it worked. The Daily rotates through goal-line stands, fourth-down decisions and protecting a lead, not only two-minute drills, with Practice to build any spot and a Career mode on top. No account is needed." } },
+        { "@type": "Question", "name": "Should you go for it on fourth down at the end of a game?", "acceptedAnswer": { "@type": "Answer", "text": "Usually, yes, when you are behind or tied with the clock short. With 2:00 left and two timeouts, the game\u2019s own simulation never prefers a punt, prefers going over a tying field goal from everywhere when down 3, and prefers the kick only on long yardage near the edge of range when tied. The full table is in the guide. See the fourth-down table." } },
         { "@type": "Question", "name": "Is there a career mode?", "acceptedAnswer": { "@type": "Answer", "text": "Yes, in beta. Create a quarterback, play one college game, get drafted and play a full season in a fictional league, with XP, skill points and abilities between games. Every team, player and college in it is made up." } },
         { "@type": "Question", "name": "Is it affiliated with the NFL?", "acceptedAnswer": { "@type": "Answer", "text": "No. The 4th Call is an independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics come from nflverse." } }
       ] }
@@ -73,6 +74,7 @@
       <li><a href="#defense">Defense</a></li>
       <li><a href="#grades">Grades &amp; score</a></li>
       <li><a href="#example">A graded drive</a></li>
+      <li><a href="#fourthdown">Fourth down</a></li>
       <li><a href="#modes">Modes</a></li>
       <li><a href="#career">Career</a></li>
       <li><a href="#strategy">How to run a 2-minute drill</a></li>
@@ -202,6 +204,53 @@
     </ul>
     <p>That is what the grade measures: the win chance of the call you made against the best call available, not whether the play worked. The pattern across the drive is the same one the <a href="#strategy">two-minute drill section</a> teaches: throw to the middle when you have timeouts or the clock is stopped, save the timeouts for the end, and know what a field goal is worth before you kick it.</p>
 
+    <h2 id="fourthdown">Fourth down: kick, punt or go?</h2>
+    <p>The same grading, applied to fourth down. Every cell is a spot with <b>2:00 left and two timeouts each</b>, graded by playing the rest of the game out 3,000 times for every option: the field goal, the punt and each of the 27 plays. The cell shows the best choice and its win chance, with the runner-up underneath. "Go" means the best play from that spot. A field goal is offered from about their 43 in (a 60-yard kick); farther out, the choice is punt or go.</p>
+    <h3>Down 3, 2:00 left</h3>
+    <div class="fdwrap"><table class="fdtable">
+      <thead><tr><th>Spot</th><th>Own 40</th><th>Midfield</th><th>Their 35</th><th>Their 20</th><th>Their 3</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">4th &amp; 1</th><td class="fd go"><b>Go 38%</b><br><small>Punt 18%</small></td><td class="fd go"><b>Go 42%</b><br><small>Punt 22%</small></td><td class="fd go"><b>Go 51%</b><br><small>FG 39%</small></td><td class="fd go"><b>Go 57%</b><br><small>FG 46%</small></td><td class="fd go"><b>Go 68%</b><br><small>FG 48%</small></td></tr>
+        <tr><th scope="row">4th &amp; 2</th><td class="fd go"><b>Go 38%</b><br><small>Punt 18%</small></td><td class="fd go"><b>Go 43%</b><br><small>Punt 21%</small></td><td class="fd go"><b>Go 51%</b><br><small>FG 39%</small></td><td class="fd go"><b>Go 56%</b><br><small>FG 47%</small></td><td class="fd go"><b>Go 65%</b><br><small>FG 47%</small></td></tr>
+        <tr><th scope="row">4th &amp; 3</th><td class="fd go"><b>Go 37%</b><br><small>Punt 18%</small></td><td class="fd go"><b>Go 42%</b><br><small>Punt 22%</small></td><td class="fd go"><b>Go 47%</b><br><small>FG 39%</small></td><td class="fd go"><b>Go 56%</b><br><small>FG 46%</small></td><td class="fd go"><b>Go 63%</b><br><small>FG 47%</small></td></tr>
+        <tr><th scope="row">4th &amp; 5</th><td class="fd go"><b>Go 37%</b><br><small>Punt 18%</small></td><td class="fd go"><b>Go 41%</b><br><small>Punt 22%</small></td><td class="fd go"><b>Go 46%</b><br><small>FG 39%</small></td><td class="fd go"><b>Go 53%</b><br><small>FG 46%</small></td><td class="fd none">—</td></tr>
+        <tr><th scope="row">4th &amp; 7</th><td class="fd go"><b>Go 32%</b><br><small>Punt 18%</small></td><td class="fd go"><b>Go 34%</b><br><small>Punt 22%</small></td><td class="fd go"><b>Go 42%</b><br><small>FG 39%</small></td><td class="fd go"><b>Go 52%</b><br><small>FG 46%</small></td><td class="fd none">—</td></tr>
+        <tr><th scope="row">4th &amp; 10</th><td class="fd go"><b>Go 30%</b><br><small>Punt 18%</small></td><td class="fd go"><b>Go 35%</b><br><small>Punt 22%</small></td><td class="fd go"><b>Go 39%</b><br><small>FG 38% · even</small></td><td class="fd go"><b>Go 48%</b><br><small>FG 46%</small></td><td class="fd none">—</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Tied, 2:00 left</h3>
+    <div class="fdwrap"><table class="fdtable">
+      <thead><tr><th>Spot</th><th>Own 40</th><th>Midfield</th><th>Their 35</th><th>Their 20</th><th>Their 3</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">4th &amp; 1</th><td class="fd go"><b>Go 63%</b><br><small>Punt 52%</small></td><td class="fd go"><b>Go 69%</b><br><small>Punt 54%</small></td><td class="fd go"><b>Go 71%</b><br><small>FG 67%</small></td><td class="fd go"><b>Go 78%</b><br><small>FG 73%</small></td><td class="fd go"><b>Go 84%</b><br><small>FG 73%</small></td></tr>
+        <tr><th scope="row">4th &amp; 2</th><td class="fd go"><b>Go 63%</b><br><small>Punt 52%</small></td><td class="fd go"><b>Go 66%</b><br><small>Punt 54%</small></td><td class="fd go"><b>Go 72%</b><br><small>FG 66%</small></td><td class="fd go"><b>Go 76%</b><br><small>FG 73%</small></td><td class="fd go"><b>Go 81%</b><br><small>FG 73%</small></td></tr>
+        <tr><th scope="row">4th &amp; 3</th><td class="fd go"><b>Go 61%</b><br><small>Punt 52%</small></td><td class="fd go"><b>Go 65%</b><br><small>Punt 54%</small></td><td class="fd go"><b>Go 73%</b><br><small>FG 66%</small></td><td class="fd go"><b>Go 76%</b><br><small>FG 73%</small></td><td class="fd go"><b>Go 80%</b><br><small>FG 74%</small></td></tr>
+        <tr><th scope="row">4th &amp; 5</th><td class="fd go"><b>Go 58%</b><br><small>Punt 52%</small></td><td class="fd go"><b>Go 63%</b><br><small>Punt 54%</small></td><td class="fd go"><b>Go 72%</b><br><small>FG 67%</small></td><td class="fd go"><b>Go 76%</b><br><small>FG 73%</small></td><td class="fd none">—</td></tr>
+        <tr><th scope="row">4th &amp; 7</th><td class="fd go"><b>Go 56%</b><br><small>Punt 52%</small></td><td class="fd go"><b>Go 63%</b><br><small>Punt 54%</small></td><td class="fd go"><b>Go 68%</b><br><small>FG 66%</small></td><td class="fd go"><b>Go 74%</b><br><small>FG 73%</small></td><td class="fd none">—</td></tr>
+        <tr><th scope="row">4th &amp; 10</th><td class="fd go"><b>Go 56%</b><br><small>Punt 52%</small></td><td class="fd go"><b>Go 59%</b><br><small>Punt 54%</small></td><td class="fd go"><b>Go 68%</b><br><small>FG 66%</small></td><td class="fd kick"><b>FG 73%</b><br><small>Go 71%</small></td><td class="fd none">—</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Down 7, 2:00 left</h3>
+    <div class="fdwrap"><table class="fdtable">
+      <thead><tr><th>Spot</th><th>Own 40</th><th>Midfield</th><th>Their 35</th><th>Their 20</th><th>Their 3</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">4th &amp; 1</th><td class="fd go"><b>Go 17%</b><br><small>Punt 7%</small></td><td class="fd go"><b>Go 20%</b><br><small>Punt 8%</small></td><td class="fd go"><b>Go 24%</b><br><small>FG 9%</small></td><td class="fd go"><b>Go 31%</b><br><small>FG 10%</small></td><td class="fd go"><b>Go 35%</b><br><small>FG 11%</small></td></tr>
+        <tr><th scope="row">4th &amp; 2</th><td class="fd go"><b>Go 16%</b><br><small>Punt 7%</small></td><td class="fd go"><b>Go 21%</b><br><small>Punt 8%</small></td><td class="fd go"><b>Go 24%</b><br><small>FG 9%</small></td><td class="fd go"><b>Go 30%</b><br><small>FG 10%</small></td><td class="fd go"><b>Go 37%</b><br><small>FG 11%</small></td></tr>
+        <tr><th scope="row">4th &amp; 3</th><td class="fd go"><b>Go 15%</b><br><small>Punt 7%</small></td><td class="fd go"><b>Go 19%</b><br><small>Punt 8%</small></td><td class="fd go"><b>Go 24%</b><br><small>FG 9%</small></td><td class="fd go"><b>Go 30%</b><br><small>FG 11%</small></td><td class="fd go"><b>Go 33%</b><br><small>FG 11%</small></td></tr>
+        <tr><th scope="row">4th &amp; 5</th><td class="fd go"><b>Go 14%</b><br><small>Punt 7%</small></td><td class="fd go"><b>Go 19%</b><br><small>Punt 8%</small></td><td class="fd go"><b>Go 24%</b><br><small>FG 9%</small></td><td class="fd go"><b>Go 29%</b><br><small>FG 11%</small></td><td class="fd none">—</td></tr>
+        <tr><th scope="row">4th &amp; 7</th><td class="fd go"><b>Go 13%</b><br><small>Punt 7%</small></td><td class="fd go"><b>Go 16%</b><br><small>Punt 8%</small></td><td class="fd go"><b>Go 22%</b><br><small>FG 9%</small></td><td class="fd go"><b>Go 24%</b><br><small>FG 11%</small></td><td class="fd none">—</td></tr>
+        <tr><th scope="row">4th &amp; 10</th><td class="fd go"><b>Go 13%</b><br><small>Punt 7%</small></td><td class="fd go"><b>Go 20%</b><br><small>Punt 8%</small></td><td class="fd go"><b>Go 19%</b><br><small>FG 9%</small></td><td class="fd go"><b>Go 25%</b><br><small>FG 11%</small></td><td class="fd none">—</td></tr>
+      </tbody>
+    </table></div>
+    <p>What the numbers say, for this clock and these timeouts:</p>
+    <ul>
+      <li><b>Punting is never the best choice in any of these spots.</b> With two minutes left you need the ball back, and the simulation says a stop and a drive is worth less than a conversion attempt from anywhere, even 4th and 10 at your own 40.</li>
+      <li><b>Down 3, going for it beats the field goal everywhere.</b> The kick only ties, and a tie earns a coin flip in overtime. The closest case is their 35 on 4th and 10, where the two are about even; at the 3, going is worth about 20 points more than kicking.</li>
+      <li><b>Tied, the kick is right only on long yardage near the end of field-goal range</b>: 4th and 10 at their 20 (+2 for the kick). Everywhere shorter or closer, going for it wins: a touchdown ends the game, and a conversion keeps the kick available.</li>
+      <li><b>Down 7, the field goal is close to worthless</b> (about 9 to 11 points of win chance, against 24 to 37 for the best play). A kick leaves you down 4 and still needing a touchdown, so it only helps if you get the ball back and score again.</li>
+    </ul>
+    <p>Two cautions. These are this game's simulation, not an NFL analytics model, and they are for exactly 2:00 with two timeouts: less clock or no timeouts changes the picture, which is why the <a href="#example">graded drive</a> above marks a tying field goal at 0:37 as a big miss. Play any of these spots yourself in <a href="/#practice">Practice</a> with Coach mode on to see every option's number before you call it.</p>
+
     <h2 id="modes">Game modes</h2>
     <div class="cards">
       <div class="card"><h3>Daily</h3><p>One game a day, the same for everyone, new at midnight UTC. The situation rotates: a two-minute drill, a goal-line stand, a fourth-down call, closing out a lead…</p></div>
@@ -246,6 +295,7 @@
     <details><summary>Are the players real?</summary><p>Teams and rosters are real NFL teams and players, with ratings computed from season statistics (nflverse). The game situations are made up.</p></details>
     <details><summary>What happens if the game is tied at the end?</summary><p>It goes to overtime by the NFL's rules. You call the coin toss, and the winner chooses to receive or kick. Both teams get the ball at least once, unless the kicking team scores a safety on the first possession; after that, the next score wins. Daily, Survivor and Practice games use the playoff format, 15-minute periods until someone wins. In Career, regular-season overtime is one 10-minute period and can end in a tie.</p></details>
     <details><summary>How is this different from other two-minute drill games?</summary><p>Three things. You call the defense as well as the offense, from 19 coverages and blitzes. Every call is graded against every other option you had, by simulation, so you learn why a call was right rather than only whether it worked. And the Daily rotates through goal-line stands, fourth-down decisions and protecting a lead, not only two-minute drills, with Practice to build any spot and a Career mode on top. No account is needed for any of it.</p></details>
+    <details><summary>Should you go for it on fourth down at the end of a game?</summary><p>Usually, yes, when you are behind or tied with the clock short. With 2:00 left and two timeouts, the game’s own simulation never prefers a punt, prefers going over a tying field goal from everywhere when down 3, and prefers the kick only on long yardage near the edge of range when tied. The full table is in the guide. <a href="#fourthdown">See the fourth-down table</a>.</p></details>
     <details><summary>Is there a career mode?</summary><p>Yes, in beta. Create a quarterback, play one college game, get drafted and play a full season in a fictional league, with XP, skill points and abilities between games. Every team, player and college in it is made up.</p></details>
     <details><summary>Is it affiliated with the NFL?</summary><p>No. The 4th Call is an independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA.</p></details>
   </main>

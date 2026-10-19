@@ -53,6 +53,11 @@ b, strong { color: var(--ink); }
 
 kbd { display: inline-block; min-width: 24px; padding: 1px 7px; border-radius: 5px; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--panel-2); font: 700 14px var(--body); color: var(--ink); text-align: center; }
 table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 16px; }
+.fdtable { font-size: 14px; }
+.fdtable th[scope="row"] { white-space: nowrap; }
+.fd small { color: var(--muted); }
+.fd.go b { color: var(--g); }
+.fdwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
 th { font: 700 13px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
