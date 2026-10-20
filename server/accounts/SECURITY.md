@@ -59,6 +59,30 @@ Requests are rows in `support_requests` (`status` open/done, `notified_at`). To 
 and to close one: `… --command "UPDATE support_requests SET status='done' WHERE id LIKE 'ABCD1234%'"`. Rows with
 `notified_at` NULL were never emailed (the provider was down): check them by hand.
 
+## No silent failures
+
+A failure either reaches the person who can act on it or is written where an operator will see it. The rule, and
+where it is kept:
+
+| Where a failure can happen | What happens now |
+|---|---|
+| Any account/payment route throws | 500 with a generic message to the player; `accounts error <path> <message>` in the Worker log (`routes.ts`) |
+| The leaderboard API or pages throw | 503 to the player; an `api.failed` / `pages.failed` audit line with the path (`worker.js`) |
+| A sign-in email can't be sent | The link and code are retired at once; 502 to the player ("could not be sent, try again"); the provider's HTTP status in the log (`auth.ts`, `mailer.ts`) |
+| The owner can't be notified of a support request | The request is stored with `notified_at` NULL; the player still gets a reference; an audit line says `notified: false`; SECURITY.md's query lists them |
+| Turnstile's script or widget fails to load | The form says so and names the likely cause (an ad blocker) instead of a button that never enables (`Turnstile.tsx`) |
+| The purchase can't be confirmed after checkout | After 15 checks: "not confirmed yet" with the session reference and the Help & refunds path; if the server itself isn't answering, that is said instead (`Account.tsx`) |
+| Sign-out isn't confirmed by the server | The player is told the session may still be live elsewhere and to use Sign out everywhere (`account.ts`) |
+| The leaderboard doesn't answer a score post or the stats page | "The leaderboard didn't answer" with a retry, not "Loading…" forever (`leaderboard.ts`, `Daily.tsx`, `Everyone.tsx`) |
+| A saved career can't be read | It is set aside under its own key, never overwritten; the player is told on the career screen (`save.ts`, `Career.tsx`) |
+| The browser refuses to save a career | A banner says so and points at the download (`Career.tsx`) |
+| An imported career file is too big or not JSON | A clear message; files over 8 MB are refused before they are read (`save.ts`) |
+| The daily sweep of old tokens fails | Logged; the sign-in it was piggybacking on proceeds (`routes.ts`) |
+
+Deliberately quiet (and why): analytics events (`track`) never throw or alert, a page must work with analytics
+blocked; `localStorage` conveniences (the remembered edition state, a challenge link, a draft) fall back to defaults
+because a private window has no storage; the share card's image falls back to text because the text share still works.
+
 ## Before live payments (owner's checklist)
 
 1. **Real Turnstile keys.** Staging uses Cloudflare's test pair, which passes everything. For production: Cloudflare →
