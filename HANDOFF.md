@@ -49,6 +49,22 @@ test key, the webhook secret from `stripe listen`, the `price_…` id for "Coach
 `RESEND_API_KEY`, `PAYMENTS=on`. The Stripe CLI is installed (winget) and logged in to the sandbox. The local D1
 (`.wrangler/`) has the migrations applied and one test purchase. The owner's personal PC has none of this yet.
 
+## 2a. Staging status (2026-10-20, later the same day)
+
+- **Live at https://nfl-2min-drill-staging.houston-parker.workers.dev** (Worker `nfl-2min-drill-staging`, separate from
+  the production Worker `nfl-2min-drill`). `/v1/me` answers `{"signedIn":false,"payments":"test"}`.
+- D1 `the-fourth-call-database`: migrations 0001 and 0002 applied remotely; all tables present.
+- `SITE_ORIGIN` set to the address above (commit `21defd1`); `PAYMENTS` on for staging only (`3549d9e`).
+- Worker secrets set on staging: `AUTH_PEPPER` (its own random value), `RESEND_API_KEY`, `STRIPE_SECRET_KEY`
+  (sandbox test key), `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (from the endpoint below).
+- Stripe sandbox webhook endpoint `we_1USgg2PcRHl4G0ky2cQvfxOl` → `<staging>/v1/stripe/webhook`, the 8 events.
+- Resend: domain `nfl-2min-drill.com` added (id `73c4740d-…`, region us-east-1), **waiting on DNS**: the owner adds
+  the TXT `resend._domainkey`, MX + TXT `send`, CNAME `rsend` records (and a `_dmarc` TXT) in Cloudflare DNS. Until
+  Resend shows it verified, sign-in email on staging fails closed (the code is never shown, the request errors).
+- Next: once verified, sign in on staging with a real address and re-run the 14 checks there (SETUP.md §5), using
+  the Stripe dashboard for refunds/disputes. No `stripe listen` needed on staging: Stripe posts to the endpoint and
+  retries on its own.
+
 ## 3. Running the sandbox
 
 ```bash

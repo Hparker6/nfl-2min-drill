@@ -50,20 +50,20 @@ Goal: the same checks passing on a real Worker, a real D1 and real email, with S
       `send`, TXT `resend._domainkey`, a `_dmarc` TXT) in Cloudflare DNS, unproxied, exactly as Resend prints them
       (SETUP.md §2). Wait for "Verified". Don't touch the site's existing records.
       *If the attorney review changes the domain, this is redone on the new one.*
-- [ ] **Database:** `npx wrangler d1 list` shows `the-fourth-call-database` (`42a1a193-…`). Then
+- [x] **Database:** `npx wrangler d1 list` shows `the-fourth-call-database` (`42a1a193-…`). Then
       `npx wrangler d1 migrations apply DB --env staging --remote`, and verify:
       `npx wrangler d1 execute DB --env staging --remote --command "SELECT name FROM sqlite_master WHERE type='table'"`
-- [ ] **First deploy, to learn the address:** `npm run build && npx wrangler deploy --env staging`. Accounts stay
+- [x] **First deploy, to learn the address:** `npm run build && npx wrangler deploy --env staging`. Accounts stay
       off on this deploy because `SITE_ORIGIN` is empty on purpose. Copy the exact URL Wrangler prints
       (`https://nfl-2min-drill-staging.<your-subdomain>.workers.dev`).
-- [ ] Put that URL in `wrangler.jsonc` → `env.staging.vars.SITE_ORIGIN`. Commit and push the branch.
-- [ ] **Secrets on the staging Worker** (prompts for each; nothing in files):
+- [x] Put that URL in `wrangler.jsonc` → `env.staging.vars.SITE_ORIGIN`. Commit and push the branch.
+- [x] **Secrets on the staging Worker** (prompts for each; nothing in files):
       `npx wrangler secret put AUTH_PEPPER --env staging` (a new random value, not the local one),
       `… RESEND_API_KEY …`, `… STRIPE_SECRET_KEY …` (test key), `… STRIPE_PRICE_ID …`.
-- [ ] **Stripe webhook endpoint for staging:** Dashboard (test mode) → Developers → Webhooks → add
+- [x] **Stripe webhook endpoint for staging:** Dashboard (test mode) → Developers → Webhooks → add
       `https://<staging-url>/v1/stripe/webhook` with the same event list as the CLI command in SETUP.md §5; copy its
       signing secret → `npx wrangler secret put STRIPE_WEBHOOK_SECRET --env staging`.
-- [ ] Set `PAYMENTS` to `"on"` in the staging vars (it's a var, not a secret), redeploy:
+- [x] Set `PAYMENTS` to `"on"` in the staging vars (it's a var, not a secret), redeploy:
       `npm run build && npx wrangler deploy --env staging`.
 - [ ] On the staging URL: `/v1/me` shows accounts on and `"payments":"test"`; sign in with a real email through Resend;
       run the 14 checks again against staging. Record results in SETUP.md or here.
