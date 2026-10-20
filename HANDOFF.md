@@ -34,15 +34,15 @@ Read this, then [LAUNCH_TODO.md](LAUNCH_TODO.md) for the ordered checklist and
 - Production (top level of `wrangler.jsonc`): **no D1 binding**, so every account and payment route answers 404.
   The live site is `main`, untouched by any of this.
 
-**Verified today in the local sandbox (wrangler dev + Vite, Stripe sandbox account, Stripe CLI):**
+**Verified 2026-10-20 in the local sandbox (wrangler dev + Vite, Stripe sandbox account, Stripe CLI):**
 - Sign in by code from the Worker log: works.
 - Checkout → Stripe-hosted page → `4242 4242 4242 4242` → `checkout.session.completed` → purchase `paid`, entitlement
   `active`, webhook outcome `granted` (SETUP.md §5 checks 1–3).
 - Unsigned webhook → 400, nothing recorded (check 5). Same event delivered twice → still one purchase, one
   entitlement, one webhook record (check 6).
-- **Not yet run:** checks 4 (forged return), 7 (already owned), 8 (restore in another browser), 9–10 (refunds),
-  11–12 (disputes), 13 (kill switch), 14 (delete). The owner was about to do 4, 7, 8 and the refund/dispute ones from
-  the Stripe dashboard. Record results in LAUNCH_TODO.md.
+- **Then all the rest (checks 4, 7–14) on the same day, driven through the API and Stripe's test API/CLI: every one
+  passes.** Results and the two notes (early events get a deliberate 503; webhook is 404 while payments are off) are
+  in LAUNCH_TODO.md. Stage 1 is complete; next is stage 2 (staging).
 
 **Set up on the owner's work PC (not in git):** `.dev.vars` with `AUTH_PEPPER`, a Stripe sandbox restricted/secret
 test key, the webhook secret from `stripe listen`, the `price_…` id for "Coach's Edition" (one-time, 4.99 USD),
@@ -74,6 +74,10 @@ Looking at records: `npx wrangler d1 execute DB --local --env dev --command "SEL
   every `node` process running wrangler and every `workerd`, then start one Worker.
 - Stopping a background `wrangler dev` from a tool doesn't always kill its `workerd` children. Same fix.
 - `.dev.vars` values override `vars` in `wrangler.jsonc` for `wrangler dev` (that's how `PAYMENTS=on` works locally).
+- Don't edit `.dev.vars` with PowerShell's `Set-Content -Encoding utf8`: Windows PowerShell 5.1 adds a byte-order mark,
+  which corrupts the first variable's name. Edit it in the editor or write UTF-8 without BOM.
+- A test buyer who ticked "Save my information with Link" gets Stripe's Link login instead of the card form next time;
+  use a new email (any `@example.com` address works locally) for repeat test purchases.
 - The Stripe-hosted checkout shows Bank/Klarna next to Card even though the session is `payment_method_types: ['card']`;
   that's Stripe Link's wallet. Turn it off in Stripe → Settings → Payment methods if unwanted. Not a code issue.
 - The branch's commit `c76f508` reverted the homepage `<title>` to the pre-SEO one. The owner knows; decide before

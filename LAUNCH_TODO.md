@@ -30,8 +30,15 @@ Goal: sign in, buy the edition with a test card, and see every check in SETUP.md
 - [x] Install the Stripe CLI, `stripe login`, then start the listener from SETUP.md §5 and copy the `whsec_…`.
 - [x] `.dev.vars`: `PAYMENTS=on`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`; restart wrangler.
       `curl localhost:8787/v1/me` must say `"payments":"test"`.
-- [ ] Run the 14 checks in SETUP.md §5. **Done 2026-10-20 (work PC): 1, 2, 3, 5, 6 pass.** Left: 4 forged return, 7 already owned,
-      8 restore, 9–10 refunds, 11–12 disputes, 13 kill switch, 14 delete. Record anything that differs.
+- [x] Run the 14 checks in SETUP.md §5. **All 14 pass (2026-10-20, work PC, Stripe sandbox):**
+      1–3 buy with 4242 → paid / active / granted · 4 forged return and someone else's session → not found, owns nothing ·
+      5 unsigned webhook → 400 · 6 same event twice → one purchase · 7 buy again → 409 · 8 fresh sign-in → owned ·
+      9 $1 refund → partially_refunded, still owned · 10 rest refunded → revoked · 11 dispute won → owned again ·
+      12 dispute lost → not owned · 13 PAYMENTS=off → checkout 503, owners keep it · 14 delete → account and entitlement
+      gone, purchase row kept unlinked, re-signup owns nothing.
+      Notes: events that arrive before their purchase get a 503 on purpose (Stripe retries them on staging/production;
+      the local CLI doesn't, so `stripe events resend <evt>` by hand). While PAYMENTS=off the webhook answers 404, so
+      Stripe holds and retries events until it's back on.
 - [ ] Optional here, required for staging: try Resend for real. Set `MAIL_MODE=resend`, `MAIL_FROM=onboarding@resend.dev`
       and `RESEND_API_KEY` in `.dev.vars`. Until the domain is verified, Resend only delivers to your own account email.
 
