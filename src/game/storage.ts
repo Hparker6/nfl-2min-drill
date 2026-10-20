@@ -2,6 +2,7 @@ import type { FieldLook, GameFacts } from './badges';
 /** Local persistence: settings, daily progress (resumable mid-spot), survivor runs, history and streaks. */
 import type { GradeKey } from './grade';
 import type { Pick } from './session';
+import type { LadderProgress } from './ladder';
 
 export interface Settings {
   theme: 'auto' | 'light' | 'dark';
@@ -16,7 +17,7 @@ export interface Settings {
 
 export interface SpotResult {
   id: string;
-  mode: 'daily' | 'survivor' | 'practice' | 'career';
+  mode: 'daily' | 'survivor' | 'practice' | 'career' | 'ladder';
   date: string;
   teams: [string, string];
   win: boolean;
@@ -51,6 +52,7 @@ export interface Store {
   history: SpotResult[];
   seenHelp: boolean;
   badges?: Record<string, string>;   // badge id → the date it was earned
+  ladder?: LadderProgress;           // the Gridiron Challenge (Coach's Edition): best stars per rung
 }
 
 const KEY = 'the4thcall:v1';

@@ -14,16 +14,20 @@ import type { CTeam, Game, StandingRow } from '../../career/types';
 import { WEATHER } from '../../engine/sim';
 import { POS_LABEL } from '../../engine/data';
 import { PlayButtons, type Commit } from './Career';
+import { LegacyTab } from './Legacy';
+import { editionShown } from '../../game/edition';
 
-type Tab = 'home' | 'schedule' | 'standings' | 'leaders' | 'team' | 'player' | 'playoffs';
+type Tab = 'home' | 'schedule' | 'standings' | 'leaders' | 'team' | 'player' | 'playoffs' | 'legacy';
 
 interface Props {
   c: Career; commit: Commit;
   onPlay: (m: 'moments' | 'full' | 'sim') => void; onBye: () => void; onRetire: () => void; onExport: () => void;
+  /** the career slots (Coach's Edition shown) */
+  onSlots?: () => void;
   initialTab?: 'home' | 'player';
 }
 
-export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, initialTab }: Props) {
+export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, onSlots, initialTab }: Props) {
   const [tab, setTab] = useState<Tab>(initialTab ?? 'home');
   const [settings, setSettings] = useState(false);
   const me = youPlayer(c);
@@ -32,6 +36,7 @@ export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, initialTab }
   const rec = pic[team.id];
   const tabs: [Tab, string][] = [['home', 'Home'], ['player', 'Player'], ['schedule', 'Schedule'], ['standings', 'Standings'], ['leaders', 'Leaders'], ['team', 'Team']];
   if (c.season.week > REG_WEEKS) tabs.splice(1, 0, ['playoffs', 'Playoffs']);
+  if (editionShown()) tabs.push(['legacy', 'Legacy']);
   return (
     <div className="cr-page cr-hub">
       <header className="cr-head" style={{ ['--tc' as string]: team.color, ['--tc2' as string]: team.color2 }}>
@@ -49,7 +54,7 @@ export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, initialTab }
         {tabs.map(([k, l]) => <button key={k} className={tab === k ? 'on' : ''} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>{l}{k === 'player' && c.you.sp > 0 ? <i className="cr-dot" aria-label="points to spend" /> : null}</button>)}
         <button className="cr-gear" onClick={() => setSettings(!settings)} aria-label="Career settings" aria-expanded={settings}>⚙</button>
       </nav>
-      {settings && <CareerSettings c={c} commit={commit} onRetire={onRetire} onExport={onExport} onClose={() => setSettings(false)} />}
+      {settings && <CareerSettings c={c} commit={commit} onRetire={onRetire} onExport={onExport} onSlots={onSlots} onClose={() => setSettings(false)} />}
       {tab === 'home' && <Home c={c} commit={commit} pic={pic} onPlay={onPlay} onBye={onBye} go={setTab} />}
       {tab === 'player' && <PlayerTab c={c} commit={commit} />}
       {tab === 'schedule' && <Schedule c={c} />}
@@ -57,6 +62,7 @@ export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, initialTab }
       {tab === 'leaders' && <Leaders c={c} />}
       {tab === 'team' && <TeamTab c={c} />}
       {tab === 'playoffs' && <Bracket c={c} />}
+      {tab === 'legacy' && <LegacyTab c={c} />}
     </div>
   );
 }
@@ -579,7 +585,7 @@ function Bracket({ c }: { c: Career }) {
   );
 }
 
-function CareerSettings({ c, commit, onRetire, onExport, onClose }: { c: Career; commit: Commit; onRetire: () => void; onExport: () => void; onClose: () => void }) {
+function CareerSettings({ c, commit, onRetire, onExport, onSlots, onClose }: { c: Career; commit: Commit; onRetire: () => void; onExport: () => void; onSlots?: () => void; onClose: () => void }) {
   const S = c.settings;
   return (
     <section className="cr-card cr-settings">
@@ -610,6 +616,7 @@ function CareerSettings({ c, commit, onRetire, onExport, onClose }: { c: Career;
       </div>
       <div className="row">
         <button className="btn" onClick={onExport}>Download save file</button>
+        {onSlots && <button className="btn" onClick={onSlots}>Your careers</button>}
         <button className="btn ghost" onClick={onClose}>Done</button>
       </div>
       <button className="btn danger" onClick={onRetire}>Delete this career and start over</button>

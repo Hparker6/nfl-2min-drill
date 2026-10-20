@@ -9,6 +9,7 @@ import { nameMaker, newLeague, overall, type League } from './league';
 import { newSeason, placesFrom, simWeek, advanceWeek, REG_WEEKS } from './season';
 import type { CPlayer, Game, LiveGame, Season } from './types';
 import { RISK_ATTR_NAME, RISK_CAP, RISK_XP, type RiskAttr, type RiskWin } from './risk';
+import { ensureLegacy, type Legacy } from './legacy';
 
 export type Arch = 'pocket' | 'gunslinger' | 'dual' | 'general';
 export const QB_ATTRS: Attr[] = ['accuracy', 'arm', 'decision', 'mobility'];
@@ -53,6 +54,7 @@ export interface Goal { key: string; text: string; xp: number; done?: boolean }
 
 export interface SeasonSummary {
   year: number; team: string; line: Line; w: number; l: number; t: number; playoff?: string; awards: string[]; ovr: number;
+  po?: Line;            // playoff stats (seasons since Career Legacy)
 }
 
 export interface CollegeGame { you: string; them: string; youName: string; themName: string; result?: { score: [number, number]; line: Line; stock: number; grades: number[] } }
@@ -94,6 +96,8 @@ export interface Career {
   boxes: Record<string, Box>;
   /** XP earned in your last game, for the postgame screen */
   last?: { gameId: string; xp: { label: string; xp: number }[]; total: number; sp: number; levelUp?: number; boosts?: { attr: RiskAttr; label: string }[]; ovr0?: number; ovr1?: number };
+  /** the record book, the league's history, retirement (career/legacy.ts; absent on careers saved before it) */
+  legacy?: Legacy;
 }
 
 /** name, nickname, colors, abbreviation */
@@ -134,7 +138,7 @@ export function newCareer(o: { name: string; number: number; arch: Arch; college
   playWholeSeason(league, prev, seed);
   const col = COLLEGES[o.college % COLLEGES.length];
   const rival = COLLEGES[(o.college + 3) % COLLEGES.length];
-  return {
+  const c: Career = {
     v: 1, id: `c${seed.toString(36)}`, seed, created: Date.now(), phase: 'college',
     you: { pid, name: o.name, number: o.number, arch: o.arch, college: col[0], xp: 0, sp: 0, abilities: [A.sig] },
     league, season: prev, history: [],
@@ -142,6 +146,8 @@ export function newCareer(o: { name: string; number: number; arch: Arch; college
     goals: [], news: [], boxes: {},
     settings: { qLen: 120, moments: 'normal', diff: 'pro', speed: 'normal', ...o.settings },
   };
+  ensureLegacy(c);   // the league's history starts with the season it played before you arrived
+  return c;
 }
 
 /** Sim a whole season to the champion (the league's history before you arrive, and tests). */

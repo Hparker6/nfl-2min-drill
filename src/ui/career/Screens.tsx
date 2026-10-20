@@ -1,5 +1,5 @@
 /** Career screens between games: draft night, the postgame, the season's end, and the offseason. */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { passerRating, type Box, type Line } from '../../career/box';
 import { ARCH, COLLEGES, levelOf, youPlayer, type Career } from '../../career/career';
 import { FINAL_NAME, teamById, teamInfo } from '../../career/league';
@@ -19,7 +19,7 @@ import { StatLine, TeamTag } from './Hub';
 import type { Commit } from './Career';
 
 /** A number that counts up to its value when it first shows (instant under reduced motion). */
-function useCountUp(target: number, ms = 1100): number {
+export function useCountUp(target: number, ms = 1100): number {
   const [v, setV] = useState(() => (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? target : 0));
   useEffect(() => {
     if (v === target) return;
@@ -256,7 +256,7 @@ export function SeasonDone({ c, onOffseason }: { c: Career; onOffseason: () => v
   );
 }
 
-export function Offseason({ c, commit, onNext }: { c: Career; commit: Commit; onNext: () => void }) {
+export function Offseason({ c, commit, onNext, retire }: { c: Career; commit: Commit; onNext: () => void; retire?: ReactNode }) {
   const me = youPlayer(c);
   const aw = c.season.awards ?? [];
   const off = offers(c);
@@ -302,6 +302,7 @@ export function Offseason({ c, commit, onNext }: { c: Career; commit: Commit; on
           <button className="btn ghost small" onClick={() => commit((x) => { x.you.wantsTrade = true; })}>Request a trade</button>
         </section>
       )}
+      {retire}
       <button className="btn primary big" disabled={free} onClick={onNext}>{free ? 'Sign somewhere to continue' : `Start the ${c.season.year + 1} season`}</button>
       <p className="muted small">Level {levelOf(c.you.xp)} · {c.you.sp} skill point{c.you.sp === 1 ? '' : 's'} to spend (on the Player tab once the season starts).</p>
     </div>

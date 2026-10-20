@@ -4,6 +4,7 @@
  */
 import { kickoffState, playOut, step } from '../engine/game';
 import { riskWins } from './risk';
+import { GAME_STATS, noteGame } from './legacy';
 import { evaluate } from '../engine/evaluate';
 import { clip, hash, rng } from '../engine/rng';
 import { SLOTS, type Attr } from '../engine/roster';
@@ -198,6 +199,10 @@ export function finishLive(c: Career, how: 'sim' | 'moments' | 'full'): { box: B
   }
   recordGame(c.season, g, box, teams, how, c.league);
   c.boxes[g.id] = box;
+  for (const k of noteGame(c, line, g, teams[1].id)) {
+    const label = GAME_STATS.find((x) => x[0] === k)![1].toLowerCase();
+    c.news.unshift({ week: c.season.week, year: c.season.year, text: `Career high: ${line[k]} ${label} against the ${teams[1].name}.`, tone: 'good' });
+  }
   awardXp(c, g.id, line, win, how, scores, g.kind, risks);
   const opp = teams[1];
   const big = line.ptd && line.ptd >= 3 ? `, ${line.ptd} touchdown passes` : '';

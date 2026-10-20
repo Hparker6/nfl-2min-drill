@@ -2,7 +2,7 @@
  * Career mode: create a quarterback, play one college game for your draft stock, get drafted, and play seasons in a
  * fictional league. Saved in this browser.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Settings as AppSettings } from '../../game/storage';
 import { track } from '../../game/analytics';
 import {
@@ -10,7 +10,10 @@ import {
 } from '../../career/career';
 import { closeWeek, finishLive, gameOf, simYourGame, startLive, COLLEGE_GAME } from '../../career/run';
 import { endSeason, runOffseason, startNextSeason } from '../../career/offseason';
-import { exportCareer, importCareer, loadCareer, saveCareer } from '../../career/save';
+import { activeSlot, addToHall, exportCareer, importCareer, loadCareer, saveCareer, setActiveSlot } from '../../career/save';
+import { hallEntry, retire } from '../../career/legacy';
+import { editionShown, ownsEdition } from '../../game/edition';
+import { RetireCard, Retired, Slots } from './Legacy';
 import { download } from '../../game/shareImage';
 import { LiveGameView } from './LiveGame';
 import { Hub } from './Hub';
@@ -25,8 +28,14 @@ export function CareerMode({ app }: { app: AppSettings }) {
   return <CareerBoundary><CareerInner app={app} /></CareerBoundary>;
 }
 
+/** The slot to open: the last one played, or slot 1 without the Coach's Edition (slots 2 and 3 are its). */
+const startSlot = () => (ownsEdition() ? activeSlot() : 1);
+
 function CareerInner({ app }: { app: AppSettings }) {
-  const [c, setC] = useState<Career | null>(loadCareer);
+  const [slot, setSlot] = useState(startSlot);
+  const slotRef = useRef(slot);
+  const [c, setC] = useState<Career | null>(() => loadCareer(slotRef.current));
+  const [slots, setSlots] = useState(false);   // the career slots screen (Coach's Edition)
   const [post, setPost] = useState<string | null>(null);      // the game id whose postgame is showing
   const [busy, setBusy] = useState<string | null>(null);
   const [unsaved, setUnsaved] = useState(false);
@@ -37,25 +46,38 @@ function CareerInner({ app }: { app: AppSettings }) {
       if (!prev) return prev;
       const next = structuredClone(prev);
       fn(next);
-      setUnsaved(!saveCareer(next));
+      setUnsaved(!saveCareer(next, slotRef.current));
       return next;
     });
   }, []);
 
-  useEffect(() => { window.scrollTo({ top: 0 }); }, [c?.phase, post, !!c?.live]);
+  useEffect(() => { window.scrollTo({ top: 0 }); }, [c?.phase, post, !!c?.live, slots, slot]);
+
+  /** Open a slot: its career, or the new-career screen when it's empty. */
+  const open = (n: number) => {
+    slotRef.current = n;
+    setActiveSlot(n);
+    setSlot(n);
+    setPost(null);
+    setUnsaved(false);
+    setC(loadCareer(n));
+    setSlots(false);
+  };
 
   /** Long work (a season of other games) off the click, so the button can show it's working. */
   const work = (label: string, fn: () => void) => { setBusy(label); setTimeout(() => { try { fn(); } finally { setBusy(null); } }, 30); };
 
   if (busy) return <div className="cr-page"><div className="cr-busy"><i /><span>{busy}</span></div></div>;
+  if (slots) return <Slots current={slot} onOpen={open} onClose={() => setSlots(false)} />;
+  const toSlots = editionShown() ? () => setSlots(true) : undefined;
 
   if (!c) {
     return <NewCareer onCreate={(o) => work('Building the league: 32 teams, a season of history…', () => {
       const nc = newCareer(o);
-      setUnsaved(!saveCareer(nc));
+      setUnsaved(!saveCareer(nc, slotRef.current));
       setC(nc);
       track('career_start', { arch: o.arch });
-    })} onLoad={(nc) => { saveCareer(nc); setC(nc); }} />;
+    })} onLoad={(nc) => { saveCareer(nc, slotRef.current); setC(nc); }} onSlots={toSlots} slot={slot} />;
   }
 
   const banner = unsaved ? <p className="notice">This browser isn't letting the game save (storage full or blocked). Your career plays on, but download a save from Settings to keep it.</p> : null;
@@ -95,16 +117,20 @@ function CareerInner({ app }: { app: AppSettings }) {
     track('game_start', { mode: 'career', resumed: false, how: mode });
   };
 
+  if (c.phase === 'retired') return <Retired c={c} onSlots={() => setSlots(true)} />;
   if (c.phase === 'college') return <>{banner}<CollegeIntro c={c} onPlay={play} /></>;
   if (c.phase === 'draft') return <>{banner}<DraftNight c={c} commit={commit} onDone={() => work('Setting up your rookie season…', () => commit((x) => joinTeam(x)))} /></>;
   if (c.phase === 'offseason') {
-    return <>{banner}<Offseason c={c} commit={commit} onNext={() => work('A new season: schedules, rosters, rookies…', () => commit((x) => startNextSeason(x)))} /></>;
+    const onRetire = () => commit((x) => { retire(x); const e = hallEntry(x, ARCH[x.you.arch].name); if (e) addToHall(e); });
+    return <>{banner}<Offseason c={c} commit={commit} onNext={() => work('A new season: schedules, rosters, rookies…', () => commit((x) => startNextSeason(x)))}
+      retire={editionShown() ? <RetireCard c={c} onRetire={onRetire} /> : undefined} /></>;
   }
   if (c.season.week > 22) {
     return <>{banner}<SeasonDone c={c} onOffseason={() => work('Awards, retirements, free agency…', () => commit((x) => { endSeason(x); runOffseason(x); }))} /></>;
   }
   return <>{banner}<Hub key={hubTab} initialTab={hubTab} c={c} commit={commit} onPlay={play} onBye={() => work('Simming the week…', () => commit((x) => closeWeek(x)))}
-    onRetire={() => { if (confirm('Start over? This career will be deleted from this browser.')) { saveCareer(null); setC(null); } }}
+    onRetire={() => { if (confirm('Start over? This career will be deleted from this browser.')) { saveCareer(null, slotRef.current); setC(null); } }}
+    onSlots={toSlots}
     onExport={() => download(exportCareer(c), `the-4th-call-career-${c.you.name.replace(/\W+/g, '-').toLowerCase()}.json`)} /></>;
 }
 
@@ -117,7 +143,7 @@ const peak = (a: Arch) => ATTRS.reduce((b, k) => (ARCH[a].attrs[k] > ARCH[a].att
  * Create your quarterback: four short steps on the left (who, how he plays, where he played, the settings, folded away)
  * and his card on the right, built live as you choose, with the button to start on the card itself.
  */
-function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number: number; arch: Arch; college: number; settings: Partial<Settings> }) => void; onLoad: (c: Career) => void }) {
+function NewCareer({ onCreate, onLoad, onSlots, slot }: { onCreate: (o: { name: string; number: number; arch: Arch; college: number; settings: Partial<Settings> }) => void; onLoad: (c: Career) => void; onSlots?: () => void; slot: number }) {
   const [name, setName] = useState('');
   const [number, setNumber] = useState(7);
   const [arch, setArch] = useState<Arch>('pocket');
@@ -254,6 +280,7 @@ function NewCareer({ onCreate, onLoad }: { onCreate: (o: { name: string; number:
           try { onLoad(await importCareer(f)); } catch (x) { setErr((x as Error).message); }
         }} /></label>
         {err && <span className="cr-err"> {err}</span>}
+        {onSlots && <span> · Slot {slot}: <button className="cr-linkish" onClick={onSlots}>your careers</button></span>}
         <span> · A fictional league: every team and player is made up. Not affiliated with the NFL.</span>
       </p>
     </div>

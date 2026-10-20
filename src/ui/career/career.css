@@ -670,3 +670,32 @@
 .dn-ticker-t { font: 600 14px var(--body); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: dn-tick .5s ease-out; }
 @keyframes dn-tick { from { opacity: 0; transform: translateY(8px); } }
 @media (max-width: 600px) { .dn-heart { position: static; margin-top: 8px; } .dn-slots i { width: 9px; height: 13px; } .dn-ticker-t { white-space: normal; } .dn-reveal b { font-size: 26px; } }
+
+/* Career Legacy: record book, retirement, the Hall, the slots */
+.lg-totals { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+.cr-scroll { overflow-x: auto; }
+.lg-annals td, .lg-annals th { white-space: nowrap; }
+.lg-you { color: var(--accent); font-weight: 700; }
+.lg-gold { color: var(--accent); }
+.lg-proj { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); padding: 10px 14px; font-size: 15px; }
+.lg-retire { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+.lg-hall { text-align: center; justify-items: center; padding: 26px 18px; background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--accent) 16%, var(--panel)) 0%, var(--panel) 65%); }
+.lg-hall .cr-lede { margin: 0 auto; }
+.lg-vote { position: relative; width: min(520px, 100%); height: 16px; border-radius: 8px; background: var(--panel-3); overflow: visible; margin-top: 10px; }
+.lg-vote i { position: absolute; inset: 0 auto 0 0; border-radius: 8px; background: var(--accent); }
+.lg-line { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--ink); }
+.lg-line em { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 600 11px var(--body); font-style: normal; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.lg-votes { margin-top: 18px; color: var(--ink-2); }
+.lg-votes b { font: 800 30px var(--display); color: var(--ink); }
+.lg-verdict { font-size: clamp(30px, 6vw, 48px) !important; color: var(--accent); animation: lg-reveal .6s 1.5s ease-out backwards; }
+.lg-hall.tier-solid .lg-verdict, .lg-hall.tier-short .lg-verdict { color: var(--ink); }
+@keyframes lg-reveal { from { opacity: 0; transform: scale(.9); letter-spacing: .2em; } }
+@media (prefers-reduced-motion: reduce) { .lg-verdict { animation: none; } }
+.lg-case .lg-total td { border-top: 2px solid var(--line-2); font-weight: 700; }
+.lg-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.lg-slot { text-align: left; display: grid; gap: 4px; background: var(--panel-2); border: 2px solid var(--line); border-radius: var(--r-md); padding: 14px; cursor: pointer; color: var(--ink); font: inherit; }
+.lg-slot:hover:not(:disabled) { border-color: var(--line-2); }
+.lg-slot.on { border-color: var(--accent); }
+.lg-slot.locked { cursor: not-allowed; opacity: .6; border-style: dashed; }
+.lg-slot b { font: 800 22px var(--display); text-transform: uppercase; }
+.tier-first, .tier-hof { color: var(--accent); }

@@ -5,6 +5,7 @@
 import { clip, gauss, hash, rng } from '../engine/rng';
 import { SLOT_GROUP, SLOTS } from '../engine/roster';
 import { seasonAwards } from './awards';
+import { noteSeason, RECORD_STATS } from './legacy';
 import { ARCH, ordinal, weeklyGoals, youPlayer, type Career, type SeasonSummary } from './career';
 import { genPlayer, nameMaker, overall, teamById, teamInfo } from './league';
 import { newSeason, placesFrom, REG_WEEKS } from './season';
@@ -26,7 +27,15 @@ export function endSeason(c: Career) {
     year: s.year, team: me.team!, line: s.stats[c.you.pid] ?? {}, w: st?.w ?? 0, l: st?.l ?? 0, t: st?.t ?? 0, playoff,
     awards: s.awards.filter((a) => a.you).map((a) => a.name), ovr: me.rating,
   };
+  const poLine = s.poStats?.[c.you.pid];
+  if (poLine && Object.keys(poLine).length) sum.po = poLine;
   c.history.push(sum);
+  const broke = noteSeason(c, s, { team: sum.team, w: sum.w, l: sum.l, t: sum.t, playoff });
+  for (const k of broke) {
+    const r = c.legacy!.records[k]!;
+    const label = RECORD_STATS.find((x) => x[0] === k)![1].toLowerCase();
+    c.news.unshift({ week: 23, year: s.year, text: `League record: ${r.name}, ${r.v.toLocaleString('en-US')} ${label} in a season.`, tone: r.you ? 'good' : 'neutral' });
+  }
   // a year off the contract: at 0 he's a free agent this offseason
   if (c.you.contract) c.you.contract.years = Math.max(0, c.you.contract.years - 1);
   for (const a of s.awards.filter((x) => x.you)) c.news.unshift({ week: 23, year: s.year, text: `${c.you.name} wins ${a.name}.`, tone: 'good' });

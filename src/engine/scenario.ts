@@ -33,7 +33,7 @@ function genAttrs(group: PosGroup, level: number, r: Rng): Partial<Record<Attr, 
   return out;
 }
 
-export type Mode = 'daily' | 'survivor' | 'practice' | 'career';
+export type Mode = 'daily' | 'survivor' | 'practice' | 'career' | 'ladder';
 
 export interface Scenario {
   id: string;

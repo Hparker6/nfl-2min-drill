@@ -4,6 +4,7 @@ import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
 import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
+import { editionShown } from './game/edition';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 import { UpdateBar } from './ui/UpdateBar';
@@ -12,11 +13,13 @@ import { FEEDBACK_URL, SUPPORT_URL } from './game/site';
 import { lazy, Suspense } from 'react';
 // career mode is its own chunk: the Daily loads as fast as it did
 const CareerMode = lazy(() => import('./ui/career/Career').then((m) => ({ default: m.CareerMode })));
+// the Gridiron Challenge (Coach's Edition) too: hidden in production until it can be bought
+const Ladder = lazy(() => import('./ui/Ladder').then((m) => ({ default: m.Ladder })));
 import { setContext, setPlayerProperties, track } from './game/analytics';
 import { audio } from './game/audio';
 
-type Mode = 'daily' | 'survivor' | 'practice' | 'everyone' | 'career';
-const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : location.hash.startsWith('#career') ? 'career' : 'daily');
+type Mode = 'daily' | 'survivor' | 'practice' | 'everyone' | 'career' | 'ladder';
+const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : location.hash.startsWith('#career') ? 'career' : location.hash === '#ladder' && editionShown() ? 'ladder' : 'daily');
 
 export default function App() {
   const [store, setStore] = useState<Store>(loadStore);
@@ -86,7 +89,7 @@ export default function App() {
           </div>
           <nav className="modes" aria-label="Game modes">
             {(['daily', 'survivor', 'practice', 'career'] as Mode[]).map((m) => (
-              <button key={m} className={`${mode === m ? 'on' : ''}${m === 'career' ? ' new' : ''}`} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
+              <button key={m} className={`${mode === m || (m === 'practice' && mode === 'ladder') ? 'on' : ''}${m === 'career' ? ' new' : ''}`} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
                 {m === 'daily' ? 'Daily' : m === 'survivor' ? 'Survivor' : m === 'practice' ? 'Practice' : <>Career<sup className="beta">Beta</sup></>}
               </button>
             ))}
@@ -112,6 +115,7 @@ export default function App() {
         {mode === 'daily' && <Daily store={store} update={update} toast={toast} go={go} onboarded={onboarded} openHelp={() => setModal('help')} />}
         {mode === 'survivor' && <Survivor store={store} update={update} toast={toast} />}
         {mode === 'practice' && <Practice store={store} update={update} />}
+        {mode === 'ladder' && <Suspense fallback={<div className="cr-busy" />}><Ladder store={store} update={update} /></Suspense>}
         {mode === 'everyone' && <Everyone store={store} go={go} />}
         {mode === 'career' && <Suspense fallback={<div className="cr-busy" />}><CareerMode app={store.settings} /></Suspense>}
       </main>
