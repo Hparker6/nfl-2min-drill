@@ -7,23 +7,31 @@
  *   ?edition=locked  what a player who hasn't bought it sees (the default)
  *   ?edition=owned   everything unlocked
  *   ?edition=hidden  what production shows
+ *   ?edition=account owned when the signed-in account owns it, by the server's last answer (needs the Worker:
+ *                    wrangler dev --env dev); the start of the replacement for this whole gate
  * The payment step will replace `editionState` with a check of a signed key; nothing else needs to change.
  */
+import { COACH_EDITION, lastKnownOwns } from './account';
+
 export type EditionState = 'hidden' | 'locked' | 'owned';
+type DevChoice = EditionState | 'account';
 
 export const EDITION_NAME = "Coach's Edition";
 export const EDITION_PRICE = '$4.99';
+/** Accounts and checkout show in development only, like the rest of the edition. */
+export const accountsShown = () => editionShown();
 const DEV_KEY = 'the4thcall:edition:dev';
 
-const isState = (v: unknown): v is EditionState => v === 'hidden' || v === 'locked' || v === 'owned';
+const isChoice = (v: unknown): v is DevChoice => v === 'hidden' || v === 'locked' || v === 'owned' || v === 'account';
 
 /** Development only: read (and remember) `?edition=` from the address. */
 function devState(): EditionState {
   try {
     const q = new URLSearchParams(location.search).get('edition');
-    if (isState(q)) localStorage.setItem(DEV_KEY, q);
+    if (isChoice(q)) localStorage.setItem(DEV_KEY, q);
     const v = localStorage.getItem(DEV_KEY);
-    return isState(v) ? v : 'locked';
+    if (v === 'account') return lastKnownOwns().includes(COACH_EDITION) ? 'owned' : 'locked';
+    return v === 'hidden' || v === 'owned' ? v : 'locked';
   } catch { return 'locked'; }
 }
 

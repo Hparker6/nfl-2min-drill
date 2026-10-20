@@ -8,6 +8,7 @@ import { GRADE_INFO, type GradeKey } from '../game/grade';
 import { archetype } from '../game/share';
 import { rateSpots } from '../game/rating';
 import { bestStreak, defaultStore, streak, type Settings, type Store } from '../game/storage';
+import { editionShown } from '../game/edition';
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,10 +78,11 @@ export function About({ onClose }: { onClose: () => void }) {
       <p>Plays are resolved by a simplified football simulation written for this game. Win chances and grades are that simulation's estimates: useful for comparing your options, but not official evaluations, real coaching grades or real-world probabilities.</p>
       <h3>Your data</h3>
       <ul>
-        <li>Your progress, streaks, stats and settings are stored only in this browser (localStorage). There are no accounts, and nothing about you is sent to a server we run.</li>
-        <li>Clearing your browser data, or <i>Settings → Erase my data</i>, removes everything.</li>
-        <li>Fonts are loaded from Google Fonts. If the site owner turns on Google Analytics, anonymous gameplay events are sent to it (for example, that a game started or a result was shared), never names or contact details.</li>
+        <li>Your progress, streaks, stats, careers and settings are stored in this browser (localStorage), not on a server. Clearing your browser data, or <i>Settings → Erase my data</i>, removes them.</li>
+        <li>The daily leaderboard: when you post a score, our server receives the nickname you chose, your score, your call grades, whether you won and a random code this browser made up (so a second post replaces the first). To limit posts, your IP address is counted for that day as a one-way hash; the address itself isn’t kept.</li>
+        <li>Fonts are loaded from Google Fonts. Cloudflare, which hosts the site, measures visits with its web analytics. If the site owner turns on Google Analytics, gameplay events are sent to it (for example, that a game started or a result was shared), never names or contact details.</li>
       </ul>
+      {editionShown() && <AccountsPrivacy />}
       <h3>No affiliation</h3>
       <p>Not affiliated with, endorsed by or connected to the NFL, any of its teams, or the NFL Players Association. Team and player names are used to identify real teams and players; no logos or marks are used.</p>
     </Modal>
@@ -131,7 +133,7 @@ export function Stats({ store, onClose }: { store: Store; onClose: () => void })
   );
 }
 
-export function SettingsModal({ store, update, onClose }: { store: Store; update: (fn: (s: Store) => void) => void; onClose: () => void }) {
+export function SettingsModal({ store, update, onClose, onAccount }: { store: Store; update: (fn: (s: Store) => void) => void; onClose: () => void; onAccount?: () => void }) {
   const st = store.settings;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => update((s) => { s.settings[k] = v; });
   const reset = () => {
@@ -166,7 +168,27 @@ export function SettingsModal({ store, update, onClose }: { store: Store; update
         </label>
         <label className="check"><input type="checkbox" checked={!st.plainDots} onChange={(e) => set('plainDots', !e.target.checked)} /> Color players by rating (red to green)</label>
       </div>
+      {onAccount && <p><button className="btn" onClick={onAccount}>Account (preview)</button></p>}
       <button className="btn danger" onClick={reset}>Erase my data</button>
     </Modal>
+  );
+}
+
+/**
+ * What accounts and purchases would collect. Shown only where the Coach's Edition is (development builds), because
+ * neither exists on the live site yet. Keep it in step with server/accounts and server/db/migrations.
+ */
+function AccountsPrivacy() {
+  return (
+    <>
+      <h3>Accounts and purchases (in development, not live)</h3>
+      <ul>
+        <li>Signing in is optional and uses your email address, no password. We store your address, when the account was made, your signed-in sessions and recent sign-in requests. Sign-in links, codes and session keys are stored only as one-way hashes, and requests are deleted about a day after they expire. A cookie keeps you signed in on this browser; it ends after 30 days without use, or 180 days at most.</li>
+        <li>Sign-in emails would be sent through an email service (not chosen yet), which receives your address to deliver them.</li>
+        <li>Purchases are paid on Stripe’s own checkout page. We never see or store card details. We keep a record of each purchase (product, amount, date, Stripe’s reference numbers and whether it was refunded or disputed) and what it unlocks. Stripe keeps its own records under its own privacy policy.</li>
+        <li>Deleting your account (Account → Delete) removes your email address, sessions, sign-in requests and what you own. Purchase records are kept without your email, for refunds, disputes and accounting.</li>
+        <li>Game progress stays in your browser either way: an account restores a purchase on another device, not your saved games.</li>
+      </ul>
+    </>
   );
 }

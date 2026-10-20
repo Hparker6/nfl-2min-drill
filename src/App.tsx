@@ -4,7 +4,8 @@ import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
 import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
-import { editionShown } from './game/edition';
+import { accountsShown, editionShown } from './game/edition';
+import { AccountModal, takeAccountHash } from './ui/Account';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 import { UpdateBar } from './ui/UpdateBar';
@@ -25,7 +26,10 @@ export default function App() {
   const [store, setStore] = useState<Store>(loadStore);
   const [mode, setMode] = useState<Mode>(modeFromHash);
   // first visit: no modal in the way. The Daily brief carries a short welcome instead.
-  const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | null>(null);
+  const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | 'account' | null>(null);
+  // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
+  const [accountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
+  useEffect(() => { if (accountFrom) setModal('account'); }, [accountFrom]);
   const [toastMsg, setToast] = useState<string | null>(null);
 
   const update = useCallback((fn: (s: Store) => void) => {
@@ -151,7 +155,8 @@ export default function App() {
       {modal === 'help' && <Help onClose={closeModal} />}
       {modal === 'stats' && <Stats store={store} onClose={closeModal} />}
       <BadgeToast />
-      {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} />}
+      {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} onAccount={accountsShown() ? () => setModal('account') : undefined} />}
+      {modal === 'account' && <AccountModal onClose={closeModal} from={accountFrom} />}
       {modal === 'about' && <About onClose={closeModal} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
       <UpdateBar />

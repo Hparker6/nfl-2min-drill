@@ -67,6 +67,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), siteMeta(site)],
     base: './',
     worker: { format: 'es' },
+    // accounts in development: DEV_API=http://localhost:8787 npm run dev sends /v1 to wrangler dev --env dev (off otherwise)
+    server: process.env.DEV_API ? { proxy: { '/v1': { target: process.env.DEV_API, changeOrigin: false } } } : undefined,
     // the engine tests simulate thousands of plays each; give them room on slower machines
     test: { exclude: ['node_modules/**', 'dist/**', 'scripts/**'], testTimeout: 120_000 },
   };

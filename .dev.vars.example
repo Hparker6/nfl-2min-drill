@@ -1,0 +1,16 @@
+# Local secrets for `wrangler dev --env dev`. Copy to .dev.vars (git-ignored) and fill in. Never commit real values,
+# and never put any of these in a VITE_ variable: those are built into the public JavaScript.
+#
+# Staging and production take the same names as Worker secrets instead: wrangler secret put NAME --env <env>.
+
+# 32+ random characters; keys every token and code hash. Generate one with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+AUTH_PEPPER=
+
+# Stripe TEST mode only. Live keys (sk_live_/rk_live_) are refused by the code (server/accounts/config.ts).
+# A restricted key is better than the full secret key: it needs Checkout Sessions (write), Charges and Disputes (read).
+STRIPE_SECRET_KEY=
+# From `stripe listen --forward-to localhost:8787/v1/stripe/webhook` (whsec_...)
+STRIPE_WEBHOOK_SECRET=
+# The test-mode Price for the Coach's Edition: one-time, 4.99 USD (price_...)
+STRIPE_PRICE_ID=

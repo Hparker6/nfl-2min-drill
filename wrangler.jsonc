@@ -19,5 +19,34 @@
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DayBoard", "AllDays"] }
-  ]
+  ],
+  // Accounts and purchases are OFF at the top level (production): no database binding, so /v1/auth, /v1/me, /v1/checkout
+  // and /v1/stripe answer 404. The dev environment below turns them on, on this machine only:
+  //   npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev
+  //   then, in another terminal: DEV_API=http://localhost:8787 npm run dev, and open http://localhost:5173/?edition=account
+  // with secrets in .dev.vars (see .dev.vars.example). A staging environment needs a real D1 database (wrangler d1
+  // create) and its secrets set with wrangler secret put --env staging; production gets the same only after review.
+  "env": {
+    "dev": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "DAY_BOARD", "class_name": "DayBoard" },
+          { "name": "ALL_DAYS", "class_name": "AllDays" }
+        ]
+      },
+      // local only: wrangler dev simulates this database on disk (.wrangler/), nothing is created in Cloudflare
+      "d1_databases": [
+        { "binding": "DB", "database_name": "the4thcall-dev", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "server/db/migrations" }
+      ],
+      "vars": {
+        "ACCOUNTS": "on",
+        // the Vite dev server, which proxies /v1 here (DEV_API=http://localhost:8787 npm run dev)
+        "SITE_ORIGIN": "http://localhost:5173",
+        "DEV_ORIGINS": "http://localhost:8787,http://127.0.0.1:8787",
+        "MAIL_MODE": "console",
+        // test-mode Stripe only (live keys are refused in code); set to on with test secrets in .dev.vars to try checkout
+        "PAYMENTS": "off"
+      }
+    }
+  }
 }

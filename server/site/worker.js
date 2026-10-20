@@ -15,6 +15,8 @@
 import { DurableObject } from 'cloudflare:workers';
 import PCT from '../../src/data/percentiles.json';
 import { rivalsFor } from '../../src/game/rivals.ts';
+// accounts and the Coach's Edition purchase: 404 unless the environment turns them on (server/accounts/config.ts)
+import { handleAccounts, isAccountsPath } from '../accounts/routes.ts';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
@@ -294,6 +296,7 @@ export default {
     if (['/leaderboard', '/leaderboard/', '/stats', '/stats/'].includes(url.pathname)) {
       try { return await pages(request, env, url); } catch { return new Response('The leaderboard is unavailable right now. Try again in a minute.', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '60' } }); }
     }
+    if (isAccountsPath(url.pathname)) return handleAccounts(request, env, url);
     if (url.pathname.startsWith('/v1/')) {
       try { return await api(request, env, url); } catch { return json({ error: 'unavailable' }, 503); }
     }

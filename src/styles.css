@@ -1319,3 +1319,13 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
   .modes button { padding: 6px 6px; font-size: 12.5px; letter-spacing: .02em; }
   .modes .beta { display: none; }
 }
+
+/* account panel (development builds) */
+.acct-dev { font-size: 13px; color: var(--muted); border: 1px dashed var(--line-2); border-radius: var(--r-sm); padding: 8px 10px; }
+.acct-form { display: grid; gap: 10px; }
+.acct-form label { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.acct-form input, .acct-del input { font: 600 16px var(--body); color: var(--ink); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 10px 12px; width: 100%; }
+.acct-msg { background: var(--panel-2); border-radius: var(--r-sm); padding: 8px 10px; }
+.acct-err { color: var(--bad); }
+.acct-ok { color: var(--good); }
+.acct-del { display: grid; gap: 8px; border: 1px solid var(--r); border-radius: var(--r-sm); padding: 10px; }
