@@ -19,7 +19,7 @@ import { accountsConfig, type AccountsEnv, type Config } from './config';
 import { addressKey, checkWrite, clearSessionCookie, fail, json, readCookie, readJson, SESSION_COOKIE, sessionCookie } from './http';
 import { deleteAccount, maskEmail, normalizeEmail, startEmail, verifyCode, verifyLink, type AuthDeps, type SignedIn } from './auth';
 import { endAllSessions, endSession, readSession } from './sessions';
-import { consoleMailer, type Mailer } from './mailer';
+import { consoleMailer, resendMailer, type Mailer } from './mailer';
 import { sweep } from './ratelimit';
 import { checkoutStatus, createCheckout, entitlementsOf, handleWebhook } from './purchases';
 
@@ -49,7 +49,7 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
     if (bad === 'method') return fail(405, 'method');
     if (bad) return fail(403, 'forbidden');
     const addr = await addressKey(req, cfg.pepper);
-    const deps: AuthDeps = { db: cfg.db, pepper: cfg.pepper, origin: cfg.origin, mailer: opts.mailer ?? (cfg.mail === 'console' ? consoleMailer : offMailer), now };
+    const deps: AuthDeps = { db: cfg.db, pepper: cfg.pepper, origin: cfg.origin, mailer: opts.mailer ?? (cfg.mail === 'resend' && cfg.resend ? resendMailer(cfg.resend.apiKey, cfg.resend.from, opts.fetch ?? fetch) : cfg.mail === 'console' ? consoleMailer : offMailer), now };
 
     if (p === '/v1/auth/email/start') {
       if (cfg.mail === 'off' && !opts.mailer) return fail(503, 'Sign-in by email is not available yet.');

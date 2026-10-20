@@ -1,7 +1,7 @@
 /**
- * Sending sign-in emails. No email provider is chosen yet, so there are two modes: "console" prints the link and code
- * to the Worker's log, allowed only when the site runs on localhost (config.ts), and "off", where sign-in by email
- * is unavailable. A real provider plugs in here.
+ * Sending sign-in emails. Three modes (config.ts): "resend" sends through Resend's API with a key kept as a Worker
+ * secret; "console" prints the link and code to the Worker's log, allowed only when the site runs on localhost; and
+ * "off", where sign-in by email is unavailable.
  */
 export interface SignInEmail { to: string; link: string; code: string; minutes: number }
 
@@ -14,7 +14,24 @@ export const consoleMailer: Mailer = {
   },
 };
 
-/** The email's words, for when a provider is connected (and for the tests to check what a message says). */
+/** Resend (https://resend.com): one POST per message. The key never leaves the Worker; a failure is just "not sent". */
+export function resendMailer(apiKey: string, from: string, f: typeof fetch = fetch): Mailer {
+  return {
+    async send(m) {
+      const { subject, text } = signInText(m);
+      try {
+        const r = await f('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
+          body: JSON.stringify({ from, to: [m.to], subject, text }),
+        });
+        return r.ok;
+      } catch { return false; }
+    },
+  };
+}
+
+/** The email's words (and what the tests check a message says). */
 export function signInText(m: SignInEmail): { subject: string; text: string } {
   return {
     subject: `Your sign-in code for The 4th Call: ${m.code}`,

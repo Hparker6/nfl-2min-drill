@@ -14,3 +14,8 @@ STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 # The test-mode Price for the Coach's Edition: one-time, 4.99 USD (price_...)
 STRIPE_PRICE_ID=
+
+# Resend (https://resend.com), for sign-in emails: the API key (re_...). The sender is MAIL_FROM in wrangler.jsonc, a
+# verified domain in Resend. Locally MAIL_MODE is "console" (links print to the log), so this is only needed to try
+# real delivery: set MAIL_MODE=resend in .dev.vars too.
+RESEND_API_KEY=

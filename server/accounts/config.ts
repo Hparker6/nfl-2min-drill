@@ -3,6 +3,7 @@
  * (wrangler.jsonc, top level) configures none of it: no database binding, so no accounts and no payments.
  *
  * Accounts need: a D1 binding (DB), ACCOUNTS = "on", SITE_ORIGIN, and an AUTH_PEPPER secret of 32+ characters.
+ * Sign-in email needs MAIL_MODE = "resend" with a RESEND_API_KEY secret and MAIL_FROM (a verified sender).
  * Payments need all that, plus PAYMENTS = "on" and the Stripe secrets. Live Stripe keys are refused outright while
  * LIVE_PAYMENTS_ALLOWED below is false: turning on live payments takes a reviewed code change, not just a setting.
  */
@@ -18,6 +19,9 @@ export interface AccountsEnv {
   /** extra origins allowed to call the API (comma-separated; local development) */
   DEV_ORIGINS?: string;
   MAIL_MODE?: string;
+  /** Resend: the API key (a secret) and the sender, e.g. "The 4th Call <signin@nfl-2min-drill.com>" */
+  RESEND_API_KEY?: string;
+  MAIL_FROM?: string;
   AUTH_PEPPER?: string;
   PAYMENTS?: string;
   STRIPE_SECRET_KEY?: string;
@@ -30,7 +34,8 @@ export interface Config {
   origin: string;
   origins: string[];
   pepper: string;
-  mail: 'console' | 'off';
+  mail: 'resend' | 'console' | 'off';
+  resend?: { apiKey: string; from: string };
   payments: PaymentsConfig | null;
 }
 
@@ -54,9 +59,18 @@ export function accountsConfig(env: AccountsEnv): Config | null {
   const pepper = env.AUTH_PEPPER ?? '';
   if (pepper.length < 32) return null;
   const extra = (env.DEV_ORIGINS ?? '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(isLocal);
-  // printing sign-in links to the log is for a local machine only
-  const mail = env.MAIL_MODE === 'console' && isLocal(origin) ? 'console' : 'off';
-  return { db: env.DB, origin, origins: [origin, ...extra], pepper, mail, payments: paymentsConfig(env) };
+  // printing sign-in links to the log is for a local machine only; a provider needs its key and a sender address
+  const resend = resendConfig(env);
+  const mail = resend ? 'resend' : env.MAIL_MODE === 'console' && isLocal(origin) ? 'console' : 'off';
+  return { db: env.DB, origin, origins: [origin, ...extra], pepper, mail, ...(resend && { resend }), payments: paymentsConfig(env) };
+}
+
+const FROM = /^(?:[^<>"\n]{1,60} <[^\s<>@]+@[^\s<>@]+\.[a-z]{2,}>|[^\s<>@]+@[^\s<>@]+\.[a-z]{2,})$/i;
+export function resendConfig(env: AccountsEnv): { apiKey: string; from: string } | null {
+  if (env.MAIL_MODE !== 'resend') return null;
+  const apiKey = env.RESEND_API_KEY ?? '', from = (env.MAIL_FROM ?? '').trim();
+  if (!/^re_[A-Za-z0-9_]{10,}$/.test(apiKey) || !FROM.test(from)) return null;
+  return { apiKey, from };
 }
 
 export function paymentsConfig(env: AccountsEnv): PaymentsConfig | null {

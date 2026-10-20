@@ -47,6 +47,29 @@
         // test-mode Stripe only (live keys are refused in code); set to on with test secrets in .dev.vars to try checkout
         "PAYMENTS": "off"
       }
+    },
+    // staging: a real Cloudflare D1 database (the-fourth-call-database, staging only) with accounts on and payments in
+    // Stripe test mode. Secrets: wrangler secret put AUTH_PEPPER|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|STRIPE_PRICE_ID --env staging
+    // Deploy: npm run build && npx wrangler deploy --env staging && npx wrangler d1 migrations apply DB --env staging --remote
+    "staging": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "DAY_BOARD", "class_name": "DayBoard" },
+          { "name": "ALL_DAYS", "class_name": "AllDays" }
+        ]
+      },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "the-fourth-call-database", "database_id": "42a1a193-5c81-495a-bf0b-730eae04098f", "migrations_dir": "server/db/migrations" }
+      ],
+      "vars": {
+        "ACCOUNTS": "on",
+        "SITE_ORIGIN": "https://nfl-2min-drill-staging.workers.dev",
+        // sign-in emails through Resend: the key is a secret (wrangler secret put RESEND_API_KEY --env staging); the
+        // sender must be an address on a domain verified in Resend
+        "MAIL_MODE": "resend",
+        "MAIL_FROM": "The 4th Call <signin@nfl-2min-drill.com>",
+        "PAYMENTS": "off"
+      }
     }
   }
 }
