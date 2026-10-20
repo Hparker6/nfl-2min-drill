@@ -98,6 +98,9 @@ async function api(request, env, url) {
   const m = url.pathname.match(/^\/v1\/day\/(\d{4}-\d{2}-\d{2})(\/score)?$/);
   if (!m || !DAY.test(m[1])) return json({ error: 'not found' }, 404);
   const day = m[1];
+  // a real calendar date, from the first Daily to tomorrow (UTC): anything else would create a storage object for nothing
+  const dayAt = Date.parse(day + 'T00:00:00Z');
+  if (!Number.isFinite(dayAt) || new Date(dayAt).toISOString().slice(0, 10) !== day || dayAt < Date.parse('2026-01-01T00:00:00Z') || dayAt > Date.now() + 864e5) return json({ error: 'not found' }, 404);
   const board = env.DAY_BOARD.get(env.DAY_BOARD.idFromName(day));
   if (request.method === 'GET' && !m[2]) {
     const tok = url.searchParams.get('token');
