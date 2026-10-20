@@ -1,7 +1,7 @@
 /**
  * The account panel (development builds only, like the rest of the Coach's Edition): sign in by email, see what you
  * own, buy the edition in Stripe's test mode, sign out, delete the account. It opens by itself when the page is
- * reached from a sign-in email (#signin=…) or back from Stripe (#purchase=…).
+ * reached from a sign-in email (#signin=…), back from Stripe (#purchase=…), or back from a cancelled checkout (#account).
  */
 import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modals';

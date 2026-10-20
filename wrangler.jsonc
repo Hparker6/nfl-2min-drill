@@ -24,8 +24,8 @@
   // and /v1/stripe answer 404. The dev environment below turns them on, on this machine only:
   //   npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev
   //   then, in another terminal: DEV_API=http://localhost:8787 npm run dev, and open http://localhost:5173/?edition=account
-  // with secrets in .dev.vars (see .dev.vars.example). A staging environment needs a real D1 database (wrangler d1
-  // create) and its secrets set with wrangler secret put --env staging; production gets the same only after review.
+  // with secrets in .dev.vars (see .dev.vars.example). The staging environment is further down; production gets the same
+  // only after review. Setup for both: server/accounts/SETUP.md.
   "env": {
     "dev": {
       "durable_objects": {

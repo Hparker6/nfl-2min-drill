@@ -1,15 +1,15 @@
 /**
  * The Coach's Edition: the one-time unlock (Career Legacy, more career slots, the Gridiron Challenge ladder).
  *
- * There is no purchase yet, so nothing can own it in a production build: there the edition is hidden, and every
- * screen looks and plays exactly as it did before. In development (`npm run dev`) it shows, so it can be reviewed,
- * in one of two states, switched with the address bar and remembered on this device:
+ * Nothing can be bought yet, so in a production build the edition is hidden and every screen looks and plays exactly
+ * as it did before. In development (`npm run dev`) it shows, so it can be reviewed, in the state chosen with the
+ * address bar (remembered on this device):
  *   ?edition=locked  what a player who hasn't bought it sees (the default)
  *   ?edition=owned   everything unlocked
  *   ?edition=hidden  what production shows
  *   ?edition=account owned when the signed-in account owns it, by the server's last answer (needs the Worker:
- *                    wrangler dev --env dev); the start of the replacement for this whole gate
- * The payment step will replace `editionState` with a check of a signed key; nothing else needs to change.
+ *                    server/accounts/SETUP.md); the start of this gate's replacement
+ * Going live means `editionState` reads the account's ownership in production too: a separate, reviewed step.
  */
 import { COACH_EDITION, lastKnownOwns } from './account';
 
