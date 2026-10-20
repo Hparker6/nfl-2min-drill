@@ -3,6 +3,8 @@
 For any Claude Code session picking this branch up. Written 2026-10-20 after the first successful sandbox purchase.
 Read this, then [LAUNCH_TODO.md](LAUNCH_TODO.md) for the ordered checklist and
 [server/accounts/SETUP.md](server/accounts/SETUP.md) for every setting and the 14-step Stripe test.
+Security controls, the threat model and the pre-launch security checklist: [server/accounts/SECURITY.md](server/accounts/SECURITY.md)
+(hardened 2026-10-20, commit `434e0df`; deployed to staging).
 
 ## 1. Rules (don't skip)
 
