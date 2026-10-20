@@ -92,14 +92,16 @@ function FinishSignIn({ token, onDone }: { token: string; onDone: (msg: string |
 
 /** Back from Stripe: ask our server (not the address bar) until the payment is confirmed by Stripe's webhook. */
 function ConfirmPurchase({ sessionId, onOwned }: { sessionId: string; onOwned: () => void }) {
-  const [state, setState] = useState<'checking' | 'owned' | 'waiting'>('checking');
+  const [state, setState] = useState<'checking' | 'owned' | 'waiting' | 'unreachable'>('checking');
   const tries = useRef(0);
+  const misses = useRef(0);
   useEffect(() => {
     let stop = false;
     const tick = async () => {
       const s = await checkoutStatus(sessionId);
       if (stop) return;
-      if (s?.owns) { setState('owned'); onOwned(); return; }
+      if (s === 'unreachable') { if (++misses.current >= 3) { setState('unreachable'); return; } }
+      else if (s?.owns) { setState('owned'); onOwned(); return; }
       if (++tries.current >= 15) { setState('waiting'); return; }
       setTimeout(tick, 2000);
     };
@@ -107,7 +109,8 @@ function ConfirmPurchase({ sessionId, onOwned }: { sessionId: string; onOwned: (
     return () => { stop = true; };
   }, [sessionId]);   // eslint-disable-line react-hooks/exhaustive-deps
   if (state === 'owned') return <p className="acct-ok">Payment confirmed: the {EDITION_NAME} is yours. <button className="btn small" onClick={() => location.reload()}>Unlock it now</button></p>;
-  if (state === 'waiting') return <p className="muted">Stripe hasn’t confirmed the payment yet. That can take a minute; it shows here as soon as it does.</p>;
+  if (state === 'waiting') return <p className="muted">Stripe hasn’t confirmed the payment yet. That can take a few minutes; reopen Account to check again. If you were charged and it still isn’t here after that, use <b>Help &amp; refunds</b> and quote <code>{sessionId.slice(-8)}</code>: nothing is lost, the purchase is on record with Stripe.</p>;
+  if (state === 'unreachable') return <p className="acct-err" role="alert">The account server isn’t answering, so the payment can’t be confirmed right now. Your payment is safe with Stripe; reopen Account in a minute to check again.</p>;
   return <p className="muted">Confirming your payment with Stripe…</p>;
 }
 
@@ -131,8 +134,8 @@ function SignedIn({ me, busy, setBusy, setMsg, refresh, onClose }: {
       {!owns && me.payments === 'off' && <p className="muted small">Purchases aren’t open.</p>}
       <p className="muted small">Bought it on another device? Signing in with the same email restores it here.</p>
       <div className="row">
-        <button className="btn" disabled={busy} onClick={async () => { await signOut(); setMsg('Signed out.'); refresh(); }}>Sign out</button>
-        <button className="btn" disabled={busy} onClick={async () => { await signOut(true); setMsg('Signed out on every device.'); refresh(); }}>Sign out everywhere</button>
+        <button className="btn" disabled={busy} onClick={async () => { const ok = await signOut(); setMsg(ok ? 'Signed out.' : 'Signed out on this device, but the server didn’t confirm. If you’re on a shared computer, use Sign out everywhere once you’re back online.'); refresh(); }}>Sign out</button>
+        <button className="btn" disabled={busy} onClick={async () => { const ok = await signOut(true); setMsg(ok ? 'Signed out on every device.' : 'The server didn’t confirm. Try again when you’re back online.'); refresh(); }}>Sign out everywhere</button>
       </div>
       {!del ? <button className="btn danger" onClick={() => setDel(true)}>Delete my account</button> : (
         <div className="acct-del">

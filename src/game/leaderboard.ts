@@ -30,25 +30,28 @@ function token(): string {
   } catch { return 'anon'; }
 }
 
-export async function submitScore(day: string, name: string, score: number, grades: string, win: boolean): Promise<Board | null> {
+/** `null`: the leaderboard is off on this site. `'failed'`: it is on but didn't answer (say so; never show "loading" forever). */
+export type BoardAnswer = Board | 'failed' | null;
+
+export async function submitScore(day: string, name: string, score: number, grades: string, win: boolean): Promise<BoardAnswer> {
   if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/day/${day}/score`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token: token(), name: name.slice(0, 20), score: Math.round(score), grades: grades.slice(0, 64), win }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) return 'failed';
     return (await r.json()) as Board;
-  } catch { return null; }
+  } catch { return 'failed'; }
 }
 
-export async function fetchBoard(day: string): Promise<Board | null> {
+export async function fetchBoard(day: string): Promise<BoardAnswer> {
   if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/day/${day}?token=${encodeURIComponent(token())}`);
-    if (!r.ok) return null;
+    if (!r.ok) return 'failed';
     return (await r.json()) as Board;
-  } catch { return null; }
+  } catch { return 'failed'; }
 }
 
 /** The histogram band a score falls in (ten bins of ten). */
@@ -58,11 +61,11 @@ export const BAND_LABELS = ['0', '10', '20', '30', '40', '50', '60', '70', '80',
 export interface DaySummary { count: number; average: number; best: { name: string; score: number }[]; bands: number[] }
 export interface Stats { days: Record<string, DaySummary> }
 
-export async function fetchStats(): Promise<Stats | null> {
+export async function fetchStats(): Promise<Stats | 'failed' | null> {
   if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/stats`);
-    if (!r.ok) return null;
+    if (!r.ok) return 'failed';
     return (await r.json()) as Stats;
-  } catch { return null; }
+  } catch { return 'failed'; }
 }

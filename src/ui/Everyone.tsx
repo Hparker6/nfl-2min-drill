@@ -11,7 +11,8 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
   const today = utcDate();
   const [stats, setStats] = useState<Stats | null | 'off'>(leaderboardOn() ? null : 'off');
   const [day, setDay] = useState(today);
-  useEffect(() => { if (leaderboardOn()) fetchStats().then((s) => setStats(s ?? { days: {} })); }, []);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { if (leaderboardOn()) fetchStats().then((s) => { if (s === 'failed') setFailed(true); else setStats(s ?? { days: {} }); }); }, []);
 
   const days = useMemo(() => (stats && stats !== 'off' ? Object.keys(stats.days).sort() : []), [stats]);
   const mine = useMemo(() => {
@@ -32,7 +33,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
       </div>
     );
   }
-  if (!stats) return <div className="page"><div className="meta"><div className="meta-l"><h1 className="meta-title">Everyone's daily stats</h1></div></div><section className="summary"><span className="muted">Loading…</span></section></div>;
+  if (!stats) return <div className="page"><div className="meta"><div className="meta-l"><h1 className="meta-title">Everyone's daily stats</h1></div></div><section className="summary"><span className="muted">{failed ? 'The leaderboard didn’t answer. Reload to try again.' : 'Loading…'}</span></section></div>;
 
   const S = stats.days;
   const td = S[today] ?? { count: 0, average: 0, best: [], bands: Array(10).fill(0) };

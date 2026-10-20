@@ -68,7 +68,8 @@ export function loadCareer(slot = activeSlot()): Career | null {
     if (!valid(c)) throw new Error('not a career');
     ensureLegacy(c);
     return c;
-  } catch {
+  } catch (e) {
+    console.warn(`career slot ${slot} could not be read (${String((e as Error)?.message).slice(0, 80)}); the data is kept under another key`);
     try {
       if (raw) {
         localStorage.setItem(`${slotKey(slot)}:unreadable:${Date.now()}`, raw);
@@ -78,6 +79,11 @@ export function loadCareer(slot = activeSlot()): Career | null {
     } catch { /* storage full or off */ }
     return null;
   }
+}
+
+/** How many unreadable saves were set aside for a slot (loadCareer keeps them under their own keys). */
+export function unreadableSaves(slot: number): number {
+  try { return Object.keys(localStorage).filter((k) => k.startsWith(`${slotKey(slot)}:unreadable:`)).length; } catch { return 0; }
 }
 
 /** Save to a slot (null deletes it). Returns false when the browser refused (storage full or blocked). */
@@ -121,8 +127,12 @@ export function exportCareer(c: Career): Blob {
   return new Blob([JSON.stringify(c)], { type: 'application/json' });
 }
 
+export const IMPORT_MAX_BYTES = 8 * 1024 * 1024;   // a season is well under a megabyte
+
 export async function importCareer(f: File): Promise<Career> {
-  const c = JSON.parse(await f.text()) as Career;
+  if (f.size > IMPORT_MAX_BYTES) throw new Error('That file is too big to be a saved career.');
+  let c: Career;
+  try { c = JSON.parse(await f.text()) as Career; } catch { throw new Error('That file is not a saved career.'); }
   if (!valid(c)) throw new Error('That file is not a saved career.');
   ensureLegacy(c);
   return c;

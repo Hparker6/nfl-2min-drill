@@ -10,7 +10,7 @@ import {
 } from '../../career/career';
 import { closeWeek, finishLive, gameOf, simYourGame, startLive, COLLEGE_GAME } from '../../career/run';
 import { endSeason, runOffseason, startNextSeason } from '../../career/offseason';
-import { activeSlot, addToHall, exportCareer, importCareer, loadCareer, saveCareer, setActiveSlot } from '../../career/save';
+import { activeSlot, addToHall, exportCareer, importCareer, loadCareer, saveCareer, setActiveSlot, unreadableSaves } from '../../career/save';
 import { hallEntry, retire } from '../../career/legacy';
 import { editionShown, ownsEdition } from '../../game/edition';
 import { RetireCard, Retired, Slots } from './Legacy';
@@ -80,7 +80,9 @@ function CareerInner({ app }: { app: AppSettings }) {
     })} onLoad={(nc) => { saveCareer(nc, slotRef.current); setC(nc); }} onSlots={toSlots} slot={slot} />;
   }
 
-  const banner = unsaved ? <p className="notice">This browser isn't letting the game save (storage full or blocked). Your career plays on, but download a save from Settings to keep it.</p> : null;
+  const [setAside] = useState(() => (c ? 0 : unreadableSaves(slotRef.current)));
+  const banner = unsaved ? <p className="notice">This browser isn't letting the game save (storage full or blocked). Your career plays on, but download a save from Settings to keep it.</p>
+    : setAside ? <p className="notice">A saved career in this slot couldn't be read, so it was set aside rather than deleted. Starting a new one here is safe; the old data stays in this browser's storage.</p> : null;
 
   // a game in progress
   if (c.live) {

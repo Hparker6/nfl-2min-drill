@@ -3,7 +3,7 @@
  * script is loaded once, from challenges.cloudflare.com (allowed by the CSP in public/_headers). It hands back a
  * token the forms send to the Worker, which verifies it with TURNSTILE_SECRET. No key: the forms work without it.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 declare global {
   interface Window { turnstile?: { render(el: HTMLElement, o: Record<string, unknown>): string; reset(id?: string): void; remove(id: string): void } }
@@ -33,20 +33,27 @@ export function Turnstile({ onToken, action }: { onToken: (t: string | null) => 
   const host = useRef<HTMLDivElement>(null);
   const cb = useRef(onToken);
   cb.current = onToken;
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!turnstileOn()) return;
     let id: string | null = null, gone = false;
+    const fail = () => { cb.current(null); setFailed(true); };
     loadScript().then(() => {
       if (gone || !host.current || !window.turnstile) return;
       id = window.turnstile.render(host.current, {
         sitekey: TURNSTILE_SITE_KEY, action, theme: 'auto', size: 'flexible',
-        callback: (t: string) => cb.current(t),
+        callback: (t: string) => { setFailed(false); cb.current(t); },
         'expired-callback': () => cb.current(null),
-        'error-callback': () => cb.current(null),
+        'error-callback': fail,
       });
-    }).catch(() => cb.current(null));
+    }).catch(fail);
     return () => { gone = true; if (id) try { window.turnstile?.remove(id); } catch { /* already gone */ } };
   }, [action]);
   if (!turnstileOn()) return null;
-  return <div ref={host} className="turnstile" />;
+  return (
+    <>
+      <div ref={host} className="turnstile" />
+      {failed && <p className="acct-err" role="alert">The bot check couldn’t load. An ad blocker or privacy extension may be blocking challenges.cloudflare.com; allow it for this site and reload.</p>}
+    </>
+  );
 }

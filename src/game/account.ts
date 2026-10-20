@@ -54,9 +54,12 @@ export async function verify(input: { token: string } | { email: string; code: s
   } catch { return 'No connection. Try again.'; }
 }
 
-export async function signOut(everywhere = false): Promise<void> {
-  try { await post(everywhere ? '/v1/auth/logout-all' : '/v1/auth/logout'); } catch { /* the cookie expires on its own */ }
+/** True when the server confirmed. False: this browser forgot the account, but the session may still be live. */
+export async function signOut(everywhere = false): Promise<boolean> {
+  let ok = false;
+  try { ok = (await post(everywhere ? '/v1/auth/logout-all' : '/v1/auth/logout')).status === 200; } catch { ok = false; }
   rememberOwns([]);
+  return ok;
 }
 
 export async function deleteAccount(email: string): Promise<string | null> {
@@ -87,12 +90,13 @@ export async function startCheckout(): Promise<{ url?: string; error?: string }>
 }
 
 /** What our server's records say about a checkout (the page we land on after Stripe proves nothing by itself). */
-export async function checkoutStatus(sessionId: string): Promise<{ found: boolean; owns: boolean; status?: string } | null> {
+export async function checkoutStatus(sessionId: string): Promise<{ found: boolean; owns: boolean; status?: string } | 'unreachable' | null> {
   try {
     const r = await fetch(`/v1/checkout/status?session_id=${encodeURIComponent(sessionId)}`, { credentials: 'same-origin' });
-    if (!r.ok) return null;
+    if (r.status === 401) return null;            // signed out: the panel shows the sign-in instead
+    if (!r.ok) return 'unreachable';
     const d = await r.json();
     if (d.owns) rememberOwns([...new Set([...lastKnownOwns(), COACH_EDITION])]);
     return d;
-  } catch { return null; }
+  } catch { return 'unreachable'; }
 }

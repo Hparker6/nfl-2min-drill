@@ -17,6 +17,7 @@ import PCT from '../../src/data/percentiles.json';
 import { rivalsFor } from '../../src/game/rivals.ts';
 // accounts and the Coach's Edition purchase: 404 unless the environment turns them on (server/accounts/config.ts)
 import { handleAccounts, isAccountsPath } from '../accounts/routes.ts';
+import { readCapped } from '../accounts/http.ts';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
@@ -98,14 +99,17 @@ async function api(request, env, url) {
   if (!m || !DAY.test(m[1])) return json({ error: 'not found' }, 404);
   const day = m[1];
   const board = env.DAY_BOARD.get(env.DAY_BOARD.idFromName(day));
-  if (request.method === 'GET' && !m[2]) return json(await board.summary(day, url.searchParams.get('token')));
+  if (request.method === 'GET' && !m[2]) {
+    const tok = url.searchParams.get('token');
+    return json(await board.summary(day, tok && /^[a-f0-9]{8,64}$/.test(tok) ? tok : null));
+  }
   if (request.method === 'POST' && m[2]) {
     // only today and yesterday (UTC) take scores, so old days stay fixed
     const now = Date.now(), dayMs = Date.parse(day + 'T00:00:00Z');
     if (!(now - dayMs < 2 * 864e5 && now - dayMs > -864e5)) return json({ error: 'day closed' }, 400);
-    // a score is a few dozen bytes; anything big is not one
-    const raw = await request.text();
-    if (raw.length > 2048) return json({ error: 'too large' }, 413);
+    // a score is a few dozen bytes; anything big is not one, and is refused before it is read
+    const raw = await readCapped(request, 2048);
+    if (raw === null) return json({ error: 'too large' }, 413);
     let body;
     try { body = JSON.parse(raw); } catch { return json({ error: 'bad json' }, 400); }
     const token = String(body.token || '').slice(0, 64);
@@ -294,11 +298,17 @@ export default {
     const to = PERMANENT[url.pathname];
     if (to) return Response.redirect(`${url.origin}${to}${url.search}`, 301);
     if (['/leaderboard', '/leaderboard/', '/stats', '/stats/'].includes(url.pathname)) {
-      try { return await pages(request, env, url); } catch { return new Response('The leaderboard is unavailable right now. Try again in a minute.', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '60' } }); }
+      try { return await pages(request, env, url); } catch (e) {
+        console.error(JSON.stringify({ audit: 'pages.failed', path: url.pathname, error: String(e?.message ?? e).slice(0, 200) }));
+        return new Response('The leaderboard is unavailable right now. Try again in a minute.', { status: 503, headers: { 'content-type': 'text/plain; charset=utf-8', 'retry-after': '60' } });
+      }
     }
     if (isAccountsPath(url.pathname)) return handleAccounts(request, env, url);
     if (url.pathname.startsWith('/v1/')) {
-      try { return await api(request, env, url); } catch { return json({ error: 'unavailable' }, 503); }
+      try { return await api(request, env, url); } catch (e) {
+        console.error(JSON.stringify({ audit: 'api.failed', path: url.pathname, error: String(e?.message ?? e).slice(0, 200) }));
+        return json({ error: 'unavailable' }, 503);
+      }
     }
     return env.ASSETS.fetch(request);
   },

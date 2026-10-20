@@ -62,7 +62,7 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
       }
       const body = await readJson(req);
       if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('signin.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
-      if ((opts.random ?? Math.random)() < 0.02) await sweep(cfg.db, now);
+      if ((opts.random ?? Math.random)() < 0.02) await sweep(cfg.db, now).catch((e) => console.error(`sweep failed: ${String((e as Error)?.message).slice(0, 200)}`));
       const r = await startEmail(deps, body?.email, addr);
       audit('signin.requested', { ok: r.ok, error: r.ok ? null : r.error });
       if (r.ok) return json({ ok: true });
