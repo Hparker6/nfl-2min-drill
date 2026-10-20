@@ -65,7 +65,7 @@ Goal: the same checks passing on a real Worker, a real D1 and real email, with S
       signing secret → `npx wrangler secret put STRIPE_WEBHOOK_SECRET --env staging`.
 - [x] Set `PAYMENTS` to `"on"` in the staging vars (it's a var, not a secret), redeploy:
       `npm run build && npx wrangler deploy --env staging`.
-- [ ] On the staging URL: `/v1/me` shows accounts on and `"payments":"test"`; sign in with a real email through Resend;
+- [x] On the staging URL (done 2026-10-20: email sign-in, purchase, unsigned and duplicate webhooks pass): `/v1/me` shows accounts on and `"payments":"test"`; sign in with a real email through Resend;
       run the 14 checks again against staging. Record results in SETUP.md or here.
 - [ ] Check the staging Worker's logs (`npx wrangler tail --env staging`) during the run: no addresses, links, codes
       or keys should ever appear, only HTTP statuses.

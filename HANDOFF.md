@@ -61,9 +61,15 @@ test key, the webhook secret from `stripe listen`, the `price_…` id for "Coach
 - Resend: domain `nfl-2min-drill.com` **verified** (id `73c4740d-…`, us-east-1). DNS in Cloudflare: TXT
   `resend._domainkey`, MX + TXT `send`, CNAME `rsend` (must be **DNS only**, not proxied, or Resend can't see it),
   TXT `_dmarc` `v=DMARC1; p=none;`. A staging sign-in email from `signin@nfl-2min-drill.com` was delivered to Gmail.
-- Next: sign in on staging with a real address and re-run the 14 checks there (SETUP.md §5), using
-  the Stripe dashboard for refunds/disputes. No `stripe listen` needed on staging: Stripe posts to the endpoint and
-  retries on its own.
+- **Verified on staging 2026-10-20:** real sign-in email (Resend) → sign in → test checkout → "Payment confirmed";
+  D1 shows purchase `paid`, entitlement `active`, webhook `granted`, delivered by Stripe on the first try. Unsigned
+  webhook → 400; the same event re-delivered by Stripe → still one of each. The staging build shows the Account panel
+  and edition preview because `isStaging()` (`src/game/edition.ts`) matches its workers.dev host; production doesn't.
+- **Not run on staging:** refunds, disputes, kill switch, delete, forged return (all passed locally on identical code).
+  Extra test accounts on staging need real inboxes (sign-in codes arrive by email); don't use made-up addresses there,
+  bounces hurt the new domain's sending reputation.
+- New-domain mail lands in Gmail's spam at first; mark "Not spam". Tighten `_dmarc` from `p=none` before launch.
+- Stripe Link shows "Pay later" and saved methods even with a card-only session; that's a Stripe dashboard setting.
 
 ## 3. Running the sandbox
 
