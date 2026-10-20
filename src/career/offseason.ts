@@ -6,6 +6,7 @@ import { clip, gauss, hash, rng } from '../engine/rng';
 import { SLOT_GROUP, SLOTS } from '../engine/roster';
 import { seasonAwards } from './awards';
 import { noteSeason, RECORD_STATS } from './legacy';
+import { editionShown } from '../game/edition';
 import { ARCH, ordinal, weeklyGoals, youPlayer, type Career, type SeasonSummary } from './career';
 import { genPlayer, nameMaker, overall, teamById, teamInfo } from './league';
 import { newSeason, placesFrom, REG_WEEKS } from './season';
@@ -31,7 +32,7 @@ export function endSeason(c: Career) {
   if (poLine && Object.keys(poLine).length) sum.po = poLine;
   c.history.push(sum);
   const broke = noteSeason(c, s, { team: sum.team, w: sum.w, l: sum.l, t: sum.t, playoff });
-  for (const k of broke) {
+  if (editionShown()) for (const k of broke) {
     const r = c.legacy!.records[k]!;
     const label = RECORD_STATS.find((x) => x[0] === k)![1].toLowerCase();
     c.news.unshift({ week: 23, year: s.year, text: `League record: ${r.name}, ${r.v.toLocaleString('en-US')} ${label} in a season.`, tone: r.you ? 'good' : 'neutral' });

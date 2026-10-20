@@ -5,6 +5,7 @@
 import { kickoffState, playOut, step } from '../engine/game';
 import { riskWins } from './risk';
 import { GAME_STATS, noteGame } from './legacy';
+import { editionShown } from '../game/edition';
 import { evaluate } from '../engine/evaluate';
 import { clip, hash, rng } from '../engine/rng';
 import { SLOTS, type Attr } from '../engine/roster';
@@ -199,7 +200,9 @@ export function finishLive(c: Career, how: 'sim' | 'moments' | 'full'): { box: B
   }
   recordGame(c.season, g, box, teams, how, c.league);
   c.boxes[g.id] = box;
-  for (const k of noteGame(c, line, g, teams[1].id)) {
+  // career highs are always kept; the news line about them comes with the Coach's Edition (free Career reads as before)
+  const highs = noteGame(c, line, g, teams[1].id);
+  if (editionShown()) for (const k of highs) {
     const label = GAME_STATS.find((x) => x[0] === k)![1].toLowerCase();
     c.news.unshift({ week: c.season.week, year: c.season.year, text: `Career high: ${line[k]} ${label} against the ${teams[1].name}.`, tone: 'good' });
   }
