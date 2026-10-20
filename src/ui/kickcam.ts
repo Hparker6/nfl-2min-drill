@@ -117,6 +117,7 @@ const KO_APPROACH: Approach = { x0: -3.4, z0: -9, dur: 1.25, strides: 6 };
 export class KickCam {
   private host: HTMLElement;
   private alive = true;
+  private runId = 0;
   constructor(host: HTMLElement) { this.host = host; }
   stop() { this.alive = false; this.host.innerHTML = ''; this.host.classList.remove('on'); }
 
@@ -354,6 +355,7 @@ export class KickCam {
 
   /** Runs frame(t) from 0 to total seconds at the given speed (0: the final frame at once), then fades the cam out. */
   private async run(total: number, speed: number, frame: (t: number) => void, atEnd: () => void) {
+    const mine = ++this.runId;   // a stop() followed by a new play(): the old run's tail must not touch the new scene
     const dur = speed > 0 ? total / speed : 0;
     if (!dur) { frame(total); atEnd(); await sleep(900); }
     else {
@@ -368,9 +370,11 @@ export class KickCam {
         requestAnimationFrame(step);
       });
     }
+    if (!this.alive || mine !== this.runId) return;   // stopped: no outcome, and nothing of a newer scene is touched
     atEnd();
     this.host.classList.add('out');
     await sleep(speed > 0 ? 260 : 0);
+    if (mine !== this.runId) return;
     this.host.classList.remove('on', 'out', 'kc-live', 'kc-cheer');
     this.host.innerHTML = '';
   }

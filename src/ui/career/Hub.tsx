@@ -8,7 +8,7 @@ import {
 import { CONF_NAME, DIV_NAME, FINAL_NAME, LEAGUE_NAME, teamById, teamInfo } from '../../career/league';
 import { tradeTargets, signWith } from '../../career/offseason';
 import { race } from '../../career/awards';
-import { gameWeather, leaders, REG_WEEKS, WEEK_NAME, statValue } from '../../career/season';
+import { gameWeather, leaders, REG_WEEKS, WEEK_NAME, statValue, alive } from '../../career/season';
 import { picture, seeds, standings } from '../../career/standings';
 import type { CTeam, Game, StandingRow } from '../../career/types';
 import { WEATHER } from '../../engine/sim';
@@ -91,7 +91,7 @@ function Home({ c, commit, pic, onPlay, onBye, go }: { c: Career; commit: Commit
   const team = teamById(c.league, me.team!);
   const div = c.league.teams.filter((t) => t.conf === team.conf && t.div === team.div).sort((a, b) => (pic[b.id]?.pct ?? 0) - (pic[a.id]?.pct ?? 0));
   const mvp = useMemo(() => race(c.league, c.season, c.history.length ? 'mvp' : 'oroy'), [c.season.games]);
-  const eliminated = c.season.week > REG_WEEKS && !g;
+  const eliminated = c.season.week > REG_WEEKS && !g && !alive(c.season, team.id);   // a top seed's wild-card bye is not elimination
   const targets = c.you.wantsTrade && c.season.week <= 9 ? tradeTargets(c) : [];
   return (
     <div className="cr-grid">

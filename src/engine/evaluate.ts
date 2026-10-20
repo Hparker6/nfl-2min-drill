@@ -79,7 +79,7 @@ function run(s: State, choices: Choice[], n: number, seed: number, from: number,
       if (measure) {
         const scored = c.score[o] - s.score[o];
         st.succ += scored > 0 || (c.off === o && c.down === 1 && c.yl !== s.yl) ? 1 : 0;
-        st.secs += s.t - c.t;
+        st.secs += c.q === s.q ? s.t - c.t : s.t;   // into the next period: it used the rest of this one
         st.give += c.off !== o && scored === 0 && choices[j].play !== 'punt' && c.stage !== 'over' ? 1 : 0;
         st.pts += scored - (c.score[1 - o] - s.score[1 - o]);
       }

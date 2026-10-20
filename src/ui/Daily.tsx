@@ -32,12 +32,19 @@ export function simulatedPercentile(performance: number): number | null {
 }
 
 export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) {
-  const [today] = useState(utcDate);
-  const sc = useMemo(() => dailyScenarios(today)[0], [today]);
-  const day = store.days[today] ?? { spots: [] };
-  const result = day.spots[0];
+  const [today, setToday] = useState(utcDate);
   // the finished game stays on screen for its review until you move on to the score
   const [reviewing, setReviewing] = useState(false);
+  const sc = useMemo(() => dailyScenarios(today)[0], [today]);
+  // midnight UTC while the tab is open: move to the new Daily, unless a game is mid-play (it finishes as yesterday's)
+  useEffect(() => {
+    const check = () => { const d = utcDate(); if (d !== today && !store.days[today]?.cur) { setToday(d); setReviewing(false); } };
+    const id = setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
+  }, [today, store.days]);
+  const day = store.days[today] ?? { spots: [] };
+  const result = day.spots[0];
   const kind = sc.kind ? DAILY_KINDS[sc.kind] : null;
   // a friend's challenge link: their score to beat, only while it is for today's Daily
   const [challenge] = useState(loadChallenge);

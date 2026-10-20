@@ -29,7 +29,8 @@ function loadScript(): Promise<void> {
 }
 
 /** Renders the widget; onToken gets the token (or null when it expires or fails, so the form disables itself). */
-export function Turnstile({ onToken, action }: { onToken: (t: string | null) => void; action: string }) {
+/** `nonce`: bump it to reset the widget (a token is single-use: after a failed submit a new one is needed). */
+export function Turnstile({ onToken, action, nonce = 0 }: { onToken: (t: string | null) => void; action: string; nonce?: number }) {
   const host = useRef<HTMLDivElement>(null);
   const cb = useRef(onToken);
   cb.current = onToken;
@@ -48,7 +49,7 @@ export function Turnstile({ onToken, action }: { onToken: (t: string | null) => 
       });
     }).catch(fail);
     return () => { gone = true; if (id) try { window.turnstile?.remove(id); } catch { /* already gone */ } };
-  }, [action]);
+  }, [action, nonce]);
   if (!turnstileOn()) return null;
   return (
     <>

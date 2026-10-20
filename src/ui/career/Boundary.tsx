@@ -3,7 +3,7 @@ import { Component, type ReactNode } from 'react';
 import { saveCareer } from '../../career/save';
 import { track } from '../../game/analytics';
 
-export class CareerBoundary extends Component<{ children: ReactNode }, { err: string | null }> {
+export class CareerBoundary extends Component<{ children: ReactNode; slot: number }, { err: string | null }> {
   state = { err: null as string | null };
   static getDerivedStateFromError(e: Error) { return { err: e.message || 'Something went wrong.' }; }
   componentDidCatch(e: Error) { track('app_error', { where: 'career', message: e.message.slice(0, 120) }); }
@@ -17,7 +17,7 @@ export class CareerBoundary extends Component<{ children: ReactNode }, { err: st
           <p className="muted">Career mode is in beta, and an update may have changed something your save relies on. Try reloading first. If it still won't open, start a new career.</p>
           <div className="row">
             <button className="btn primary" onClick={() => location.reload()}>Reload</button>
-            <button className="btn" onClick={() => { if (confirm('Delete this career and start a new one?')) { saveCareer(null); location.reload(); } }}>Start a new career</button>
+            <button className="btn" onClick={() => { if (confirm('Delete this career and start a new one?')) { saveCareer(null, this.props.slot); location.reload(); } }}>Start a new career</button>
           </div>
         </section>
       </div>

@@ -60,7 +60,8 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
         console.warn(`sign-in email is off: ${cfg.mail.why}`);
         return fail(503, 'Sign-in by email is not available yet.');
       }
-      const body = await readJson(req);
+      const body = await readJson(req, 4096);
+      if (!body) return fail(400, 'Something in the request isn’t right.');
       if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('signin.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
       if ((opts.random ?? Math.random)() < 0.02) await sweep(cfg.db, now).catch((e) => console.error(`sweep failed: ${String((e as Error)?.message).slice(0, 200)}`));
       const r = await startEmail(deps, body?.email, addr);
@@ -99,7 +100,8 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
       return await withSession(cfg, req, now, async (s) => { const r = await createCheckout(cfg.db, cfg.payments!, cfg.origin, s, now, opts.fetch ?? fetch); audit('checkout.started', { status: r.status, live: cfg.payments!.live }); return r; });
     }
     if (p === '/v1/support') {
-      const body = await readJson(req, 8192);
+      const body = await readJson(req, 12288);
+      if (!body) return fail(400, 'Something in the form isn’t right (too long, or not sent as the game sends it).');
       if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('support.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
       const s = await readSession(cfg.db, readCookie(req, SESSION_COOKIE), now);   // optional: a locked-out player can still write
       const r = await submitSupport({ db: cfg.db, pepper: cfg.pepper, mail: cfg.mail, supportTo: cfg.supportTo, now, fetch: opts.fetch ?? fetch, notifier: opts.notifier }, body, addr, s?.userId ?? null);

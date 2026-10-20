@@ -54,13 +54,14 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState<string | null>(null);
-  const ask = async () => { setBusy(true); setErr(null); const e = await requestSignIn(email, token ?? undefined); setBusy(false); if (e) setErr(e); else setSent(true); };
+  const [nonce, setNonce] = useState(0);
+  const ask = async () => { setBusy(true); setErr(null); const e = await requestSignIn(email, token ?? undefined); setBusy(false); if (e) { setErr(e); setToken(null); setNonce((n) => n + 1); } else setSent(true); };
   const useCode = async () => { setBusy(true); setErr(null); const e = await verify({ email, code: code.trim() }); setBusy(false); if (e) setErr(e); else onSignedIn(); };
   return (
     <div className="acct-form">
       <p>Sign in with your email: no password. An account lets a purchase follow you to other devices. (Saved games stay in each browser.)</p>
       <label><span>Email</span><input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={sent} /></label>
-      {!sent && <Turnstile action="signin" onToken={setToken} />}
+      {!sent && <Turnstile action="signin" onToken={setToken} nonce={nonce} />}
       {!sent ? <button className="btn primary" disabled={busy || !email.includes('@') || (turnstileOn() && !token)} onClick={ask}>Email me a sign-in link</button> : (
         <>
           <p className="muted small">If that address can sign in, a link and a 6-digit code are on their way. They work once, for 15 minutes.</p>

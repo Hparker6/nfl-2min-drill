@@ -22,6 +22,7 @@ export function SupportModal({ onClose, page }: { onClose: () => void; page: str
   const [message, setMessage] = useState('');
   const [website, setWebsite] = useState('');   // the honeypot: hidden from people, filled by bots
   const [token, setToken] = useState<string | null>(null);
+  const [nonce, setNonce] = useState(0);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ref, setRef] = useState<string | null>(null);
@@ -32,7 +33,7 @@ export function SupportModal({ onClose, page }: { onClose: () => void; page: str
     setBusy(true); setErr(null);
     const r = await sendSupport({ kind, email, message, page, website, turnstile: token ?? undefined });
     setBusy(false);
-    if (r.ref) setRef(r.ref); else setErr(r.error ?? 'Something went wrong. Try again.');
+    if (r.ref) setRef(r.ref); else { setErr(r.error ?? 'Something went wrong. Try again.'); setToken(null); setNonce((n) => n + 1); }
   };
   const current = KINDS.find((k) => k.id === kind)!;
   return (
@@ -58,7 +59,7 @@ export function SupportModal({ onClose, page }: { onClose: () => void; page: str
             <textarea value={message} maxLength={2000} rows={6} placeholder={current.hint} onChange={(e) => setMessage(e.target.value)} />
           </label>
           <label className="hp" aria-hidden="true">Website<input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} /></label>
-          <Turnstile action="support" onToken={setToken} />
+          <Turnstile action="support" onToken={setToken} nonce={nonce} />
           {err && <p className="acct-err">{err}</p>}
           <div className="row">
             <button className="btn primary" type="submit" disabled={!ready}>{busy ? 'Sending…' : 'Send'}</button>

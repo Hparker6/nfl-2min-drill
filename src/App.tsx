@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BadgeToast } from './ui/Badges';
 import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
@@ -29,7 +29,7 @@ export default function App() {
   // first visit: no modal in the way. The Daily brief carries a short welcome instead.
   const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | 'account' | 'support' | null>(null);
   // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
-  const [accountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
+  const [accountFrom, setAccountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
   useEffect(() => { if (accountFrom) setModal('account'); }, [accountFrom]);
   const [toastMsg, setToast] = useState<string | null>(null);
 
@@ -42,9 +42,11 @@ export default function App() {
     });
   }, []);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useCallback((m: string) => {
     setToast(m);
-    setTimeout(() => setToast(null), 2600);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
 
   // the funnel: which screen, and who (new or returning)
@@ -81,7 +83,7 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  const closeModal = useCallback(() => setModal(null), []);
+  const closeModal = useCallback(() => { setModal(null); setAccountFrom(null); }, []);   // a sign-in or purchase hash is used once
   const onboarded = useCallback(() => update((s) => { s.seenHelp = true; }), [update]);
 
   return (

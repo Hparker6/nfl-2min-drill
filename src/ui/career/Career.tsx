@@ -25,7 +25,7 @@ import './career.css';
 export type Commit = (fn: (c: Career) => void) => void;
 
 export function CareerMode({ app }: { app: AppSettings }) {
-  return <CareerBoundary><CareerInner app={app} /></CareerBoundary>;
+  return <CareerBoundary slot={startSlot()}><CareerInner app={app} /></CareerBoundary>;
 }
 
 /** The slot to open: the last one played, or slot 1 without the Coach's Edition (slots 2 and 3 are its). */
@@ -39,6 +39,7 @@ function CareerInner({ app }: { app: AppSettings }) {
   const [post, setPost] = useState<string | null>(null);      // the game id whose postgame is showing
   const [busy, setBusy] = useState<string | null>(null);
   const [unsaved, setUnsaved] = useState(false);
+  const [setAside, setSetAside] = useState(() => unreadableSaves(slotRef.current));   // an unreadable save in this slot, set aside by loadCareer
   const [hubTab, setHubTab] = useState<'home' | 'player'>('home');   // the postgame's Spend points opens the Player tab
 
   const commit: Commit = useCallback((fn) => {
@@ -61,6 +62,7 @@ function CareerInner({ app }: { app: AppSettings }) {
     setPost(null);
     setUnsaved(false);
     setC(loadCareer(n));
+    setSetAside(unreadableSaves(n));
     setSlots(false);
   };
 
@@ -72,17 +74,18 @@ function CareerInner({ app }: { app: AppSettings }) {
   const toSlots = editionShown() ? () => setSlots(true) : undefined;
 
   if (!c) {
-    return <NewCareer onCreate={(o) => work('Building the league: 32 teams, a season of history…', () => {
+    return <>
+      {setAside > 0 && <p className="notice">A saved career in this slot couldn't be read, so it was set aside rather than deleted. Starting a new one here is safe; the old data stays in this browser's storage.</p>}
+      <NewCareer onCreate={(o) => work('Building the league: 32 teams, a season of history…', () => {
       const nc = newCareer(o);
       setUnsaved(!saveCareer(nc, slotRef.current));
       setC(nc);
       track('career_start', { arch: o.arch });
-    })} onLoad={(nc) => { saveCareer(nc, slotRef.current); setC(nc); }} onSlots={toSlots} slot={slot} />;
+    })} onLoad={(nc) => { saveCareer(nc, slotRef.current); setC(nc); }} onSlots={toSlots} slot={slot} />
+    </>;
   }
 
-  const [setAside] = useState(() => (c ? 0 : unreadableSaves(slotRef.current)));
-  const banner = unsaved ? <p className="notice">This browser isn't letting the game save (storage full or blocked). Your career plays on, but download a save from Settings to keep it.</p>
-    : setAside ? <p className="notice">A saved career in this slot couldn't be read, so it was set aside rather than deleted. Starting a new one here is safe; the old data stays in this browser's storage.</p> : null;
+  const banner = unsaved ? <p className="notice">This browser isn't letting the game save (storage full or blocked). Your career plays on, but download a save from Settings to keep it.</p> : null;
 
   // a game in progress
   if (c.live) {

@@ -86,6 +86,7 @@ export function GameScreen(p: Props) {
   const gameRef = useRef<HTMLDivElement>(null);
   const jobRef = useRef<GradeJob | null>(null);
   const doneRef = useRef(false);
+  const gradesRef = useRef<Set<Promise<unknown>>>(new Set());   // grades still in flight (finish waits for them, briefly)
   const busyRef = useRef(false);          // one game-state transition at a time
   const staleRef = useRef(false);         // the field shows a finished play, not a formation
   const [view, setView] = useState<State>(() => clone(session.s));
@@ -234,7 +235,9 @@ export function GameScreen(p: Props) {
     // the field keeps the final frame; the players move to the next spot when the next call is set up
   }, [sc, session, speed, react]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback(async () => {
+    // a clock call's grade can still be running when the AI runs the game out: give it a moment so the result counts it
+    if (gradesRef.current.size) await Promise.race([Promise.allSettled([...gradesRef.current]), sleep(3000)]);
     const r = session.result();
     const recs = session.records.filter((x) => x.grade);
     const res: SpotResult = spotResult(session, utcDate());
@@ -299,7 +302,7 @@ export function GameScreen(p: Props) {
       for (let guard = 0; guard < 300; guard++) {
         if (session.over) {
           if (p.segment) { p.segment.onEnd(clone(session.s), session.records, session.log.map((l) => l.ev)); return; }
-          finish(); return;
+          await finish(); return;
         }
         const d = session.decision();
         if (d) { setLast(null); present(d); return; }
@@ -447,7 +450,10 @@ export function GameScreen(p: Props) {
       edited_routes: o.choice.routes ? Object.keys(o.choice.routes).length : undefined, target: o.choice.target,
     });
     const gradedAt = Date.now();
-    const settle = (g: Grade) => { session.setGrade(recIdx, g); onPicks(session.picks); setTrail((t) => [...t, g.bestWp]); };
+    gradesRef.current.add(gp);
+    gp.finally(() => gradesRef.current.delete(gp)).catch(() => {});
+    // a grade that lands after the game is over must not write back: the next game's saved picks would be this game's
+    const settle = (g: Grade) => { if (doneRef.current) return; session.setGrade(recIdx, g); onPicks(session.picks); setTrail((t) => [...t, g.bestWp]); };
     const playedOut = evs.some((e) => e.type === 'snap' || e.type === 'kick' || e.type === 'pat');
     try {
       if (!playedOut) {
@@ -525,6 +531,8 @@ export function GameScreen(p: Props) {
     if (phase !== 'result') return;
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.closest?.('[role="dialog"], button, summary, input, select, textarea, a')) return;   // a modal or a control has the key
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); next(); }
       else if (e.key.toLowerCase() === 'r') { e.preventDefault(); replay(); }
     };

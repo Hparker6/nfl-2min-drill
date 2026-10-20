@@ -46,7 +46,7 @@ export async function createCheckout(db: D1Database, pay: PaymentsConfig, origin
     payment_intent_data: { metadata: meta },
     success_url: `${origin}/#purchase={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/#account`,
-  }, `checkout:${s.userId}:${Math.floor(now / 60_000)}`);
+  }, `checkout:${s.userId}:${cust ? 'c' : 'e'}:${Math.floor(now / 60_000)}`);
   if (!cs?.url || !/^https:\/\/checkout\.stripe\.com\//.test(cs.url)) return fail(502, 'Checkout could not be started.');
   return json({ url: cs.url });
 }
@@ -61,7 +61,9 @@ export async function checkoutStatus(db: D1Database, userId: string, sessionId: 
 
 // ---- webhooks ----
 
-interface StripeEvent { id: string; type: string; livemode: boolean; data: { object: { id: string } } }
+interface StripeEvent { id: string; type: string; livemode: boolean; created?: number; data: { object: { id: string } } }
+/** Stripe retries a failed delivery for days; a purchase missing this long after its event was created is not one of ours. */
+const RETRY_WINDOW_MS = 60 * 60_000;
 interface CheckoutSession {
   id: string; object: 'checkout.session'; mode: string; status: string; payment_status: string; livemode: boolean;
   amount_total: number | null; currency: string | null; client_reference_id: string | null; customer: string | null;
@@ -82,7 +84,7 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
   if (!(await verifyStripeSignature(body, req.headers.get('stripe-signature'), pay.webhookSecret, now))) return fail(400, 'bad signature');
   let ev: StripeEvent;
   try { ev = JSON.parse(body); } catch { return fail(400, 'bad json'); }
-  const STRIPE_ID = /^[a-z]{2,10}_[A-Za-z0-9_]{1,200}$/;
+  const STRIPE_ID = /^[a-z]{2,10}_[A-Za-z0-9_]{1,130}$/;   // the same bound as the Stripe client's path check
   if (!ev?.id || typeof ev.type !== 'string' || typeof ev.data?.object?.id !== 'string' || !STRIPE_ID.test(ev.id) || !STRIPE_ID.test(ev.data.object.id)) return fail(400, 'bad event');
   if (ev.livemode !== pay.live) return fail(400, 'wrong mode');
   if (await db.prepare('SELECT 1 FROM webhook_events WHERE event_id = ?').bind(ev.id).first()) return json({ received: true, duplicate: true });
@@ -90,18 +92,23 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
   const stripe = stripeClient(pay.secretKey, f);
   let stmts: D1PreparedStatement[] = [];
   let outcome: Outcome;
+  let guard: { id: string; status: PurchaseStatus } | undefined;
   try {
-    ({ stmts, outcome } = await apply(db, pay, stripe, ev, now));
+    ({ stmts, outcome, guard } = await apply(db, pay, stripe, ev, now));
   } catch (e) {
     if (e instanceof RetryLater) return fail(503, e.message);
+    if (e instanceof NotOurs) { stmts = []; outcome = `ignored: ${e.message}`; }
     // signed by Stripe, but about something Stripe doesn't have (another account's object, or deleted): nothing to do
     if ((e as StripeError)?.status === 404) { stmts = []; outcome = 'ignored: Stripe has no such object'; }
     else if ((e as StripeError)?.status >= 500 || (e as StripeError)?.status === 429) return fail(503, 'stripe unavailable');
     else throw e;
   }
-  stmts.push(db.prepare('INSERT INTO webhook_events (event_id, type, received_at, outcome) VALUES (?, ?, ?, ?)').bind(ev.id, ev.type, now, outcome));
+  stmts.push(guard
+    ? db.prepare('INSERT INTO webhook_events (event_id, type, received_at, outcome) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM purchases WHERE id = ? AND status = ?)').bind(ev.id, ev.type, now, outcome, guard.id, guard.status)
+    : db.prepare('INSERT INTO webhook_events (event_id, type, received_at, outcome) VALUES (?, ?, ?, ?)').bind(ev.id, ev.type, now, outcome));
   try {
     await db.batch(stmts);
+    if (guard && !(await db.prepare('SELECT 1 FROM webhook_events WHERE event_id = ?').bind(ev.id).first())) return fail(503, 'the purchase changed under this event; send it again');
   } catch (e) {
     // the same event processed at the same moment by another delivery: its transaction won, this one changed nothing
     if (/UNIQUE|constraint/i.test(String((e as Error)?.message)) && (await db.prepare('SELECT 1 FROM webhook_events WHERE event_id = ?').bind(ev.id).first())) return json({ received: true, duplicate: true });
@@ -111,7 +118,8 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
   return json({ received: true, outcome });
 }
 
-async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typeof stripeClient>, ev: StripeEvent, now: number): Promise<{ stmts: D1PreparedStatement[]; outcome: Outcome }> {
+/** `guard`: the event row is only written if the purchase ended in this state; otherwise another delivery won the race and Stripe is asked to send this one again. */
+async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typeof stripeClient>, ev: StripeEvent, now: number): Promise<{ stmts: D1PreparedStatement[]; outcome: Outcome; guard?: { id: string; status: PurchaseStatus } }> {
   switch (ev.type) {
     case 'checkout.session.completed':
     case 'checkout.session.async_payment_succeeded': {
@@ -133,10 +141,10 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
     }
     case 'charge.refunded': {
       const ch = await stripe.get<Charge>(`/v1/charges/${encodeURIComponent(ev.data.object.id)}`);
-      const p = await purchaseByIntent(db, ch.payment_intent);
+      const p = await purchaseByIntent(db, ch.payment_intent, ev, now);
       const full = ch.refunded || ch.amount_refunded >= ch.amount;
       const status: PurchaseStatus = full ? 'refunded' : ch.amount_refunded > 0 ? (p.status === 'paid' ? 'partially_refunded' : p.status) : p.status;
-      return { stmts: setStatus(db, p.id, status, now, full ? 'refunded' : 'partial refund'), outcome: status };
+      return { stmts: setStatus(db, p.id, p.status, status, now, full ? 'refunded' : 'partial refund'), outcome: status, guard: { id: p.id, status } };
     }
     case 'charge.dispute.created':
     case 'charge.dispute.updated':
@@ -144,10 +152,12 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
     case 'charge.dispute.funds_withdrawn':
     case 'charge.dispute.funds_reinstated': {
       const d = await stripe.get<Dispute>(`/v1/disputes/${encodeURIComponent(ev.data.object.id)}`);
-      const p = await purchaseByIntent(db, d.payment_intent);
+      const p = await purchaseByIntent(db, d.payment_intent, ev, now);
       if (p.status === 'refunded') return { stmts: [], outcome: 'ignored: already refunded' };
-      const status: PurchaseStatus = d.status === 'won' ? 'dispute_won' : d.status === 'lost' ? 'dispute_lost' : 'disputed';
-      return { stmts: setStatus(db, p.id, status, now, `dispute ${d.status}`), outcome: status };
+      // an inquiry (warning_*) withdraws no funds and often closes without becoming a chargeback: it changes nothing
+      if (d.status.startsWith('warning_')) return { stmts: [], outcome: `ignored: inquiry ${d.status}` };
+      const status: PurchaseStatus = d.status === 'won' ? 'dispute_won' : d.status === 'lost' ? 'dispute_lost' : d.status === 'charge_refunded' ? 'refunded' : 'disputed';
+      return { stmts: setStatus(db, p.id, p.status, status, now, `dispute ${d.status}`), outcome: status, guard: { id: p.id, status } };
     }
     default:
       return { stmts: [], outcome: 'ignored: not handled' };
@@ -169,16 +179,24 @@ export function checkoutProblem(cs: CheckoutSession, pay: PaymentsConfig): strin
   return null;
 }
 
-async function purchaseByIntent(db: D1Database, pi: string | null): Promise<{ id: string; status: PurchaseStatus }> {
-  const p = pi ? await db.prepare('SELECT id, status FROM purchases WHERE payment_intent_id = ?').bind(pi).first<{ id: string; status: PurchaseStatus }>() : null;
-  // its checkout hasn't been recorded yet (events can arrive in any order): ask Stripe to send this one again later
-  if (!p) throw new RetryLater('purchase not recorded yet');
-  return p;
+/** Not ours after all: a charge made some other way in the same Stripe account, or a checkout we ignored on purpose. */
+class NotOurs extends Error {}
+
+async function purchaseByIntent(db: D1Database, pi: string | null, ev: StripeEvent, now: number): Promise<{ id: string; status: PurchaseStatus }> {
+  if (!pi) throw new NotOurs('no payment intent');   // our checkouts always have one
+  const p = await db.prepare('SELECT id, status FROM purchases WHERE payment_intent_id = ?').bind(pi).first<{ id: string; status: PurchaseStatus }>();
+  if (p) return p;
+  // its checkout may not be recorded yet (events can arrive in any order): ask Stripe to send this one again later.
+  // Past the window it never will be: the charge isn't from one of our checkouts. Record it and stop the retries.
+  const age = ev.created ? now - ev.created * 1000 : 0;
+  if (age > RETRY_WINDOW_MS) throw new NotOurs('no such purchase');
+  throw new RetryLater('purchase not recorded yet');
 }
 
-function setStatus(db: D1Database, purchaseId: string, status: PurchaseStatus, now: number, reason: string): D1PreparedStatement[] {
+function setStatus(db: D1Database, purchaseId: string, from: PurchaseStatus, status: PurchaseStatus, now: number, reason: string): D1PreparedStatement[] {
   return [
-    db.prepare('UPDATE purchases SET status = ?, updated_at = ? WHERE id = ?').bind(status, now, purchaseId),
+    // only from the state that was read: two events about the same purchase arriving together can't undo each other
+    db.prepare('UPDATE purchases SET status = ?, updated_at = ? WHERE id = ? AND status = ?').bind(status, now, purchaseId, from),
     recompute(db, purchaseId, now, reason),
   ];
 }

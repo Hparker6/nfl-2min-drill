@@ -154,6 +154,8 @@ function GreenRoom({ c, onYourPick }: { c: Career; onYourPick: () => void }) {
   const hot = interest.includes(cur.team) && shown < last;
   const said = useRef(new Set<number>());
   const texted = useRef(false);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => { for (const x of timers.current) clearTimeout(x); }, []);
   const stock = d.stock ?? c.college.result?.stock ?? 50;
   const [lo, hi] = range(stock);
   const R = reduced();
@@ -179,7 +181,8 @@ function GreenRoom({ c, onYourPick }: { c: Career; onYourPick: () => void }) {
     if (beat === 'clock' && !texted.current && last > 4 && shown >= Math.floor(last / 2)) {
       texted.current = true;
       setText(TEXTS[hash(c.seed, 'text') % TEXTS.length]);
-      setTimeout(() => setText(null), R ? 2500 : 5200);
+      const tt = setTimeout(() => setText(null), R ? 2500 : 5200);
+      timers.current.push(tt);
     }
     const ms = R ? 250 : beat === 'clock' ? (fast ? 500 : hot ? 2600 : 1300) : beat === 'in' ? (fast ? 160 : hot ? 1300 : 650) : (fast ? 380 : hot ? 1700 : 1000);
     const t = setTimeout(() => {

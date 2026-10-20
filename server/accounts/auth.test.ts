@@ -113,8 +113,8 @@ describe('sign-in by email', () => {
     const wrong = code === '000000' ? '000001' : '000000';
     for (let i = 0; i < 5; i++) expect((await call(env, '/v1/auth/email/verify', { body: { email: 'pat@example.com', code: wrong } }, at(T0 + MIN))).status).toBe(400);
     expect((await call(env, '/v1/auth/email/verify', { body: { email: 'pat@example.com', code } }, at(T0 + MIN))).status).toBe(400);
-    // the link from that email is dead too
-    expect((await call(env, '/v1/auth/email/verify', { body: { token: box.last().link.split('#signin=')[1] } }, at(T0 + MIN))).status).toBe(400);
+    // the link from that email still works: wrong code guesses (which anyone can make for any address) never kill it
+    expect((await call(env, '/v1/auth/email/verify', { body: { token: box.last().link.split('#signin=')[1] } }, at(T0 + MIN))).status).toBe(200);
   });
 
   it('the right code signs in', async () => {

@@ -92,6 +92,8 @@ export interface State {
   coin?: { call: Coin; face: Coin; won: Team; pick?: Team };   // overtime's toss: the call, how it landed, who won, and who chooses now
   otPlay?: boolean;       // a late-game spot that ends tied plays overtime (the playoff rules); absent on older dailies, where a weighted coin settles it
   twoPlay?: boolean;      // a two-point try is a snap from the 2 that someone calls; absent on older games, where it's a weighted coin
+  nr?: boolean;           // the finer NFL rules: an untimed down after a defensive foul at 0:00, no try after a walk-off touchdown, kicks
+                          // recovered or returned past the goal line score, the two-minute warning counts in a kneel-out; absent on older games
   tryTwo?: boolean;       // a two-point try is on: the next snap is it (no clock, in for two or nothing)
   // ---- the game within the game (absent on older games): their coordinator, his adjustments, momentum
   dc?: DcStyle;           // their defensive coordinator's tendency (the defense you face)

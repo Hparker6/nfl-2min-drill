@@ -271,7 +271,7 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
-    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.dc = dcFor(seedStr); s.mo = 0; }
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.nr = true; s.dc = dcFor(seedStr); s.mo = 0; }
     if (fair && checkSpot(s, { daily: true }).length) continue;   // never keep a spot that breaks the rules
     const wp = quickWp(s, hash(seedStr, tries));
     if (fair ? wp >= FAIR_WP[0] && wp <= FAIR_WP[1] : wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
@@ -293,7 +293,7 @@ function repairDaily(p0: SpotParams, teams: [TeamInfo, TeamInfo], seedStr: strin
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
-    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.dc = dcFor(seedStr); s.mo = 0; }
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.nr = true; s.dc = dcFor(seedStr); s.mo = 0; }
     if (checkSpot(s, { daily: true }).length) continue;
     const wp = quickWp(s, hash(seedStr, 'repair', step));
     if (wp >= FAIR_WP[0] && wp <= FAIR_WP[1]) return { s, wp, p };
@@ -382,6 +382,7 @@ export function customScenario(p: SpotParams, seedStr: string): Scenario {
   s.otPlay = true;
   s.toss = true;
   s.twoPlay = true;
+  s.nr = true;
   s.dc = dcFor(seedStr);
   s.mo = 0;
   return { id: seedStr, seed: hash(seedStr), mode: 'practice', teams, home: p.home, start: s, baseWp: quickWp(s, hash(seedStr)) };

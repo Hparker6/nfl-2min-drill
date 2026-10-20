@@ -206,6 +206,7 @@ export function CallPanel(p: Props) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if ((e.target as HTMLElement)?.closest?.('[role="dialog"]')) return;   // a modal is open: its keys are its own
       const n = Number(e.key);
       if (n >= 1 && n <= keyed.length) {
         e.preventDefault();

@@ -42,6 +42,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
   const recent = days.slice(-14);
   const sel = S[day];
   const i = days.indexOf(day);
+  const at = i < 0 ? days.length : i;   // a day with no scores (today, early) sits after the last one that has any
   const maxBand = sel ? Math.max(1, ...sel.bands) : 1;
   const yourBand = yours ? Math.min(9, Math.floor(rateSpots([yours]).performance / 10)) : -1;
 
@@ -71,7 +72,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
         <div className="dayhead">
           <h2>{fmtDay(day)} <span className="muted">· Daily #{dayNumber(day)}</span></h2>
           <div className="row">
-            <button className="icon" disabled={i <= 0} onClick={() => setDay(days[i - 1])} aria-label="Previous day">‹</button>
+            <button className="icon" disabled={at <= 0} onClick={() => setDay(days[at - 1])} aria-label="Previous day">‹</button>
             <button className="icon" disabled={i < 0 || i >= days.length - 1} onClick={() => setDay(days[i + 1])} aria-label="Next day">›</button>
           </div>
         </div>

@@ -4,7 +4,8 @@
  *
  * What it gives away: nothing about whether an address has an account. Asking always gets the same answer, and no
  * account is looked up until a token is used. Rate limits (ratelimit.ts) cap emails per address and per caller; a
- * code allows 5 tries, so guessing one takes on the order of 100,000 emails.
+ * code allows 5 tries, so guessing one takes on the order of 100,000 emails. Wrong code tries never touch the link:
+ * otherwise anyone who knew an address could kill its sign-in links by guessing codes.
  */
 import type { D1Database } from './d1';
 import { hmacSha256, randomCode, randomToken, safeEqual, sha256 } from './crypto';
@@ -66,8 +67,8 @@ export async function verifyLink(d: AuthDeps, rawToken: unknown, addr: string): 
   if (!(await hit(d.db, LIMITS.verifyPerAddress, addr, d.now))) return null;
   if (typeof rawToken !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(rawToken)) return null;
   const row = await d.db.prepare(
-    `UPDATE login_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? AND attempts < ? RETURNING email`,
-  ).bind(d.now, await sha256(rawToken), d.now, MAX_CODE_TRIES).first<{ email: string }>();
+    `UPDATE login_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email`,
+  ).bind(d.now, await sha256(rawToken), d.now).first<{ email: string }>();
   return row ? signIn(d, row.email) : null;
 }
 

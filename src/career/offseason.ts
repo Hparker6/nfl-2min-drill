@@ -190,8 +190,10 @@ export function offers(c: Career): { team: string; years: number; salary: number
     .sort((a, b) => a.need - b.need || (r() - 0.5))
     .slice(0, 4);
   const out = teams.map((x) => ({ team: x.t.id, years: 2 + Math.floor(r() * 4), salary: Math.round(value * (0.9 + r() * 0.25) * 10) / 10 }));
-  // your own team always wants you back
-  if (!c.you.wantsTrade) out.unshift({ team: me.team!, years: 3 + Math.floor(r() * 3), salary: Math.round(value * 1.05 * 10) / 10 });
+  // your own team always wants you back; when you asked for a trade and nobody better bites, it is still there
+  // (a career can never be stuck with no team to sign with)
+  const own = { team: me.team!, years: 3 + Math.floor(r() * 3), salary: Math.round(value * 1.05 * 10) / 10 };
+  if (!c.you.wantsTrade || !out.length) out.unshift(own);
   return out;
 }
 
@@ -215,7 +217,7 @@ export function signWith(c: Career, team: string, years: number, salary: number,
   }
   to.roster.QB = me.id;
   me.team = to.id;
-  c.news.unshift({ week: 0, year: c.season.year + 1, text: trade ? `Traded: ${c.you.name} to ${to.city}${theirs ? ` for ${theirs.name}` : ''}.` : `${c.you.name} signs with ${to.city}: ${years} years, $${salary}m a year.`, tone: 'good' });
+  c.news.unshift({ week: 0, year: c.season.year + (c.phase === 'offseason' ? 1 : 0), text: trade ? `Traded: ${c.you.name} to ${to.city}${theirs ? ` for ${theirs.name}` : ''}.` : `${c.you.name} signs with ${to.city}: ${years} years, $${salary}m a year.`, tone: 'good' });
 }
 
 /** Teams that would trade for you now: a worse quarterback, and you're worth his spot. */

@@ -133,6 +133,7 @@ export function rungScenario(r: Rung, attempt: number): Scenario {
   s.otPlay = true;
   s.toss = true;
   s.twoPlay = true;
+  s.nr = true;
   s.dc = dcFor(seed);
   s.mo = 0;
   return { id: `${seed}:${attempt}`, seed: hash(seed, attempt), mode: 'ladder', teams, home: r.home, start: s, baseWp: r.wp };

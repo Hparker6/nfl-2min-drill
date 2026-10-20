@@ -24,7 +24,10 @@ export async function fetchMe(): Promise<Me> {
     if (r.status === 404) return { state: 'off' };
     if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) return { state: 'unreachable' };
     const d = await r.json();
-    const me: Me = d.signedIn ? { state: 'signed-in', email: d.email, owns: d.owns ?? [], payments: d.payments } : { state: 'signed-out', payments: d.payments };
+    if (!d || typeof d !== 'object') return { state: 'unreachable' };
+    const payments: Payments = d.payments === 'test' || d.payments === 'live' ? d.payments : 'off';
+    const owns = Array.isArray(d.owns) ? d.owns.filter((x: unknown) => typeof x === 'string') : [];
+    const me: Me = d.signedIn === true ? { state: 'signed-in', email: typeof d.email === 'string' ? d.email : '', owns, payments } : { state: 'signed-out', payments };
     rememberOwns(me.state === 'signed-in' ? me.owns : []);
     return me;
   } catch { return { state: 'unreachable' }; }

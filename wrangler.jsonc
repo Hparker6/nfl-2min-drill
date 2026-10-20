@@ -49,7 +49,7 @@
       }
     },
     // STAGING: a separate Worker (nfl-2min-drill-staging, on workers.dev) with a real D1 database (the-fourth-call-database,
-    // staging only). Accounts on, payments off (Stripe test mode only when turned on; live keys are refused in code).
+    // staging only). Accounts ON and payments ON, in Stripe test mode (the Stripe secrets are test keys; live keys are refused in code).
     // Secrets: wrangler secret put AUTH_PEPPER|RESEND_API_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|STRIPE_PRICE_ID --env staging
     // Order: npx wrangler d1 migrations apply DB --env staging --remote, THEN npm run build && npx wrangler deploy --env staging
     // (tables first, so the Worker never runs against an empty database). Full steps: server/accounts/SETUP.md.
@@ -65,9 +65,8 @@
       ],
       "vars": {
         "ACCOUNTS": "on",
-        // EMPTY ON PURPOSE, so accounts stay off until it is right. It must be the staging Worker's exact address, which
-        // includes your account's workers.dev subdomain: https://nfl-2min-drill-staging.<your-subdomain>.workers.dev
-        // (the first deploy prints it). Sign-in links are built from it: a wrong host would send them somewhere else.
+        // the staging Worker's exact address (the first deploy printed it). Sign-in links are built from it: a wrong host
+        // would send them somewhere else. Empty, accounts stay off.
         "SITE_ORIGIN": "https://nfl-2min-drill-staging.houston-parker.workers.dev",
         // sign-in emails through Resend: the key is a secret (wrangler secret put RESEND_API_KEY --env staging); the
         // sender must be an address on a domain verified in Resend

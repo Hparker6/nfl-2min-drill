@@ -33,6 +33,12 @@ function token(): string {
 /** `null`: the leaderboard is off on this site. `'failed'`: it is on but didn't answer (say so; never show "loading" forever). */
 export type BoardAnswer = Board | 'failed' | null;
 
+/** A board the page can render; anything else (a captive portal, a changed API) is a failure, not a crash. */
+function asBoard(x: unknown): Board | 'failed' {
+  const b = x as Board;
+  return b && typeof b === 'object' && typeof b.count === 'number' && Array.isArray(b.bands) && Array.isArray(b.best) ? b : 'failed';
+}
+
 export async function submitScore(day: string, name: string, score: number, grades: string, win: boolean): Promise<BoardAnswer> {
   if (!ON) return null;
   try {
@@ -41,7 +47,7 @@ export async function submitScore(day: string, name: string, score: number, grad
       body: JSON.stringify({ token: token(), name: name.slice(0, 20), score: Math.round(score), grades: grades.slice(0, 64), win }),
     });
     if (!r.ok) return 'failed';
-    return (await r.json()) as Board;
+    return asBoard(await r.json());
   } catch { return 'failed'; }
 }
 
@@ -50,7 +56,7 @@ export async function fetchBoard(day: string): Promise<BoardAnswer> {
   try {
     const r = await fetch(`${URL}/v1/day/${day}?token=${encodeURIComponent(token())}`);
     if (!r.ok) return 'failed';
-    return (await r.json()) as Board;
+    return asBoard(await r.json());
   } catch { return 'failed'; }
 }
 
@@ -66,6 +72,7 @@ export async function fetchStats(): Promise<Stats | 'failed' | null> {
   try {
     const r = await fetch(`${URL}/v1/stats`);
     if (!r.ok) return 'failed';
-    return (await r.json()) as Stats;
+    const s = (await r.json()) as Stats;
+    return s && typeof s === 'object' && s.days && typeof s.days === 'object' && !Array.isArray(s.days) ? s : 'failed';
   } catch { return 'failed'; }
 }

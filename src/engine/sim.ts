@@ -121,6 +121,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   if (dropId !== 'quick' && dropId !== 'screen' && dropId !== 'hail' && r() < 0.03) {
     res.kind = 'scramble';
     const y = clip(Math.round(4 + PM.scramble + gauss(r) * 4), -3, yt);
+    if (s.yl + y <= 0) { res.safety = true; res.yards = -s.yl; res.dur = 5; return res; }   // run down in his own end zone
     res.yards = y;
     res.td = y >= yt;
     res.oob = !res.td && r() < 0.4;
@@ -246,7 +247,7 @@ export function resolvePunt(s: State, st: StChoice, r: Rng): PlayResult {
   res.dur = 7;
   res.turnover = true;
   if (st === 'rush') {
-    if (r() < 0.03) { res.blocked = true; res.yards = -8; return res; }
+    if (r() < 0.03) { res.blocked = true; res.yards = -8; if (s.nr && s.yl <= 8) res.defTd = true; return res; }   // fallen on in the end zone
     if (r() < 0.025) { res.penalty = 'rough'; res.turnover = false; res.yards = Math.min(15, Math.floor(ytg(s) / 2)); return res; }
   }
   const gross = Math.round(45 + wx(s).punt + gauss(r) * 7);
@@ -254,6 +255,7 @@ export function resolvePunt(s: State, st: StChoice, r: Rng): PlayResult {
   if (s.yl + gross >= 100) { res.touchback = true; res.yards = 80 - s.yl; return res; }
   const ret = st === 'return' ? Math.max(0, Math.round(8 + gauss(r) * 6)) : Math.max(0, Math.round(3 + gauss(r) * 3));
   if (st === 'return' && r() < 0.005) { res.defTd = true; }
+  if (s.nr && ret >= s.yl + gross) res.defTd = true;   // the return reaches the end zone (a short punt, a long return)
   res.yards = gross;
   res.retYds = ret;
   return res;
@@ -412,12 +414,25 @@ function otCheck(s: State) {
     if (s.otp >= 3 && unequal) return end();
   }
   if (s.stage === 'pat') return;   // the try is still to come: judge the score after it
+  // the second possession ended with a score that leaves it behind (a field goal down seven, a missed try): over
+  if (s.stage === 'kick' && s.otp === 2 && s.kicker === s.otOwn && unequal) return end();
   s.otS = [s.score[0], s.score[1]];
   if ((s.stage === 'pre' || s.stage === 'call') && s.off !== s.otOwn) {
     if (s.otp === 2 && unequal) return end();
     s.otp++;
     s.otOwn = s.off;
   }
+}
+
+/**
+ * A touchdown on the last play of regulation that decides the game ends it on the spot: no try (the NFL skips a try
+ * that can't change the outcome). Down three or more with no time left, the try is moot too. Overtime has its own rule
+ * (otCheck).
+ */
+function walkOff(s: State, scorer: Team) {
+  if (!s.nr || s.t > 0 || (s.q != null && s.q !== 4)) return;
+  const l = leadOf(s, scorer);
+  if (l > 0 || l < -2) { s.stage = 'kick'; s.kicker = scorer; endCheck(s); }
 }
 
 function changePoss(s: State, yl: number) {
@@ -441,7 +456,8 @@ export function applySnap(s: State, res: PlayResult): boolean {
   s.pendPlay = null;
 
   if (res.penalty === 'hold') {
-    const back = s.yl <= 20 ? Math.ceil(s.yl / 2) : 10;
+    // inside the 20: half the distance to the goal, rounded down (a penalty can never put the ball in the end zone)
+    const back = s.yl <= 20 ? Math.floor(s.yl / 2) : 10;
     s.yl -= back;
     s.dist += back;
     s.running = false;
@@ -455,7 +471,8 @@ export function applySnap(s: State, res: PlayResult): boolean {
     s.dist = Math.min(10, 100 - s.yl);
     s.running = false;
     s.stage = 'pre';
-    endCheck(s);
+    // a defensive foul on the last play of a period: it is extended by one untimed down (the clock stays at 0:00)
+    if (!(s.nr && s.t <= 0)) endCheck(s);
     return true;
   }
   if (res.safety) {
@@ -481,6 +498,7 @@ export function applySnap(s: State, res: PlayResult): boolean {
       s.off = d;
       s.stage = 'pat';
       s.running = false;
+      walkOff(s, d);
       return false;
     }
     let newYl: number;
@@ -494,6 +512,7 @@ export function applySnap(s: State, res: PlayResult): boolean {
     s.score[o] += 6;
     s.stage = 'pat';
     s.running = false;
+    walkOff(s, o);
     return true;
   }
   const inc = (res.kind === 'pass' && !res.complete) || res.kind === 'spike';
@@ -703,6 +722,7 @@ function kickStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
   if (td) {
     s.score[rcv] += 6;
     s.stage = 'pat';
+    walkOff(s, rcv);
   } else {
     s.yl = yl;
     s.down = 1;
@@ -754,7 +774,8 @@ export function value0(s: State): number {
 /** Can the offense kneel out the clock from here? */
 export function canKneel(s: State): boolean {
   if (leadOf(s, s.off) <= 0) return false;
-  let tos = s.to[other(s.off)];
+  // the two-minute warning still to come stops the clock once, like one more timeout for the defense
+  let tos = s.to[other(s.off)] + (s.nr && !s.warned && s.t > 120 ? 1 : 0);
   let burn = 0;
   const n = 4 - s.down + 1;
   for (let k = 0; k < n; k++) {

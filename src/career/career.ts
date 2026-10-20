@@ -234,8 +234,7 @@ export function joinTeam(c: Career) {
   const me = youPlayer(c);
   me.team = team;
   // a jersey number nobody else on the team wears
-  const nums = new Set(Object.values(t.roster).map((id) => c.league.players[id]?.number));
-  nums.delete(me.number);
+  const nums = new Set(Object.values(t.roster).filter((id) => id !== c.you.pid).map((id) => c.league.players[id]?.number));
   if (nums.has(me.number)) for (let n = 1; n <= 19; n++) if (!nums.has(n)) { me.number = n; c.you.number = n; break; }
   c.you.drafted = { year: d.year, round: d.yourPick <= 32 ? 1 : 2, pick: d.yourPick, team };
   c.you.contract = rookieDeal(d.yourPick);
