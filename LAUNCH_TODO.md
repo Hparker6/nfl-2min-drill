@@ -88,6 +88,8 @@ Each item here is an owner decision or an external approval, not a code task, ex
       set the production secrets with `npx wrangler secret put NAME` (no `--env`).
 - [ ] **Switch production from the preview gate to account-based ownership** (`src/game/edition.ts`), and flip
       `LIVE_PAYMENTS_ALLOWED` to `true` in `server/accounts/config.ts`: one reviewed commit, by you.
+- [ ] **Security pre-launch list** in server/accounts/SECURITY.md: real Turnstile keys, Stripe Radar 3DS rule,
+      Stripe receipts on, DMARC to quarantine, separate production secrets incl. `SUPPORT_TO`, log monitoring.
 - [ ] **AdSense vs. buyers:** if the edition promises no ads, the ad slot must respect the entitlement before ads go on.
 - [ ] Merge `coachs-edition` into `main` (that deploys). Then on production: buy once yourself with a real card for
       the smallest sanity check, refund it, and watch the logs for an hour.

@@ -3,8 +3,11 @@
 For any Claude Code session picking this branch up. Written 2026-10-20 after the first successful sandbox purchase.
 Read this, then [LAUNCH_TODO.md](LAUNCH_TODO.md) for the ordered checklist and
 [server/accounts/SETUP.md](server/accounts/SETUP.md) for every setting and the 14-step Stripe test.
-Security controls, the threat model and the pre-launch security checklist: [server/accounts/SECURITY.md](server/accounts/SECURITY.md)
-(hardened 2026-10-20, commit `434e0df`; deployed to staging).
+Security controls mapped to the OWASP Top 10 (web and API), the threat model and the pre-launch checklist:
+[server/accounts/SECURITY.md](server/accounts/SECURITY.md). Hardened 2026-10-20 (`434e0df`, `8d5b3a6`): body caps,
+cookie shape check, extra headers, Stripe id and path allowlists, an audit log, Cloudflare Turnstile on the open
+forms, and a **Help & refunds form** (`/v1/support`, migration 0003, stored then emailed to `SUPPORT_TO`). All deployed
+and verified on staging (a form submission reached the owner's inbox). Staging uses Turnstile's **test** keys.
 
 ## 1. Rules (don't skip)
 

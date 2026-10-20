@@ -166,3 +166,16 @@ changed. Write down anything that differs from "Expect", with the event id.
 - Production keeps the development-only edition gate; account-based ownership in production is a separate, reviewed
   step.
 - No tax calculation, no country restriction, no admin tools.
+
+
+## 7. The support form, the bot check, the audit log (added 2026-10-20)
+
+- **Help & refunds** (`src/ui/Support.tsx` → `POST /v1/support` → `support.ts`, table `support_requests` from migration
+  0003). Set `SUPPORT_TO` to the address that should get the notifications (a Worker secret on staging/production; a
+  line in `.dev.vars` locally). Without it, requests are still stored; read them with the query in SECURITY.md.
+  Refunds are issued in the Stripe dashboard; the webhook revokes the edition on its own.
+- **Turnstile** (`turnstile.ts`, `src/ui/Turnstile.tsx`): set `TURNSTILE_SECRET` (Worker secret / `.dev.vars`) and build
+  with `VITE_TURNSTILE_SITE_KEY`. Both or neither: with only the secret, every sign-in and support request is refused
+  (fails closed); with only the site key, the widget shows and the token is ignored. Staging uses Cloudflare's test
+  pair (site `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`), which passes everything.
+- **Audit log** (`audit.ts`): `npx wrangler tail --env staging` and look for lines starting with `{"audit":`.
