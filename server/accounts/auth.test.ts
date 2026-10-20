@@ -36,8 +36,8 @@ describe('off unless configured', () => {
   });
 
   it('printing sign-in links to the log is only allowed on localhost', () => {
-    expect(accountsConfig(testEnv({ MAIL_MODE: 'console' }))?.mail).toBe('off');
-    expect(accountsConfig(testEnv({ MAIL_MODE: 'console', SITE_ORIGIN: 'http://localhost:8787' }))?.mail).toBe('console');
+    expect(accountsConfig(testEnv({ MAIL_MODE: 'console' }))?.mail).toEqual({ kind: 'off', why: 'console mail is for localhost only' });
+    expect(accountsConfig(testEnv({ MAIL_MODE: 'console', SITE_ORIGIN: 'http://localhost:8787' }))?.mail).toEqual({ kind: 'console' });
   });
 
   it('without a mail provider, asking for a sign-in says it is unavailable', async () => {

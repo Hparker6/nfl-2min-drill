@@ -10,14 +10,15 @@ import {
 } from '../game/account';
 import { EDITION_NAME, EDITION_PRICE } from '../game/edition';
 
-/** What the address bar brought: a sign-in link's token, or a checkout to confirm. Read once, then cleared. */
+/** What the address bar brought: a sign-in link's token, a checkout to confirm, or a return from a cancelled checkout. Read once, then cleared. */
 export function takeAccountHash(): { token?: string; purchase?: string } | null {
   const h = location.hash;
   const m = h.match(/^#signin=([A-Za-z0-9_-]{43})$/) ?? null;
   const p = h.match(/^#purchase=(cs_(?:test|live)_[A-Za-z0-9]{10,200})$/) ?? null;
-  if (!m && !p) return null;
+  const back = h === '#account';   // Stripe's cancel page sends people back here
+  if (!m && !p && !back) return null;
   history.replaceState(null, '', location.pathname + location.search);
-  return m ? { token: m[1] } : { purchase: p![1] };
+  return m ? { token: m[1] } : p ? { purchase: p[1] } : {};
 }
 
 export function AccountModal({ onClose, from }: { onClose: () => void; from?: { token?: string; purchase?: string } | null }) {

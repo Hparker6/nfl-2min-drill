@@ -49,10 +49,13 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
     if (bad === 'method') return fail(405, 'method');
     if (bad) return fail(403, 'forbidden');
     const addr = await addressKey(req, cfg.pepper);
-    const deps: AuthDeps = { db: cfg.db, pepper: cfg.pepper, origin: cfg.origin, mailer: opts.mailer ?? (cfg.mail === 'resend' && cfg.resend ? resendMailer(cfg.resend.apiKey, cfg.resend.from, opts.fetch ?? fetch) : cfg.mail === 'console' ? consoleMailer : offMailer), now };
+    const deps: AuthDeps = { db: cfg.db, pepper: cfg.pepper, origin: cfg.origin, mailer: opts.mailer ?? mailerFor(cfg, opts.fetch ?? fetch), now };
 
     if (p === '/v1/auth/email/start') {
-      if (cfg.mail === 'off' && !opts.mailer) return fail(503, 'Sign-in by email is not available yet.');
+      if (cfg.mail.kind === 'off' && !opts.mailer) {
+        console.warn(`sign-in email is off: ${cfg.mail.why}`);
+        return fail(503, 'Sign-in by email is not available yet.');
+      }
       const body = await readJson(req);
       if ((opts.random ?? Math.random)() < 0.02) await sweep(cfg.db, now);
       const r = await startEmail(deps, body?.email, addr);
@@ -92,6 +95,13 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
     console.error('accounts error', p, (e as Error)?.message);
     return fail(500, 'Something went wrong. Try again.');
   }
+}
+
+/** The configured way to send sign-in email (opts.mailer overrides it in tests). */
+function mailerFor(cfg: Config, f: typeof fetch): Mailer {
+  if (cfg.mail.kind === 'console') return consoleMailer;
+  if (cfg.mail.kind === 'resend') return resendMailer(cfg.mail, f);
+  return offMailer;
 }
 
 async function withSession(cfg: Config, req: Request, now: number, fn: (s: NonNullable<Awaited<ReturnType<typeof readSession>>>) => Promise<Response>): Promise<Response> {

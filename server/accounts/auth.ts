@@ -51,7 +51,10 @@ export async function startEmail(d: AuthDeps, rawEmail: unknown, addr: string): 
   await d.db.prepare('INSERT INTO login_tokens (token_hash, email, code_hash, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
     .bind(tokenHash, email, await codeHash(d.pepper, tokenHash, code), d.now, d.now + TOKEN_TTL_MS).run();
   const sent = await d.mailer.send({ to: email, link: `${d.origin}/#signin=${token}`, code, minutes: TOKEN_TTL_MS / 60_000 });
-  return sent ? { ok: true } : { ok: false, error: 'mail-failed' };
+  if (sent) return { ok: true };
+  // never delivered: retire it, so a link or code that may yet turn up late (or was never seen) can't be used
+  await d.db.prepare('UPDATE login_tokens SET used_at = ? WHERE token_hash = ?').bind(d.now, tokenHash).run();
+  return { ok: false, error: 'mail-failed' };
 }
 
 const codeHash = (pepper: string, tokenHash: string, code: string) => hmacSha256(pepper, `code:${tokenHash}:${code}`);

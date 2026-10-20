@@ -1,60 +1,170 @@
-/** The Resend mailer and its configuration: what is sent, what counts as sent, and when the mode is on. */
-import { describe, expect, it } from 'vitest';
-import { resendMailer, signInText } from './mailer';
-import { accountsConfig, resendConfig } from './config';
-import { call, inbox, testEnv } from './testing';
+/**
+ * Sign-in email delivery: configuration (on only when complete, console only on localhost), the Resend request,
+ * provider failures (a link that wasn't delivered can't be used), and what never leaks: the address, the link, the
+ * code and the API key stay out of logs and out of every response.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { accountsConfig, mailConfig } from './config';
+import { MAIL_TIMEOUT_MS, resendMailer, signInText } from './mailer';
+import { call, ORIGIN, testEnv } from './testing';
 
-const MSG = { to: 'pat@example.com', link: 'https://game.test/#signin=abc', code: '123456', minutes: 15 };
+const T0 = Date.UTC(2026, 9, 20, 12);
+const KEY = 're_TESTKEY_abc123xyz';
+const RESEND = { MAIL_MODE: 'resend', RESEND_API_KEY: KEY, MAIL_FROM: 'The 4th Call <sign-in@mail.example.com>' };
 
-describe('the Resend mailer', () => {
-  it('posts one message with the key in the header and the sign-in words in the body', async () => {
-    const calls: { url: string; init: RequestInit }[] = [];
-    const f = (async (url: string, init: RequestInit) => { calls.push({ url, init }); return new Response('{"id":"x"}', { status: 200 }); }) as unknown as typeof fetch;
-    const ok = await resendMailer('re_test_key_1234567890', 'The 4th Call <signin@game.test>', f).send(MSG);
-    expect(ok).toBe(true);
-    expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('https://api.resend.com/emails');
-    const h = calls[0].init.headers as Record<string, string>;
-    expect(h.authorization).toBe('Bearer re_test_key_1234567890');
-    const body = JSON.parse(String(calls[0].init.body));
-    expect(body).toEqual({ from: 'The 4th Call <signin@game.test>', to: ['pat@example.com'], ...signInText(MSG) });
-    expect(body.text).toContain(MSG.link);
-    expect(body.subject).toContain('123456');
+/** A pretend Resend: answers with `status` (or throws), and keeps every request. */
+function fakeResend(status = 200, mode: 'answer' | 'throw' | 'timeout' = 'answer') {
+  const sent: { url: string; init: RequestInit; body: Record<string, unknown> }[] = [];
+  const f = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    sent.push({ url: String(input), init: init!, body: JSON.parse(String(init!.body)) });
+    if (mode === 'throw') throw new TypeError('network down');
+    if (mode === 'timeout') throw Object.assign(new Error('timed out'), { name: 'TimeoutError' });
+    return Response.json(status < 300 ? { id: 'email_123' } : { name: 'error', message: 'nope', statusCode: status }, { status });
+  }) as typeof fetch;
+  return { sent, fetch: f };
+}
+
+let logs: string[] = [];
+beforeEach(() => {
+  logs = [];
+  for (const k of ['log', 'warn', 'error', 'info'] as const) vi.spyOn(console, k).mockImplementation((...a: unknown[]) => { logs.push(a.map(String).join(' ')); });
+});
+afterEach(() => vi.restoreAllMocks());
+
+const rows = (env: ReturnType<typeof testEnv>) => env.DB.raw.prepare('SELECT used_at FROM login_tokens').all() as { used_at: number | null }[];
+
+describe('configuration', () => {
+  it('resend needs a well-formed key and sender; anything less leaves email off, saying why', () => {
+    expect(mailConfig(RESEND, ORIGIN)).toEqual({ kind: 'resend', apiKey: KEY, from: RESEND.MAIL_FROM });
+    expect(mailConfig({ ...RESEND, MAIL_FROM: 'sign-in@mail.example.com' }, ORIGIN).kind).toBe('resend');
+    // the sender staging is configured with (wrangler.jsonc)
+    expect(mailConfig({ ...RESEND, MAIL_FROM: 'The 4th Call <signin@nfl-2min-drill.com>' }, ORIGIN).kind).toBe('resend');
+    const off = (env: Record<string, string | undefined>) => mailConfig(env, ORIGIN);
+    expect(off({ ...RESEND, RESEND_API_KEY: undefined })).toEqual({ kind: 'off', why: 'RESEND_API_KEY is missing or malformed' });
+    expect(off({ ...RESEND, RESEND_API_KEY: 'sk_live_wrongkind' }).kind).toBe('off');
+    expect(off({ ...RESEND, MAIL_FROM: undefined })).toEqual({ kind: 'off', why: 'MAIL_FROM is missing or malformed' });
+    for (const from of ['not an address', 'The 4th Call <a@b.co', 'a@b.co>', 'Evil\r\nBcc: x@y.z <a@b.co>', 'Name <a@b.co>\nX: y', '<a@b.co>']) {
+      expect(off({ ...RESEND, MAIL_FROM: from }).kind, JSON.stringify(from)).toBe('off');
+    }
+    expect(off({})).toEqual({ kind: 'off', why: 'MAIL_MODE is not set' });
+    expect(off({ MAIL_MODE: 'smtp' }).kind).toBe('off');
   });
-  it('a rejected or failed request is "not sent", never a throw', async () => {
-    const bad = (async () => new Response('nope', { status: 401 })) as unknown as typeof fetch;
-    expect(await resendMailer('re_k_1234567890', 'a@b.co', bad).send(MSG)).toBe(false);
-    const down = (async () => { throw new Error('network'); }) as unknown as typeof fetch;
-    expect(await resendMailer('re_k_1234567890', 'a@b.co', down).send(MSG)).toBe(false);
+
+  it('console mail is refused anywhere but localhost', () => {
+    expect(mailConfig({ MAIL_MODE: 'console' }, 'https://staging.example.com').kind).toBe('off');
+    expect(mailConfig({ MAIL_MODE: 'console' }, 'http://localhost:5173').kind).toBe('console');
+    expect(mailConfig({ MAIL_MODE: 'console' }, 'http://127.0.0.1:8787').kind).toBe('console');
+  });
+
+  it('a non-local site without email configured fails closed: 503, nothing written, nothing sent, the reason logged', async () => {
+    for (const extra of [{}, { MAIL_MODE: 'console' }, { MAIL_MODE: 'resend' }, { ...RESEND, RESEND_API_KEY: '' }]) {
+      const env = testEnv(extra);
+      const r = fakeResend();
+      const res = await call(env, '/v1/auth/email/start', { body: { email: 'pat@example.com' } }, { now: T0, fetch: r.fetch });
+      expect(res.status).toBe(503);
+      expect(r.sent.length).toBe(0);
+      expect(rows(env).length).toBe(0);
+    }
+    expect(logs.every((l) => l.startsWith('sign-in email is off:'))).toBe(true);
+    expect(logs.join('\n')).not.toContain('pat@example.com');
   });
 });
 
-describe('the resend mode', () => {
-  it('is on only with the mode, a plausible key and a sender address', () => {
-    expect(resendConfig(testEnv({ MAIL_MODE: 'resend', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: 'The 4th Call <signin@game.test>' }))).toEqual({ apiKey: 're_abcdefghijkl', from: 'The 4th Call <signin@game.test>' });
-    expect(resendConfig(testEnv({ MAIL_MODE: 'resend', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: 'signin@game.test' }))).not.toBeNull();
-    for (const extra of [
-      { MAIL_MODE: 'console', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: 'signin@game.test' },
-      { MAIL_MODE: 'resend', RESEND_API_KEY: '', MAIL_FROM: 'signin@game.test' },
-      { MAIL_MODE: 'resend', RESEND_API_KEY: 'sk_test_notresend', MAIL_FROM: 'signin@game.test' },
-      { MAIL_MODE: 'resend', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: '' },
-      { MAIL_MODE: 'resend', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: 'not an address' },
-    ]) expect(resendConfig(testEnv(extra)), JSON.stringify(extra)).toBeNull();
-    // the whole config says so too, and it works off localhost (unlike console mode)
-    expect(accountsConfig(testEnv({ MAIL_MODE: 'resend', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: 'signin@game.test' }))?.mail).toBe('resend');
-    expect(accountsConfig(testEnv({ MAIL_MODE: 'resend', RESEND_API_KEY: 'bad', MAIL_FROM: 'signin@game.test' }))?.mail).toBe('off');
+describe('sending through Resend', () => {
+  it('posts one message, to the address only, with the link and the code in the body and neither in the subject', async () => {
+    const env = testEnv(RESEND);
+    const r = fakeResend(200);
+    const res = await call(env, '/v1/auth/email/start', { body: { email: ' Pat@Example.com ' } }, { now: T0, fetch: r.fetch });
+    expect(res).toMatchObject({ status: 200, body: { ok: true } });
+    expect(r.sent.length).toBe(1);
+    const { url, init, body } = r.sent[0];
+    expect(url).toBe('https://api.resend.com/emails');
+    expect(init.method).toBe('POST');
+    expect((init.headers as Record<string, string>).authorization).toBe(`Bearer ${KEY}`);
+    expect(init.signal).toBeTruthy();
+    expect(body.to).toEqual(['pat@example.com']);
+    expect(body.from).toBe(RESEND.MAIL_FROM);
+    expect(body.subject).toBe('Sign in to The 4th Call');
+    const text = String(body.text), html = String(body.html);
+    const link = text.match(/https:\/\/game\.test\/#signin=[A-Za-z0-9_-]{43}/)?.[0];
+    const code = text.match(/code: (\d{6})/)?.[1];
+    expect(link && code).toBeTruthy();
+    expect(String(body.subject)).not.toContain(code!);
+    expect(html).toContain(`href="${link}"`);
+    expect(html).toContain(code!);
+    expect(body.tags).toEqual([{ name: 'category', value: 'sign_in' }]);
+    // the emailed link signs in
+    const v = await call(env, '/v1/auth/email/verify', { body: { token: link!.split('#signin=')[1] } }, { now: T0 + 60_000 });
+    expect(v.status).toBe(200);
+    expect(logs).toEqual([]);
   });
-  it('a sign-in request goes out through Resend and answers the same as any other', async () => {
-    const env = testEnv({ MAIL_MODE: 'resend', RESEND_API_KEY: 're_abcdefghijkl', MAIL_FROM: 'signin@game.test' });
-    const sent: string[] = [];
-    const f = (async (_url: string, init: RequestInit) => { sent.push(JSON.parse(String(init.body)).to[0]); return new Response('{}', { status: 200 }); }) as unknown as typeof fetch;
-    const r = await call(env, '/v1/auth/email/start', { body: { email: 'Pat@Example.com' } }, { now: Date.UTC(2026, 9, 20, 12), fetch: f });
-    expect(r.status).toBe(200);
-    expect(sent).toEqual(['pat@example.com']);
-    // and when Resend is down, the caller is told, without a stack trace
-    const down = (async () => new Response('', { status: 500 })) as unknown as typeof fetch;
-    const r2 = await call(env, '/v1/auth/email/start', { body: { email: 'kim@example.com' } }, { now: Date.UTC(2026, 9, 20, 12), fetch: down });
-    expect(r2.status).toBeGreaterThanOrEqual(400);
-    void inbox;
+
+  it('still says the same thing for every address (no account probing through the provider)', async () => {
+    const env = testEnv(RESEND);
+    const r = fakeResend(200);
+    const a = await call(env, '/v1/auth/email/start', { body: { email: 'one@example.com' } }, { now: T0, fetch: r.fetch });
+    const b = await call(env, '/v1/auth/email/start', { body: { email: 'two@example.com' } }, { now: T0, fetch: r.fetch });
+    expect([a.status, a.body]).toEqual([b.status, b.body]);
+  });
+
+  for (const [what, provider] of [
+    ['rejects it (422)', () => fakeResend(422)], ['is down (500)', () => fakeResend(500)], ['rate-limits it (429)', () => fakeResend(429)],
+    ['is unreachable', () => fakeResend(200, 'throw')], ['times out', () => fakeResend(200, 'timeout')],
+  ] as const) {
+    it(`when the provider ${what}: a 502, the undelivered link and code retired, nothing sensitive logged or returned`, async () => {
+      const env = testEnv(RESEND);
+      const r = provider();
+      const res = await call(env, '/v1/auth/email/start', { body: { email: 'pat@example.com' } }, { now: T0, fetch: r.fetch });
+      expect(res.status).toBe(502);
+      expect(res.body).toEqual({ error: 'The sign-in email could not be sent. Try again.' });
+      expect(rows(env)).toEqual([{ used_at: T0 }]);
+      const { text } = r.sent[0].body as { text: string };
+      const token = text.match(/#signin=([A-Za-z0-9_-]{43})/)![1], code = text.match(/code: (\d{6})/)![1];
+      expect((await call(env, '/v1/auth/email/verify', { body: { token } }, { now: T0 + 1000 })).status).toBe(400);
+      expect((await call(env, '/v1/auth/email/verify', { body: { email: 'pat@example.com', code } }, { now: T0 + 1000 })).status).toBe(400);
+      const all = logs.join('\n') + JSON.stringify(res.body);
+      for (const secret of ['pat@example.com', token, code, KEY]) expect(all).not.toContain(secret);
+      expect(logs.some((l) => l.startsWith('sign-in email not sent:'))).toBe(true);
+    });
+  }
+
+  it('an address built to inject headers never reaches the provider', async () => {
+    const env = testEnv(RESEND);
+    const r = fakeResend(200);
+    for (const email of ['pat@example.com\r\nBcc: all@example.com', 'pat@example.com, other@example.com', 'Pat <pat@example.com>']) {
+      expect((await call(env, '/v1/auth/email/start', { body: { email } }, { now: T0, fetch: r.fetch })).status).toBe(400);
+    }
+    expect(r.sent.length).toBe(0);
+  });
+
+  it('the key is sent only to Resend, only in the Authorization header, and never appears in a response', async () => {
+    const env = testEnv(RESEND);
+    const r = fakeResend(200);
+    const res = await call(env, '/v1/auth/email/start', { body: { email: 'pat@example.com' } }, { now: T0, fetch: r.fetch });
+    expect(JSON.stringify(res.body) + [...res.headers.values()].join(' ')).not.toContain(KEY);
+    expect(r.sent.every((s) => new URL(s.url).host === 'api.resend.com')).toBe(true);
+    expect(JSON.stringify(r.sent[0].body)).not.toContain(KEY);
+  });
+
+  it('the mailer never throws, and uses a timeout', async () => {
+    const m = resendMailer({ kind: 'resend', apiKey: KEY, from: 'a@b.co' }, (async () => { throw new Error('boom'); }) as unknown as typeof fetch);
+    await expect(m.send({ to: 'p@e.co', link: 'https://x/#signin=t', code: '123456', minutes: 15 })).resolves.toBe(false);
+    expect(MAIL_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
+  });
+
+  it('the message escapes what it puts in HTML', () => {
+    const { html } = signInText({ to: 'p@e.co', link: 'https://x/#signin="><script>', code: '123456', minutes: 15 });
+    expect(html).not.toContain('"><script>');
+    expect(html).toContain('&quot;&gt;&lt;script&gt;');
+  });
+});
+
+describe('local development', () => {
+  it('console mode on localhost prints the link and works without a provider', async () => {
+    const env = testEnv({ MAIL_MODE: 'console', SITE_ORIGIN: 'http://localhost:5173' });
+    expect(accountsConfig(env)?.mail.kind).toBe('console');
+    const res = await call(env, '/v1/auth/email/start', { body: { email: 'pat@example.com' }, origin: 'http://localhost:5173' }, { now: T0 });
+    expect(res.status).toBe(200);
+    expect(logs.some((l) => l.includes('[dev mail]') && l.includes('#signin='))).toBe(true);
   });
 });
