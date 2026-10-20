@@ -14,7 +14,7 @@
  */
 import { hash, rng } from '../engine/rng';
 import type { TeamInfo } from '../engine/types';
-import { inkOn, shade } from './stadium';
+import { DRESSING, inkOn, shade } from './stadium';
 
 export type Flight = 'through' | 'doinkIn' | 'left' | 'right' | 'short' | 'doinkOut';
 
@@ -177,7 +177,7 @@ export class KickCam {
       for (let x = -40; x <= 40; x += 16) {
         const [sx] = project(x, zw, 0.8);
         const t = this.el('text', { x: sx, y: (yTop + yBot) / 2, class: 'kc-wallt', fill: inkOn(E.color), 'font-size': ((yBot - yTop) * 0.62).toFixed(2) }, cam);
-        t.textContent = E.name.toUpperCase();
+        t.textContent = DRESSING;
       }
     }
     // the net, raised behind the uprights for the kick

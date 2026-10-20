@@ -20,6 +20,11 @@ type El = (tag: string, attrs: Record<string, string | number>, parent?: Element
 export const BEHIND = 18;
 /** How far past an end line the camera may look: the post, the squad, the wall and the front rows. */
 export const BEHIND_VIEW = 9;
+/**
+ * What the stadium's decorative surfaces carry (the walls, the midfield mark, the kick cam's wall): the game's own
+ * name, not the teams'. The end zones keep the team names: they show which end is whose.
+ */
+export const DRESSING = 'THE 4TH CALL';
 
 const POST = 3.083;          // center to upright, yards (18 ft 6 in apart)
 const BAR = 1.25;            // the crossbar's lift on screen
@@ -75,16 +80,17 @@ export function drawNumberArrow(el: El, g: SVGElement, x: number, u: number) {
 }
 
 /**
- * The midfield mark: the home team's name painted faintly on the turf in a thin double ring, the way a stadium paints
- * its logo at the 50 (names only, no logos). Faint enough that the players and lines read over it.
+ * The midfield mark: the game's own name (DRESSING) painted faintly on the turf in a thin double ring, the way a
+ * stadium paints its mark at the 50 (no team names, no logos). Faint enough that the players and lines read over it.
+ * The home team is still passed in (unused) so the caller and its stadium layout stay as they are.
  */
-export function drawMidfield(el: El, g: SVGElement, home: TeamInfo, W: number) {
+export function drawMidfield(el: El, g: SVGElement, _home: TeamInfo, W: number) {
   const cx = W / 2, cy = 60;
   el('circle', { cx, cy, r: 6.4, 'stroke-width': 0.32, class: 'f-mid' }, g);
   el('circle', { cx, cy, r: 5.7, 'stroke-width': 0.12, class: 'f-mid' }, g);
   const t = el('text', { x: cx, y: cy + 0.1, class: 'f-midt' }, g);
-  t.textContent = home.name.toUpperCase();
-  t.setAttribute('textLength', String(Math.min(10.4, home.name.length * 1.5)));
+  t.textContent = DRESSING;
+  t.setAttribute('textLength', '10.4');
   t.setAttribute('lengthAdjust', 'spacingAndGlyphs');
 }
 
@@ -145,7 +151,7 @@ export function drawEnd(el: El, parent: SVGElement, team: TeamInfo, home: TeamIn
   el('rect', { x: -6, y: wall.y, width: W + 12, height: 0.16, fill: ac, opacity: 0.9 }, g);
   for (let x = 5; x < W; x += 15.5) {
     const t = el('text', { x, y: wall.y + wall.h * 0.58, class: 'f-wallt', fill: ac }, g);
-    t.textContent = team.name.toUpperCase();
+    t.textContent = DRESSING;
   }
 
   // the cheer squad, on the ground between the end line and the wall: five a side, the middle left to the post
@@ -214,7 +220,7 @@ function mascot(el: El, parent: SVGElement, x: number, fy: number, team: TeamInf
   for (const sx of [-1, 1]) el('rect', { x: sx < 0 ? -0.24 : 0.06, y: -0.72, width: 0.18, height: 0.64, rx: 0.08, fill: fur }, fig);
   el('rect', { x: -0.32, y: -1.5, width: 0.64, height: 0.86, rx: 0.2, fill: team.color }, fig);                          // jersey
   const t = el('text', { x: 0, y: -1.06, class: 'f-mascn', fill: ac }, fig);
-  t.textContent = team.name[0].toUpperCase();
+  t.textContent = '4';
   for (const sx of [-1, 1]) {
     const arm = el('g', { class: `arm arm-${sx < 0 ? 'l' : 'r'}`, transform: `translate(${(sx * 0.3).toFixed(2)} -1.38)` }, fig);
     const sw = el('g', { class: 'sw' }, arm);
