@@ -25,7 +25,7 @@ export async function createSession(db: D1Database, userId: string, now: number)
  * this use extended it, so the caller can refresh the cookie.
  */
 export async function readSession(db: D1Database, token: string | null, now: number): Promise<(Session & { renewed?: number }) | null> {
-  if (!token || token.length > 128) return null;
+  if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const tokenHash = await sha256(token);
   const row = await db.prepare(
     `SELECT s.token_hash, s.user_id, s.created_at, s.expires_at, s.last_seen_at, u.email

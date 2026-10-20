@@ -13,7 +13,7 @@
  */
 import type { D1Database, D1PreparedStatement } from './d1';
 import { PRODUCT, type PaymentsConfig } from './config';
-import { fail, json } from './http';
+import { fail, json, readCapped } from './http';
 import { hit, LIMITS } from './ratelimit';
 import { stripeClient, verifyStripeSignature, type StripeError } from './stripe';
 import type { Session } from './sessions';
@@ -76,8 +76,8 @@ type Outcome = string;
 class RetryLater extends Error {}
 
 export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Request, now: number, f: typeof fetch): Promise<Response> {
-  const body = await req.text();
-  if (body.length > 256 * 1024) return fail(413, 'too large');
+  const body = await readCapped(req, 256 * 1024);
+  if (body === null) return fail(413, 'too large');
   if (!(await verifyStripeSignature(body, req.headers.get('stripe-signature'), pay.webhookSecret, now))) return fail(400, 'bad signature');
   let ev: StripeEvent;
   try { ev = JSON.parse(body); } catch { return fail(400, 'bad json'); }

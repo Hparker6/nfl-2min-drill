@@ -71,7 +71,8 @@ export async function deleteAccount(email: string): Promise<string | null> {
 export async function startCheckout(): Promise<{ url?: string; error?: string }> {
   try {
     const { status, data } = await post('/v1/checkout');
-    return status === 200 && typeof data.url === 'string' ? { url: data.url } : { error: err(data, 'Checkout could not be started.') };
+    // the server already checks this; the browser checks again, so nothing can send a player anywhere but Stripe
+    return status === 200 && typeof data.url === 'string' && /^https:\/\/checkout\.stripe\.com\//.test(data.url) ? { url: data.url } : { error: err(data, 'Checkout could not be started.') };
   } catch { return { error: 'No connection. Try again.' }; }
 }
 

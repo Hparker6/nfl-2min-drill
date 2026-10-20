@@ -9,6 +9,9 @@ const HEADERS = {
   'x-content-type-options': 'nosniff',
   'content-security-policy': "default-src 'none'; frame-ancestors 'none'",
   'referrer-policy': 'no-referrer',
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'permissions-policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  'cross-origin-resource-policy': 'same-origin',
 };
 
 export function json(data: unknown, status = 200, extra: Record<string, string> = {}): Response {
@@ -46,10 +49,35 @@ export function checkWrite(req: Request, origins: string[]): string | null {
   return null;
 }
 
-/** Read a small JSON body (null when it's too big or not JSON). */
+/**
+ * The body as text, at most `max` bytes, or null when it's bigger. A declared Content-Length over the limit is refused
+ * before anything is read, and a body without one (or lying about it) is read in chunks and abandoned past the limit:
+ * nobody can make the Worker buffer a huge upload.
+ */
+export async function readCapped(req: Request, max: number): Promise<string | null> {
+  const declared = req.headers.get('content-length');
+  if (declared !== null && (!/^\d{1,12}$/.test(declared) || Number(declared) > max)) return null;
+  if (!req.body) return '';
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) { await reader.cancel().catch(() => {}); return null; }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const c of chunks) { all.set(c, at); at += c.byteLength; }
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(all); } catch { return null; }   // not valid UTF-8: not ours
+}
+
+/** Read a small JSON object (null when it's too big, not UTF-8, not JSON, or not an object). */
 export async function readJson(req: Request, max = 2048): Promise<Record<string, unknown> | null> {
-  const raw = await req.text();
-  if (raw.length > max) return null;
+  const raw = await readCapped(req, max);
+  if (raw === null) return null;
   try {
     const v = JSON.parse(raw);
     return v && typeof v === 'object' && !Array.isArray(v) ? v : null;

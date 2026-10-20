@@ -91,6 +91,12 @@ const project = (x: number, z: number, h = 0): [number, number] => { const s = s
 const SKIN = ['#f1c9a5', '#e0ac85', '#c68c5f', '#a5673f', '#7c4a2a', '#5a3620'];
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const ease = (f: number) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+/** A bold line and a small one, as text nodes: names never become markup. */
+function caption(host: HTMLElement, title: string, sub: string) {
+  const b = document.createElement('b'), s = document.createElement('span');
+  b.textContent = title; s.textContent = sub;
+  host.replaceChildren(b, s);
+}
 
 interface Scene {
   svg: SVGSVGElement; cam: SVGElement; gp: SVGElement; people: SVGElement; r: () => number;
@@ -337,7 +343,7 @@ export class KickCam {
   private graphics(title: string, sub: string) {
     const lower = document.createElement('div');
     lower.className = 'kc-lower';
-    lower.innerHTML = `<b>${title}</b><span>${sub}</span>`;
+    caption(lower, title, sub);
     this.host.appendChild(lower);
     const verdict = document.createElement('div');
     verdict.className = 'kc-verdict';
@@ -404,7 +410,7 @@ export class KickCam {
       const f = path.flight;
       const sub = f === 'left' ? 'Wide left' : f === 'right' ? 'Wide right' : f === 'short' ? 'Short' : f === 'doinkOut' ? 'Off the upright' : f === 'doinkIn' ? 'Off the upright and in!' : k.xp ? 'Extra point' : `${k.dist} yards`;
       verdict.className = `kc-verdict show ${k.good ? 'good' : 'bad'}`;
-      verdict.innerHTML = `<b>${k.good ? 'It’s good!' : 'No good'}</b><span>${sub}</span>`;
+      caption(verdict, k.good ? 'It’s good!' : 'No good', sub);
       if (f === 'doinkIn' || f === 'doinkOut') host.querySelector(path.cross < 0 ? '.kc-up-l' : '.kc-up-r')?.classList.add('kc-clank');
       if (k.good) host.classList.add('kc-cheer');
       onOutcome?.();
@@ -474,7 +480,7 @@ export class KickCam {
     const land = () => {
       if (caught) return;
       caught = true;
-      if (k.touchback) { verdict.className = 'kc-verdict show neutral'; verdict.innerHTML = `<b>Touchback</b><span>Out to the ${k.spot}</span>`; }
+      if (k.touchback) { verdict.className = 'kc-verdict show neutral'; caption(verdict, 'Touchback', `Out to the ${k.spot}`); }
       onCatch?.();
     };
     const frame = (t: number) => {

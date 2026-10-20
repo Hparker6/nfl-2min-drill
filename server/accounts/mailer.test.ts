@@ -168,3 +168,32 @@ describe('local development', () => {
     expect(logs.some((l) => l.includes('[dev mail]') && l.includes('#signin='))).toBe(true);
   });
 });
+
+describe('the sign-in message, hardened', () => {
+  const m = { to: 'p@e.co', link: 'https://nfl-2min-drill.com/#signin=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', code: '042917', minutes: 15 };
+  it('keeps the code out of the subject and the preview line, and copyable as six digits', () => {
+    const { subject, html, text } = signInText(m);
+    expect(subject).not.toContain(m.code);
+    const preview = html.match(/<div style="display:none[^>]*>([^<]*)<\/div>/)?.[1] ?? '';
+    expect(preview).not.toContain(m.code);
+    expect(html).toContain(`>${m.code}</td>`);
+    expect(text).toContain(`code: ${m.code}`);
+  });
+  it('says why it arrived and warns against sharing the code, in both versions', () => {
+    const { html, text } = signInText(m);
+    for (const s of [html, text]) {
+      expect(s).toContain('never ask you for this code');
+      expect(s).toContain('There is no mailing list');
+      expect(s).toContain('nfl-2min-drill.com');
+    }
+  });
+  it('has no images and no external resources (nothing to block, nothing that tracks)', () => {
+    const { html } = signInText(m);
+    expect(html).not.toMatch(/<img|src=|url\(|<link /i);
+  });
+  it('escapes a hostile link everywhere it appears', () => {
+    const { html } = signInText({ ...m, link: 'https://x.test/#signin="><img src=x onerror=alert(1)>' });
+    expect(html).not.toContain('<img');
+    expect(html).not.toContain('onerror=alert(1)>');
+  });
+});
