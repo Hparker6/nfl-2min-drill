@@ -20,18 +20,18 @@ Three stages. Each stage has to pass before the next starts, and nothing in stag
 
 Goal: sign in, buy the edition with a test card, and see every check in SETUP.md §5 pass, all on localhost.
 
-- [ ] `AUTH_PEPPER` in `.dev.vars`: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
-- [ ] Terminal 1: `npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev`
-- [ ] Terminal 2: `DEV_API=http://localhost:8787 npm run dev` (PowerShell: `$env:DEV_API='http://localhost:8787'; npm run dev`)
-- [ ] Open `http://localhost:5173/?edition=account`, request a sign-in; the link and code print in terminal 1
+- [x] `AUTH_PEPPER` in `.dev.vars`: `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"`
+- [x] Terminal 1: `npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev`
+- [x] Terminal 2: `DEV_API=http://localhost:8787 npm run dev` (PowerShell: `$env:DEV_API='http://localhost:8787'; npm run dev`)
+- [x] Open `http://localhost:5173/?edition=account`, request a sign-in; the link and code print in terminal 1
       (`MAIL_MODE` is `console` locally, so Resend isn't needed yet). Sign in, sign out, sign in with the code.
-- [ ] **Stripe, test mode:** create the product "Coach's Edition", one-time **4.99 USD**; note the `price_…` id.
+- [x] **Stripe, test mode:** create the product "Coach's Edition", one-time **4.99 USD**; note the `price_…` id.
       Create a restricted test key (`rk_test_…`: Checkout Sessions write, Charges and Disputes read).
-- [ ] Install the Stripe CLI, `stripe login`, then start the listener from SETUP.md §5 and copy the `whsec_…`.
-- [ ] `.dev.vars`: `PAYMENTS=on`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`; restart wrangler.
+- [x] Install the Stripe CLI, `stripe login`, then start the listener from SETUP.md §5 and copy the `whsec_…`.
+- [x] `.dev.vars`: `PAYMENTS=on`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`; restart wrangler.
       `curl localhost:8787/v1/me` must say `"payments":"test"`.
-- [ ] Run the 14 checks in SETUP.md §5 (buy, forged return, unsigned webhook, duplicate event, already owned,
-      restore, partial and full refund, dispute won and lost, kill switch, delete). Record anything that differs.
+- [ ] Run the 14 checks in SETUP.md §5. **Done 2026-10-20 (work PC): 1, 2, 3, 5, 6 pass.** Left: 4 forged return, 7 already owned,
+      8 restore, 9–10 refunds, 11–12 disputes, 13 kill switch, 14 delete. Record anything that differs.
 - [ ] Optional here, required for staging: try Resend for real. Set `MAIL_MODE=resend`, `MAIL_FROM=onboarding@resend.dev`
       and `RESEND_API_KEY` in `.dev.vars`. Until the domain is verified, Resend only delivers to your own account email.
 

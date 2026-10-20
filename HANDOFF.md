@@ -1,87 +1,99 @@
-# Handoff: read this before working on `coachs-edition`
+# Handoff: `coachs-edition` (accounts and the Coach's Edition purchase)
 
-For any Claude session working on this branch. Two sessions share it; this file is how they stay in step. Last
-updated 2026-10-20.
+For any Claude Code session picking this branch up. Written 2026-10-20 after the first successful sandbox purchase.
+Read this, then [LAUNCH_TODO.md](LAUNCH_TODO.md) for the ordered checklist and
+[server/accounts/SETUP.md](server/accounts/SETUP.md) for every setting and the 14-step Stripe test.
 
-## 1. First, pull
+## 1. Rules (don't skip)
+
+- **Pull first:** `git checkout coachs-edition && git pull origin coachs-edition`. Small commits, push when a piece is done.
+- **Never merge into `main` and never push to `main` from this branch.** Pushing `main` deploys the live site.
+- **Never rewrite pushed history** (no rebase, squash, amend, force-push). Fix forward.
+- **Never commit** `.dev.vars`, `.wrangler/`, `docs/legal/`, or any key. They're git-ignored; the repo is public.
+  If a key is ever pasted into a chat, treat it as leaked: rotate it in the provider's dashboard.
+- **Run the checks after changes:** `npm run typecheck`, `npm run build`, and the suite from the repo root:
+  `npx vitest run --root <absolute repo path>`. Running Vitest from a parent folder picks up a different config and
+  reports false failures (5-second timeouts, a `scripts/percentiles` error). 343 tests pass as of this handoff.
+- Don't change `LIVE_PAYMENTS_ALLOWED` (`server/accounts/config.ts`) or add a D1 binding at the top level of
+  `wrangler.jsonc`. Both are the owner's reviewed call; either one turns real behavior on in production.
+
+## 2. What exists and what's verified
+
+**Code (all on this branch, pushed):**
+- Passwordless email accounts (`server/accounts/`): single-use link + 6-digit code, hashed sessions in a `__Host-`
+  cookie, rate limits, no account enumeration, account deletion. D1 migrations `0001_accounts`, `0002_purchases`.
+- Stripe Checkout, test mode only: the server creates the session at its fixed price, verifies webhook signatures,
+  records each event once (idempotent), re-reads the session from Stripe's API, handles refunds and disputes.
+  Live keys are refused in code.
+- Sign-in email through Resend's HTTP API (`mailer.ts`): `MAIL_MODE=resend` + `RESEND_API_KEY` secret + `MAIL_FROM`.
+  Locally `MAIL_MODE=console` prints the link and code to the Worker log instead.
+- Coach's Edition features behind the gate (Career Legacy, three career slots, the ladder), hidden in production builds.
+- A `staging` Wrangler environment bound to the real D1 database `the-fourth-call-database`
+  (`42a1a193-5c81-495a-bf0b-730eae04098f`), accounts on, `PAYMENTS` off, **`SITE_ORIGIN` empty on purpose** until the
+  staging Worker's real address is known (it must be exact; sign-in links are built from it).
+- Production (top level of `wrangler.jsonc`): **no D1 binding**, so every account and payment route answers 404.
+  The live site is `main`, untouched by any of this.
+
+**Verified today in the local sandbox (wrangler dev + Vite, Stripe sandbox account, Stripe CLI):**
+- Sign in by code from the Worker log: works.
+- Checkout → Stripe-hosted page → `4242 4242 4242 4242` → `checkout.session.completed` → purchase `paid`, entitlement
+  `active`, webhook outcome `granted` (SETUP.md §5 checks 1–3).
+- Unsigned webhook → 400, nothing recorded (check 5). Same event delivered twice → still one purchase, one
+  entitlement, one webhook record (check 6).
+- **Not yet run:** checks 4 (forged return), 7 (already owned), 8 (restore in another browser), 9–10 (refunds),
+  11–12 (disputes), 13 (kill switch), 14 (delete). The owner was about to do 4, 7, 8 and the refund/dispute ones from
+  the Stripe dashboard. Record results in LAUNCH_TODO.md.
+
+**Set up on the owner's work PC (not in git):** `.dev.vars` with `AUTH_PEPPER`, a Stripe sandbox restricted/secret
+test key, the webhook secret from `stripe listen`, the `price_…` id for "Coach's Edition" (one-time, 4.99 USD),
+`RESEND_API_KEY`, `PAYMENTS=on`. The Stripe CLI is installed (winget) and logged in to the sandbox. The local D1
+(`.wrangler/`) has the migrations applied and one test purchase. The owner's personal PC has none of this yet.
+
+## 3. Running the sandbox
 
 ```bash
-git checkout coachs-edition
-git pull origin coachs-edition
+# terminal 1: the Worker with accounts on (reads .dev.vars; local D1 on disk)
+npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev --port 8787
+# terminal 2: the game, proxying /v1 to the Worker
+DEV_API=http://localhost:8787 npm run dev           # PowerShell: $env:DEV_API='http://localhost:8787'; npm run dev
+# terminal 3: Stripe events forwarded to the Worker (must stay open while testing purchases)
+stripe listen --forward-to localhost:8787/v1/stripe/webhook --events checkout.session.completed,checkout.session.async_payment_succeeded,charge.refunded,charge.dispute.created,charge.dispute.updated,charge.dispute.closed,charge.dispute.funds_withdrawn,charge.dispute.funds_reinstated
 ```
+Open `http://localhost:5173/?edition=account#account`. The Account panel is also under the header's Settings icon.
+`curl localhost:8787/v1/me` should answer `{"signedIn":false,"payments":"test"}`.
 
-Don't work from memory of earlier commits: the email code changed after `c9210c2` (section 2).
+Looking at records: `npx wrangler d1 execute DB --local --env dev --command "SELECT status FROM purchases"` (also
+`entitlements`, `webhook_events`). Re-deliver an event: `stripe events resend <evt_id>`.
 
-## 2. What changed on top of `c9210c2` (the Resend + staging commit)
+## 4. Things that bit us (so they don't bite you)
 
-Another session reworked the email code in `ef97827`:
+- **"Confirming…" that never finishes** = `stripe listen` isn't running. The purchase is fine in Stripe; the webhook
+  never reached the Worker. Start the listener and `stripe events resend` the `checkout.session.completed` event.
+- **`/v1/me` says `payments: off` although `.dev.vars` is right** = a stale `workerd` from an earlier `wrangler dev`
+  still holds port 8787 and answers with old settings. Check `netstat -ano | findstr :8787`; if two listeners, kill
+  every `node` process running wrangler and every `workerd`, then start one Worker.
+- Stopping a background `wrangler dev` from a tool doesn't always kill its `workerd` children. Same fix.
+- `.dev.vars` values override `vars` in `wrangler.jsonc` for `wrangler dev` (that's how `PAYMENTS=on` works locally).
+- The Stripe-hosted checkout shows Bank/Klarna next to Card even though the session is `payment_method_types: ['card']`;
+  that's Stripe Link's wallet. Turn it off in Stripe → Settings → Payment methods if unwanted. Not a code issue.
+- The branch's commit `c76f508` reverted the homepage `<title>` to the pre-SEO one. The owner knows; decide before
+  this branch ever merges (it resets the SEO measurement window described in `marketing/GOOGLE_SEO_MEASUREMENT.md`).
 
-- `resendConfig()` is gone; use `mailConfig(env, origin)` in `server/accounts/config.ts`.
-- `cfg.mail` is now an object, not a string:
-  - `{ kind: 'console' }`
-  - `{ kind: 'resend', apiKey, from }`
-  - `{ kind: 'off', why }`
-- `resendMailer` is now `resendMailer(cfg.mail, fetch)` in `server/accounts/mailer.ts`, with a 10-second timeout.
-- When an email can't be sent, its link and code are cancelled at once (`auth.ts`), and the log gets only the
-  provider's HTTP status: never the address, link, code or key.
-- The sign-in code is in the email body, not the subject (no lock-screen previews). There's an HTML version too.
-- **Staging `SITE_ORIGIN` is `""` on purpose**, which keeps staging accounts off. The previous value,
-  `https://nfl-2min-drill-staging.workers.dev`, doesn't exist: workers.dev addresses include the account's subdomain.
-  A name like it could also be registered by someone else, who would then receive the sign-in links built from it.
-  Set it to the exact address Cloudflare shows for the staging Worker
-  (`https://nfl-2min-drill-staging.<account-subdomain>.workers.dev`). Copy it from Cloudflare; don't guess.
-- Unchanged: the staging D1 binding (`the-fourth-call-database`) and `MAIL_FROM`
-  (`The 4th Call <signin@nfl-2min-drill.com>`).
-- Full setup, every setting and how it fails, the Resend DNS records, the staging steps and a Stripe test-mode checklist:
-  `server/accounts/SETUP.md`.
+## 5. Next, in order
 
-## 3. Rules for the shared branch
+1. Finish SETUP.md §5 checks 4, 7–14 locally and record them in LAUNCH_TODO.md (stage 1).
+2. Stage 2 (staging on Cloudflare): verify `nfl-2min-drill.com` in Resend (DNS from Resend's dashboard), apply the
+   migrations to the real D1 (`--env staging --remote`), deploy staging once to learn its URL, put that URL in
+   `SITE_ORIGIN`, set the five secrets with `wrangler secret put … --env staging`, add a Stripe test webhook endpoint
+   for `https://<staging>/v1/stripe/webhook`, set `PAYMENTS` on, redeploy, repeat the 14 checks there.
+3. Stage 3 (live) is the owner's: legal review, tax/merchant of record, Stripe live activation, production D1 and
+   secrets, the reviewed commit that adds production bindings and flips `LIVE_PAYMENTS_ALLOWED`, then the merge.
 
-- **Pull before starting; push as soon as a piece of work is done.** Small commits.
-- **Never rewrite pushed history:** no rebase, squash, amend or force-push. Fix things in a new commit on top.
-- **Don't edit the same files at the same time.** The overlap so far: `server/accounts/` and `wrangler.jsonc`. If both
-  sessions need them, finish and push one change before starting the other.
-- **Never merge into `main` or deploy production.** Pushing to `main` deploys the live site.
-- **Never commit** `.dev.vars`, any key or secret, or anything under `docs/legal/`. All three are git-ignored; keep
-  them that way. The repository is public.
-- After any change, run the checks: `npx tsc -b`, `npx vitest run`, `npm run build`.
+## 6. Where secrets go
 
-## 4. Where secrets go
-
-- **Staging and production: Cloudflare Worker secrets.** Use `npx wrangler secret put NAME --env staging`, or the
-  dashboard: the Worker → Settings → Variables and Secrets → type **Secret**. Each Worker (environment) has its own
-  values.
-- **Local: `.dev.vars`** (git-ignored; the template is `.dev.vars.example`).
-- **Not** in GitHub secrets: Cloudflare's Git integration deploys this, not GitHub Actions. Not in Cloudflare's
-  build variables, any `VITE_` variable (built into the public JavaScript), or `wrangler.jsonc` (public).
-- The secrets: `AUTH_PEPPER` (32+ random characters; a different value per environment), `RESEND_API_KEY`,
-  `STRIPE_SECRET_KEY` (test mode: `sk_test_`/`rk_test_`), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`.
-
-## 5. Where things stand
-
-- **Built and tested (343 tests):**
-  - Passwordless email accounts, sessions, rate limits and account deletion.
-  - Stripe Checkout in test mode: verified webhooks, duplicate events ignored, refunds and disputes.
-  - Sign-in email through Resend.
-  - The Coach's Edition features: Career Legacy, three career slots, the Gridiron Challenge.
-- **Production is untouched:** no D1 binding at the top level of `wrangler.jsonc`, so every account and payment route
-  answers 404. The Coach's Edition stays hidden in production builds (`src/game/edition.ts`).
-- **Live payments are blocked in code:** `LIVE_PAYMENTS_ALLOWED = false` in `server/accounts/config.ts`, and live Stripe
-  keys are refused. Turning that on is a deliberate, reviewed code change, made by the owner after the legal review.
-  It's not a setting, and no session should change it on its own.
-
-### Next, in order
-
-1. Put the real staging address in `SITE_ORIGIN`.
-2. Verify `nfl-2min-drill.com` in Resend (DNS records in `SETUP.md` §2). Then set the staging secrets.
-3. Run the migrations, **then** deploy staging:
-   - `npx wrangler d1 migrations apply DB --env staging --remote`
-   - `npm run build && npx wrangler deploy --env staging`
-4. Run the Stripe test-mode checklist (`SETUP.md` §5) and record the results.
-
-### Still open (owner decisions)
-
-- The attorney review: the domain, real NFL names, and whether the LLC is the seller.
-- Tax and merchant of record: standard Stripe or Stripe Managed Payments.
-- Refund and dispute policy, terms of sale, and the final privacy policy.
-- Switching production from the preview gate to account-based ownership.
+| Where | What |
+|---|---|
+| `.dev.vars` (git-ignored, per machine) | local: `AUTH_PEPPER`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `RESEND_API_KEY`, `PAYMENTS` |
+| `npx wrangler secret put NAME --env staging` (or no `--env` for production) | the same names on Cloudflare |
+| `wrangler.jsonc` | only non-secrets: bindings, database ids, `ACCOUNTS`, `SITE_ORIGIN`, `MAIL_MODE`, `MAIL_FROM`, `PAYMENTS` |
+| Never | GitHub secrets (Cloudflare's Git integration deploys, not Actions), `VITE_*` (public JavaScript), chats |
