@@ -68,7 +68,7 @@
         // EMPTY ON PURPOSE, so accounts stay off until it is right. It must be the staging Worker's exact address, which
         // includes your account's workers.dev subdomain: https://nfl-2min-drill-staging.<your-subdomain>.workers.dev
         // (the first deploy prints it). Sign-in links are built from it: a wrong host would send them somewhere else.
-        "SITE_ORIGIN": "",
+        "SITE_ORIGIN": "https://nfl-2min-drill-staging.houston-parker.workers.dev",
         // sign-in emails through Resend: the key is a secret (wrangler secret put RESEND_API_KEY --env staging); the
         // sender must be an address on a domain verified in Resend
         "MAIL_MODE": "resend",
