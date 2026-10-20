@@ -2,7 +2,7 @@
  * The Coach's Edition: the one-time unlock (Career Legacy, more career slots, the Gridiron Challenge ladder).
  *
  * Nothing can be bought yet, so in a production build the edition is hidden and every screen looks and plays exactly
- * as it did before. In development (`npm run dev`) it shows, so it can be reviewed, in the state chosen with the
+ * as it did before. In development (`npm run dev`) and on the staging Worker it shows, so it can be reviewed, in the state chosen with the
  * address bar (remembered on this device):
  *   ?edition=locked  what a player who hasn't bought it sees (the default)
  *   ?edition=owned   everything unlocked
@@ -35,11 +35,17 @@ function devState(): EditionState {
   } catch { return 'locked'; }
 }
 
+/**
+ * The staging Worker (wrangler deploy --env staging) runs a production build, but it exists to test accounts and test-mode
+ * checkout, so it gets the same preview as development. Only its workers.dev address matches: the live site never does.
+ */
+export const isStaging = (host = typeof location !== 'undefined' ? location.hostname : '') => /^nfl-2min-drill-staging\.[a-z0-9-]+\.workers\.dev$/i.test(host);
+
 let cached: EditionState | null = null;
 
 export function editionState(): EditionState {
   if (cached) return cached;
-  cached = import.meta.env.DEV ? devState() : 'hidden';
+  cached = import.meta.env.DEV || isStaging() ? devState() : 'hidden';
   return cached;
 }
 
