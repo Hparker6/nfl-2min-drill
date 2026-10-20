@@ -65,7 +65,7 @@ describe('configuration', () => {
       expect(r.sent.length).toBe(0);
       expect(rows(env).length).toBe(0);
     }
-    expect(logs.every((l) => l.startsWith('sign-in email is off:'))).toBe(true);
+    expect(logs.every((l) => l.startsWith('sign-in email is off:') || l.startsWith('{"audit"'))).toBe(true);
     expect(logs.join('\n')).not.toContain('pat@example.com');
   });
 });
@@ -96,7 +96,8 @@ describe('sending through Resend', () => {
     // the emailed link signs in
     const v = await call(env, '/v1/auth/email/verify', { body: { token: link!.split('#signin=')[1] } }, { now: T0 + 60_000 });
     expect(v.status).toBe(200);
-    expect(logs).toEqual([]);
+    expect(logs.filter((l) => !l.startsWith('{"audit"'))).toEqual([]);
+    expect(logs.join('\n')).not.toContain('pat@example.com');
   });
 
   it('still says the same thing for every address (no account probing through the provider)', async () => {

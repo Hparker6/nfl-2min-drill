@@ -46,6 +46,29 @@ export function resendMailer(cfg: Extract<MailConfig, { kind: 'resend' }>, f: ty
   };
 }
 
+export interface Notice { to: string; replyTo?: string; subject: string; text: string }
+
+/** A plain-text notice (to the owner: a support request). HTML is the same text, escaped, in a <pre>. */
+export async function sendNotice(cfg: MailConfig, n: Notice, f: typeof fetch): Promise<boolean> {
+  if (cfg.kind === 'console') { console.log(`[dev mail] notice to ${n.to}: ${n.subject}\n${n.text}`); return true; }
+  if (cfg.kind !== 'resend') return false;
+  const html = `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111"><pre style="white-space:pre-wrap;font:14px/1.5 Consolas,Menlo,monospace">${esc(n.text)}</pre></body></html>`;
+  try {
+    const r = await f('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${cfg.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ from: cfg.from, to: [n.to], ...(n.replyTo ? { reply_to: n.replyTo } : {}), subject: n.subject.slice(0, 200), text: n.text, html, tags: [{ name: 'category', value: 'support' }] }),
+      signal: AbortSignal.timeout(MAIL_TIMEOUT_MS),
+    });
+    if (r.ok) return true;
+    console.error(`notice not sent: Resend answered ${r.status}`);
+    return false;
+  } catch (e) {
+    console.error(`notice not sent: ${(e as Error)?.name === 'TimeoutError' ? 'Resend timed out' : 'Resend unreachable'}`);
+    return false;
+  }
+}
+
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 /** The site's address for the footer: just the host of the sign-in link (it is the site the player asked from). */

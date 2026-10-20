@@ -13,6 +13,11 @@ AUTH_PEPPER=
 # MAIL_FROM=The 4th Call <sign-in@mail.your-domain>
 # RESEND_API_KEY=
 
+# Support form: where requests are emailed (an address you read). Requests are stored in D1 either way.
+SUPPORT_TO=
+# Cloudflare Turnstile secret (with VITE_TURNSTILE_SITE_KEY in the build). Test secret: 1x0000000000000000000000000000000AA
+TURNSTILE_SECRET=
+
 # Stripe TEST mode only (server/accounts/SETUP.md, section 5). Live keys (sk_live_/rk_live_) are refused in code.
 # PAYMENTS=on
 # A restricted key is better than the full secret key: Checkout Sessions (write), Charges and Disputes (read).

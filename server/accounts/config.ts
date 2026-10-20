@@ -29,6 +29,10 @@ export interface AccountsEnv {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_PRICE_ID?: string;
+  /** where support requests go (an address you read); the form still stores requests without it */
+  SUPPORT_TO?: string;
+  /** Cloudflare Turnstile: set to require the bot check on the sign-in and support forms */
+  TURNSTILE_SECRET?: string;
 }
 
 export interface Config {
@@ -38,6 +42,8 @@ export interface Config {
   pepper: string;
   mail: MailConfig;
   payments: PaymentsConfig | null;
+  supportTo: string | null;
+  turnstile: string | null;
 }
 
 /** How sign-in emails go out. `off` says why (for the operator's log; never shown to players). */
@@ -66,7 +72,13 @@ export function accountsConfig(env: AccountsEnv): Config | null {
   const pepper = env.AUTH_PEPPER ?? '';
   if (pepper.length < 32) return null;
   const extra = (env.DEV_ORIGINS ?? '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(isLocal);
-  return { db: env.DB, origin, origins: [origin, ...extra], pepper, mail: mailConfig(env, origin), payments: paymentsConfig(env) };
+  const supportTo = (env.SUPPORT_TO ?? '').trim();
+  const turnstile = (env.TURNSTILE_SECRET ?? '').trim();
+  return {
+    db: env.DB, origin, origins: [origin, ...extra], pepper, mail: mailConfig(env, origin), payments: paymentsConfig(env),
+    supportTo: /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(supportTo) ? supportTo : null,
+    turnstile: /^[A-Za-z0-9_-]{20,}$/.test(turnstile) ? turnstile : null,
+  };
 }
 
 /** A sender: an address, or a display name and an address in angle brackets. One line, nothing that could add a header. */

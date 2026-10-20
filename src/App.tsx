@@ -6,6 +6,7 @@ import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
 import { accountsShown, editionShown } from './game/edition';
 import { AccountModal, takeAccountHash } from './ui/Account';
+import { SupportModal } from './ui/Support';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 import { UpdateBar } from './ui/UpdateBar';
@@ -26,7 +27,7 @@ export default function App() {
   const [store, setStore] = useState<Store>(loadStore);
   const [mode, setMode] = useState<Mode>(modeFromHash);
   // first visit: no modal in the way. The Daily brief carries a short welcome instead.
-  const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | 'account' | null>(null);
+  const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | 'account' | 'support' | null>(null);
   // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
   const [accountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
   useEffect(() => { if (accountFrom) setModal('account'); }, [accountFrom]);
@@ -132,6 +133,7 @@ export default function App() {
           <a href="/leaderboard/">Leaderboard</a>
           <a href="/stats/">Stats</a>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
+          {accountsShown() && <button onClick={() => setModal('support')}>Help &amp; refunds</button>}
           {FEEDBACK_URL && <a href={FEEDBACK_URL} target="_blank" rel="noopener">Feedback</a>}
           {SUPPORT_URL && <a href={SUPPORT_URL} target="_blank" rel="noopener">Support the developer</a>}
         </nav>
@@ -156,7 +158,8 @@ export default function App() {
       {modal === 'stats' && <Stats store={store} onClose={closeModal} />}
       <BadgeToast />
       {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} onAccount={accountsShown() ? () => setModal('account') : undefined} />}
-      {modal === 'account' && <AccountModal onClose={closeModal} from={accountFrom} />}
+      {modal === 'account' && <AccountModal onClose={closeModal} from={accountFrom} onSupport={() => setModal('support')} />}
+      {modal === 'support' && <SupportModal onClose={closeModal} page={mode} />}
       {modal === 'about' && <About onClose={closeModal} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
       <UpdateBar />

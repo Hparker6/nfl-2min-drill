@@ -11,6 +11,8 @@ export const LIMITS = {
   verifyPerAddress: { name: 'verify-addr-15m', max: 30, windowSec: 900 },
   codePerEmailHour: { name: 'code-email-1h', max: 10, windowSec: 3600 },
   checkoutPerUser: { name: 'checkout-user-1h', max: 10, windowSec: 3600 },
+  supportPerAddress: { name: 'support-addr-1h', max: 5, windowSec: 3600 },
+  supportPerEmailDay: { name: 'support-email-day', max: 5, windowSec: 86400 },
 } satisfies Record<string, Limit>;
 
 /** Count one hit. True while it's within the limit. */

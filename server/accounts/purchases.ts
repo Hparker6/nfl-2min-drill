@@ -17,6 +17,7 @@ import { fail, json, readCapped } from './http';
 import { hit, LIMITS } from './ratelimit';
 import { stripeClient, verifyStripeSignature, type StripeError } from './stripe';
 import type { Session } from './sessions';
+import { audit } from './audit';
 
 export type PurchaseStatus = 'paid' | 'refunded' | 'partially_refunded' | 'disputed' | 'dispute_won' | 'dispute_lost';
 const ACTIVE: PurchaseStatus[] = ['paid', 'partially_refunded', 'dispute_won'];
@@ -81,7 +82,8 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
   if (!(await verifyStripeSignature(body, req.headers.get('stripe-signature'), pay.webhookSecret, now))) return fail(400, 'bad signature');
   let ev: StripeEvent;
   try { ev = JSON.parse(body); } catch { return fail(400, 'bad json'); }
-  if (!ev?.id || typeof ev.type !== 'string' || !ev.data?.object?.id) return fail(400, 'bad event');
+  const STRIPE_ID = /^[a-z]{2,10}_[A-Za-z0-9_]{1,200}$/;
+  if (!ev?.id || typeof ev.type !== 'string' || typeof ev.data?.object?.id !== 'string' || !STRIPE_ID.test(ev.id) || !STRIPE_ID.test(ev.data.object.id)) return fail(400, 'bad event');
   if (ev.livemode !== pay.live) return fail(400, 'wrong mode');
   if (await db.prepare('SELECT 1 FROM webhook_events WHERE event_id = ?').bind(ev.id).first()) return json({ received: true, duplicate: true });
 
@@ -105,6 +107,7 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
     if (/UNIQUE|constraint/i.test(String((e as Error)?.message)) && (await db.prepare('SELECT 1 FROM webhook_events WHERE event_id = ?').bind(ev.id).first())) return json({ received: true, duplicate: true });
     throw e;
   }
+  audit('webhook', { type: ev.type, outcome });
   return json({ received: true, outcome });
 }
 

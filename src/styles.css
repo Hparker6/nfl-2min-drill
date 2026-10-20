@@ -54,6 +54,14 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .btn.big { width: 100%; padding: 14px 18px; font: 700 20px var(--display); letter-spacing: .06em; text-transform: uppercase; }
 .btn.ghost { background: none; border-color: transparent; color: var(--muted); }
 .btn.danger { background: none; border-color: var(--r); color: var(--r); margin-top: 16px; }
+/* the help & refunds form */
+.support label { display: grid; gap: 4px; font: 600 13px var(--body); color: var(--ink-2); }
+.support select, .support input[type="email"], .support textarea { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 10px; font: 500 15px var(--body); width: 100%; box-sizing: border-box; }
+.support textarea { resize: vertical; min-height: 120px; line-height: 1.45; }
+.support .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.turnstile { min-height: 65px; }
+.acct-help { margin: 14px 18px 18px; }
+.acct-help .link { padding: 0; }
 .icon { width: 40px; height: 40px; border: 0; background: none; border-radius: var(--r-sm); display: grid; place-items: center; cursor: pointer; color: var(--ink-2); }
 .icon:hover { background: var(--panel-2); color: var(--ink); }
 

@@ -11,6 +11,7 @@
  *   POST /v1/checkout                                      start a Stripe Checkout for the Coach's Edition
  *   GET  /v1/checkout/status?session_id=                   what our records say about that checkout (never Stripe's redirect)
  *   POST /v1/stripe/webhook                                Stripe's events (signature checked; see purchases.ts)
+ *   POST /v1/support            { kind, email, message, page?, turnstile? }  a refund request, bug report or question (support.ts)
  *
  * Every POST from a browser must come from one of our origins, as JSON (http.ts checkWrite); the webhook is the
  * exception, and is authenticated by Stripe's signature instead.
@@ -19,13 +20,16 @@ import { accountsConfig, type AccountsEnv, type Config } from './config';
 import { addressKey, checkWrite, clearSessionCookie, fail, json, readCookie, readJson, SESSION_COOKIE, sessionCookie } from './http';
 import { deleteAccount, maskEmail, normalizeEmail, startEmail, verifyCode, verifyLink, type AuthDeps, type SignedIn } from './auth';
 import { endAllSessions, endSession, readSession } from './sessions';
-import { consoleMailer, resendMailer, type Mailer } from './mailer';
+import { consoleMailer, resendMailer, type Mailer, type Notice } from './mailer';
 import { sweep } from './ratelimit';
 import { checkoutStatus, createCheckout, entitlementsOf, handleWebhook } from './purchases';
+import { submitSupport } from './support';
+import { verifyTurnstile } from './turnstile';
+import { audit } from './audit';
 
-export interface RouteOpts { now?: number; mailer?: Mailer; fetch?: typeof fetch; random?: () => number }
+export interface RouteOpts { now?: number; mailer?: Mailer; notifier?: (n: Notice) => Promise<boolean>; fetch?: typeof fetch; random?: () => number }
 
-export const isAccountsPath = (p: string) => p.startsWith('/v1/auth/') || p === '/v1/me' || p.startsWith('/v1/me/') || p === '/v1/checkout' || p.startsWith('/v1/checkout/') || p === '/v1/stripe/webhook';
+export const isAccountsPath = (p: string) => p.startsWith('/v1/auth/') || p === '/v1/me' || p.startsWith('/v1/me/') || p === '/v1/checkout' || p.startsWith('/v1/checkout/') || p === '/v1/stripe/webhook' || p === '/v1/support';
 
 const NOT_FOUND = () => fail(404, 'not found');
 const offMailer: Mailer = { send: async () => false };
@@ -57,8 +61,10 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
         return fail(503, 'Sign-in by email is not available yet.');
       }
       const body = await readJson(req);
+      if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('signin.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
       if ((opts.random ?? Math.random)() < 0.02) await sweep(cfg.db, now);
       const r = await startEmail(deps, body?.email, addr);
+      audit('signin.requested', { ok: r.ok, error: r.ok ? null : r.error });
       if (r.ok) return json({ ok: true });
       if (r.error === 'invalid-email') return fail(400, 'That doesn’t look like an email address.');
       if (r.error === 'rate-limited') return fail(429, 'Too many sign-in requests. Try again in a few minutes.');
@@ -67,6 +73,7 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
     if (p === '/v1/auth/email/verify') {
       const body = await readJson(req);
       const done = body && 'token' in body ? await verifyLink(deps, body.token, addr) : await verifyCode(deps, body?.email, body?.code, addr);
+      audit('signin.verify', { by: body && 'token' in body ? 'link' : 'code', ok: !!done, created: done?.created ?? null });
       if (!done) return fail(400, 'That sign-in link or code is wrong, used or expired. Ask for a new one.');
       return signedIn(done, now);
     }
@@ -83,12 +90,22 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
         const body = await readJson(req);
         if (normalizeEmail(body?.email) !== s.email) return fail(400, 'Type your account’s email address to confirm.');
         await deleteAccount(cfg.db, s.userId, s.email);
+        audit('account.deleted', {});
         return json({ ok: true, deleted: true }, 200, { 'set-cookie': clearSessionCookie() });
       });
     }
     if (p === '/v1/checkout') {
       if (!cfg.payments) return fail(503, 'Purchases are not open.');
-      return await withSession(cfg, req, now, async (s) => createCheckout(cfg.db, cfg.payments!, cfg.origin, s, now, opts.fetch ?? fetch));
+      return await withSession(cfg, req, now, async (s) => { const r = await createCheckout(cfg.db, cfg.payments!, cfg.origin, s, now, opts.fetch ?? fetch); audit('checkout.started', { status: r.status, live: cfg.payments!.live }); return r; });
+    }
+    if (p === '/v1/support') {
+      const body = await readJson(req, 8192);
+      if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('support.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
+      const s = await readSession(cfg.db, readCookie(req, SESSION_COOKIE), now);   // optional: a locked-out player can still write
+      const r = await submitSupport({ db: cfg.db, pepper: cfg.pepper, mail: cfg.mail, supportTo: cfg.supportTo, now, fetch: opts.fetch ?? fetch, notifier: opts.notifier }, body, addr, s?.userId ?? null);
+      if (r.ok) return json({ ok: true, ref: r.ref });
+      if (r.error === 'rate-limited') return fail(429, 'Too many requests from here today. Try again tomorrow.');
+      return fail(400, r.field === 'email' ? 'That doesn’t look like an email address.' : r.field === 'message' ? 'Write between 10 and 2000 characters.' : 'Something in the form isn’t right.');
     }
     return NOT_FOUND();
   } catch (e) {

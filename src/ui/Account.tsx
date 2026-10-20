@@ -4,6 +4,7 @@
  * reached from a sign-in email (#signin=…), back from Stripe (#purchase=…), or back from a cancelled checkout (#account).
  */
 import { useEffect, useRef, useState } from 'react';
+import { Turnstile, turnstileOn } from './Turnstile';
 import { Modal } from './Modals';
 import {
   checkoutStatus, COACH_EDITION, deleteAccount, fetchMe, requestSignIn, signOut, startCheckout, verify, type Me,
@@ -21,7 +22,7 @@ export function takeAccountHash(): { token?: string; purchase?: string } | null 
   return m ? { token: m[1] } : p ? { purchase: p[1] } : {};
 }
 
-export function AccountModal({ onClose, from }: { onClose: () => void; from?: { token?: string; purchase?: string } | null }) {
+export function AccountModal({ onClose, from, onSupport }: { onClose: () => void; from?: { token?: string; purchase?: string } | null; onSupport?: () => void }) {
   const [me, setMe] = useState<Me | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,6 +42,7 @@ export function AccountModal({ onClose, from }: { onClose: () => void; from?: { 
       {me?.state === 'signed-in' && (
         <SignedIn me={me} busy={busy} setBusy={setBusy} setMsg={setMsg} refresh={refresh} onClose={onClose} />
       )}
+      {onSupport && <p className="muted small acct-help">Need a refund, or something’s wrong? <button className="link" onClick={onSupport}>Help &amp; refunds</button></p>}
     </Modal>
   );
 }
@@ -51,13 +53,15 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const ask = async () => { setBusy(true); setErr(null); const e = await requestSignIn(email); setBusy(false); if (e) setErr(e); else setSent(true); };
+  const [token, setToken] = useState<string | null>(null);
+  const ask = async () => { setBusy(true); setErr(null); const e = await requestSignIn(email, token ?? undefined); setBusy(false); if (e) setErr(e); else setSent(true); };
   const useCode = async () => { setBusy(true); setErr(null); const e = await verify({ email, code: code.trim() }); setBusy(false); if (e) setErr(e); else onSignedIn(); };
   return (
     <div className="acct-form">
       <p>Sign in with your email: no password. An account lets a purchase follow you to other devices. (Saved games stay in each browser.)</p>
       <label><span>Email</span><input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={sent} /></label>
-      {!sent ? <button className="btn primary" disabled={busy || !email.includes('@')} onClick={ask}>Email me a sign-in link</button> : (
+      {!sent && <Turnstile action="signin" onToken={setToken} />}
+      {!sent ? <button className="btn primary" disabled={busy || !email.includes('@') || (turnstileOn() && !token)} onClick={ask}>Email me a sign-in link</button> : (
         <>
           <p className="muted small">If that address can sign in, a link and a 6-digit code are on their way. They work once, for 15 minutes.</p>
           <label><span>Code</span><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} /></label>

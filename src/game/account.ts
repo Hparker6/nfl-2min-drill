@@ -40,9 +40,9 @@ export function lastKnownOwns(): string[] {
 
 const err = (d: Record<string, unknown>, fallback: string) => (typeof d.error === 'string' ? d.error : fallback);
 
-export async function requestSignIn(email: string): Promise<string | null> {
+export async function requestSignIn(email: string, turnstile?: string): Promise<string | null> {
   try {
-    const { status, data } = await post('/v1/auth/email/start', { email });
+    const { status, data } = await post('/v1/auth/email/start', { email, ...(turnstile ? { turnstile } : {}) });
     return status === 200 ? null : err(data, 'Something went wrong. Try again.');
   } catch { return 'No connection. Try again.'; }
 }
@@ -65,6 +65,16 @@ export async function deleteAccount(email: string): Promise<string | null> {
     if (status === 200) { rememberOwns([]); return null; }
     return err(data, 'The account could not be deleted. Try again.');
   } catch { return 'No connection. Try again.'; }
+}
+
+export type SupportKind = 'refund' | 'bug' | 'account' | 'other';
+
+/** The help & refunds form (server/accounts/support.ts). The answer carries the reference the server assigned. */
+export async function sendSupport(f: { kind: SupportKind; email: string; message: string; page: string; website?: string; turnstile?: string }): Promise<{ ref?: string; error?: string }> {
+  try {
+    const { status, data } = await post('/v1/support', f);
+    return status === 200 && typeof data.ref === 'string' ? { ref: data.ref } : { error: err(data, 'The message could not be sent. Try again.') };
+  } catch { return { error: 'No connection. Try again.' }; }
 }
 
 /** Start Stripe Checkout: the server makes the session at its own fixed price and sends back Stripe's page. */
