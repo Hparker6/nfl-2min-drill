@@ -73,7 +73,7 @@
         // sender must be an address on a domain verified in Resend
         "MAIL_MODE": "resend",
         "MAIL_FROM": "The 4th Call <signin@nfl-2min-drill.com>",
-        "PAYMENTS": "off"
+        "PAYMENTS": "on"
       }
     }
   }
