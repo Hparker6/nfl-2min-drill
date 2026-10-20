@@ -46,7 +46,7 @@ Goal: sign in, buy the edition with a test card, and see every check in SETUP.md
 
 Goal: the same checks passing on a real Worker, a real D1 and real email, with Stripe still in test mode.
 
-- [ ] **Resend domain:** add `nfl-2min-drill.com` in Resend → Domains and create the DNS records it shows (MX and TXT on
+- [x] **Resend domain:** (verified 2026-10-20; the `rsend` CNAME has to be DNS only) add `nfl-2min-drill.com` in Resend → Domains and create the DNS records it shows (MX and TXT on
       `send`, TXT `resend._domainkey`, a `_dmarc` TXT) in Cloudflare DNS, unproxied, exactly as Resend prints them
       (SETUP.md §2). Wait for "Verified". Don't touch the site's existing records.
       *If the attorney review changes the domain, this is redone on the new one.*

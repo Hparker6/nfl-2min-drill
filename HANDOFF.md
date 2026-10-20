@@ -58,10 +58,10 @@ test key, the webhook secret from `stripe listen`, the `price_…` id for "Coach
 - Worker secrets set on staging: `AUTH_PEPPER` (its own random value), `RESEND_API_KEY`, `STRIPE_SECRET_KEY`
   (sandbox test key), `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (from the endpoint below).
 - Stripe sandbox webhook endpoint `we_1USgg2PcRHl4G0ky2cQvfxOl` → `<staging>/v1/stripe/webhook`, the 8 events.
-- Resend: domain `nfl-2min-drill.com` added (id `73c4740d-…`, region us-east-1), **waiting on DNS**: the owner adds
-  the TXT `resend._domainkey`, MX + TXT `send`, CNAME `rsend` records (and a `_dmarc` TXT) in Cloudflare DNS. Until
-  Resend shows it verified, sign-in email on staging fails closed (the code is never shown, the request errors).
-- Next: once verified, sign in on staging with a real address and re-run the 14 checks there (SETUP.md §5), using
+- Resend: domain `nfl-2min-drill.com` **verified** (id `73c4740d-…`, us-east-1). DNS in Cloudflare: TXT
+  `resend._domainkey`, MX + TXT `send`, CNAME `rsend` (must be **DNS only**, not proxied, or Resend can't see it),
+  TXT `_dmarc` `v=DMARC1; p=none;`. A staging sign-in email from `signin@nfl-2min-drill.com` was delivered to Gmail.
+- Next: sign in on staging with a real address and re-run the 14 checks there (SETUP.md §5), using
   the Stripe dashboard for refunds/disputes. No `stripe listen` needed on staging: Stripe posts to the endpoint and
   retries on its own.
 
