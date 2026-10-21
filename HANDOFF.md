@@ -150,7 +150,11 @@ purchase, auto-unlock, and a refund that revoked it automatically all work. What
    region WNAM, empty. Migrations 0001–0004 still to apply (`npx wrangler d1 migrations apply DB --remote`), which
    needs the top-level binding from item 9 first.
 9. [ ] **Needs the owner's explicit OK in the session** (Claude Code's permission check blocked it on 2026-10-21 as a
-   production change): **Production config** (one reviewed commit): top-level D1 binding, `ACCOUNTS`, `SITE_ORIGIN=https://nfl-2min-drill.com`,
+   production change). **To unblock:** the owner says in the chat "approved: make the production config change and flip
+   live payments" (or allows it at Claude Code's permission prompt, or makes the two edits by hand: the top-level
+   `d1_databases` + `vars` block in `wrangler.jsonc` described below, and `LIVE_PAYMENTS_ALLOWED = true` in
+   `server/accounts/config.ts`, with its test in `purchases.test.ts` updated). Nothing goes live from this commit alone:
+   it only matters once merged to `main` and the production secrets exist. **Production config** (one reviewed commit): top-level D1 binding, `ACCOUNTS`, `SITE_ORIGIN=https://nfl-2min-drill.com`,
    `MAIL_MODE=resend`, `MAIL_FROM=The 4th Call <login@nfl-2min-drill.com>`, `PAYMENTS`, the real Turnstile site key in the
    build, and `LIVE_PAYMENTS_ALLOWED` flipped. Production secrets via `npx wrangler secret put` (no `--env`):
    `AUTH_PEPPER` (new random value), `RESEND_API_KEY`, `STRIPE_SECRET_KEY` (live), `STRIPE_PRICE_ID`,
