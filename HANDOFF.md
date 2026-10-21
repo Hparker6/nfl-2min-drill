@@ -1,5 +1,46 @@
 # Handoff: `coachs-edition` (accounts and the Coach's Edition purchase)
 
+## START HERE (updated 2026-10-22, end of the work-PC session)
+
+**Three branches matter:**
+
+| Branch | What it is | Status |
+|---|---|---|
+| `main` | The live site (nfl-2min-drill.com). Pushing it deploys. | Unchanged since `8bc5726` (kickoff cam). |
+| `live-ads` | `main` + the leaderboard integrity fix + ads. **Ready to go live.** | Pushed. Waiting on the owner (Claude Code's permission check blocks pushes to `main`). |
+| `coachs-edition` | Everything else: accounts, the $4.99 Coach's Edition, Stripe, the Coach's Playbook, career and game polish. Deployed to staging only. | Pushed. Waits on Stripe live (the owner needs an EIN first). |
+
+**To put ads and the leaderboard fix live (the owner):** from the repo folder, `git push origin live-ads:main`, or open
+https://github.com/Hparker6/nfl-2min-drill/pull/new/live-ads, create the pull request and merge it. Then:
+- AdSense → Sites: the site showed **"Getting ready"** (Google's review) and ads.txt **"Not found"** on 2026-10-22,
+  because ads.txt wasn't live yet. Once `live-ads` is live, `https://nfl-2min-drill.com/ads.txt` must show
+  `google.com, pub-2581780385461126, DIRECT, f08c47fec0942fa0`; Google re-checks within about a day. No ads fill until
+  the site is approved. Unfilled slots take no space and show no label, so nothing looks broken meanwhile.
+- **Keep AdSense Auto ads OFF** (AdSense → Ads → By site → nfl-2min-drill.com). Auto ads would place ads next to the
+  play controls (policy risk, accidental clicks) and for Coach's Edition buyers, who paid for no ads.
+- After it's live, **merge `main` back into `coachs-edition`** before the next merge the other way: both branches
+  changed `server/site/worker.js`, `src/ui/AdSlot.tsx`, `src/game/site.ts`, `public/_headers`, `index.html` and the
+  pages with the same intent (`coachs-edition` also has the owner check in AdSlot); resolve toward `coachs-edition`.
+
+**Ads, where they are (both branches):** one display unit, `initial_ad_unit`, slot `4281334746`, publisher
+`ca-pub-2581780385461126` (both public; `src/game/site.ts`). Placements: the game's end-of-game screen (Daily, Survivor,
+Practice; `AdSlot where="end"` in `GameScreen.tsx`), Career's postgame, the page footer (never while a game is on
+screen), the How to play guide (three, between sections), the leaderboard and stats pages. The game loads Google's
+script itself (`src/ui/AdSlot.tsx`, 1.5 s after the page draws, only where an ad renders); the static and Worker pages
+use `public/ads.js` (their CSP allows no inline script). On `coachs-edition`, owners of the edition see none and their
+browser never loads the script. Next revenue step (owner): apply for AdSense's H5 Games Ads for rewarded ads ("watch
+an ad to continue your Survivor run").
+
+**What's left before the $4.99 sells:** section 5 below. In short: the owner gets an EIN, activates Stripe live, sets
+it up (product $4.99, descriptor THE 4TH CALL, Radar 3DS rule, receipts), creates a Turnstile widget; Claude then does
+the production config (item 9, needs the owner's explicit OK in the chat), the live webhook, the merge, and one real
+purchase + refund together. `NR_FROM` (engine rule date, `src/engine/scenario.ts`) must be later than that merge day.
+
+**Working on another machine:** `git fetch && git checkout coachs-edition && git pull`, `npm install`. Secrets are
+not in git: `.dev.vars` (local, see section 6) and Cloudflare Worker secrets (already set on staging). The staging
+site is https://nfl-2min-drill-staging.houston-parker.workers.dev (add `?edition=owned` to preview what an owner sees).
+Run tests from the repo root: `npx vitest run --root <absolute repo path>`.
+
 For any Claude Code session picking this branch up. Written 2026-10-20 after the first successful sandbox purchase.
 Read this, then [LAUNCH_TODO.md](LAUNCH_TODO.md) for the ordered checklist and
 [server/accounts/SETUP.md](server/accounts/SETUP.md) for every setting and the 14-step Stripe test.
