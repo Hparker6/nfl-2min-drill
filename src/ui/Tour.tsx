@@ -76,6 +76,7 @@ export const FIRST_GAME_TOUR: TourStep[] = [
   { sel: '.sb', title: 'Your spot', text: 'The score, the clock, the ball and both teams’ timeouts. The bar on the right is your chance to win from here.' },
   { sel: '.stage', title: 'The field', text: 'Your players are circles, theirs are diamonds, colored by rating. Tap one for his ratings. The play you pick is drawn here before you snap it.' },
   { sel: '.side .tempo', title: 'The clock', text: 'Pick a tempo with each play: hurry up, huddle, or milk the clock. Timeouts and spikes are here too.' },
+  { sel: '.side .cp-simple', title: 'Your playbook', text: 'Six plays to start: runs, short passes and a deep shot. Pick one, then Snap (or press Enter). The full playbook, 27 plays, is a tap away whenever you want it.' },
   { sel: '.side .tabs5', title: 'Your playbook', text: '27 calls in five tabs: runs, short and deep passes, RPOs and trick plays. Pick one, then Snap (or press Enter).' },
   { sel: '.side .def-list', title: 'Your defense', text: 'When they have the ball, you call the defense: 19 coverages and blitzes. Pick one, then call it.' },
   { title: 'Every call is graded', text: 'The game plays your call out thousands of times against every option you had: great call, close, costly or big miss. A good call that doesn’t work out still counts as good.' },

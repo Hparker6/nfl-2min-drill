@@ -15,6 +15,8 @@ export interface Settings {
   fieldLook?: FieldLook; // the field's look (badges unlock more)
   autoNext?: boolean;    // after a play's result and grade, go on by itself (on unless set to false)
   haptics?: boolean;     // phones: a buzz on the big moments (on unless set to false)
+  simple?: boolean;      // the rookie playbook: a few plays and defenses, the extras hidden (new players start with it)
+  simpleChosen?: boolean;// the player set it themselves (then it never switches on its own)
 }
 
 export interface SpotResult {
@@ -62,7 +64,7 @@ const KEY = 'the4thcall:v1';
 
 export const defaultStore = (): Store => ({
   v: 1,
-  settings: { theme: 'auto', speed: 'normal', hints: true },
+  settings: { theme: 'auto', speed: 'normal', hints: true, simple: true },
   days: {},
   surv: { best: 0, runs: 0 },
   history: [],
@@ -80,7 +82,8 @@ export function loadStore(): Store {
     return {
       ...d,
       ...s,
-      settings: { ...d.settings, ...(s.settings || {}) },
+      // the rookie playbook is for new players: a save with games in it keeps the full one unless it chose otherwise
+      settings: { ...d.settings, simple: Array.isArray(s.history) && s.history.length > 0 ? undefined : true, ...(s.settings || {}) },
       days: s.days && typeof s.days === 'object' ? s.days : {},
       surv: { ...d.surv, ...(s.surv || {}) },
       history: Array.isArray(s.history) ? s.history : [],

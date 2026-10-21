@@ -49,9 +49,12 @@ export default function App() {
   // effects (badges announced, analytics, the save itself), so they are applied to the latest store outside of one
   const storeRef = useRef(store);
   const [unsaved, setUnsaved] = useState(false);
+  const graduated = useRef(false);
   const update = useCallback((fn: (s: Store) => void) => {
     const next = structuredClone(storeRef.current);
     fn(next);
+    // three games in: the full playbook opens on its own (unless the player chose a playbook themselves)
+    if (next.settings.simple && !next.settings.simpleChosen && next.history.length >= 3) { next.settings.simple = false; graduated.current = true; }
     storeRef.current = next;
     setUnsaved(!saveStore(next));
     setStore(next);
@@ -63,6 +66,13 @@ export default function App() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+  // the rookie playbook's "Show the full playbook" link (CallPanel sends this), and the note when it opens by itself
+  useEffect(() => {
+    const full = () => { update((s) => { s.settings.simple = false; s.settings.simpleChosen = true; }); toast('Full playbook: 27 plays and 19 defenses. Settings brings the rookie one back.'); };
+    window.addEventListener('4c:fullplaybook', full);
+    return () => window.removeEventListener('4c:fullplaybook', full);
+  }, [update, toast]);
+  useEffect(() => { if (graduated.current) { graduated.current = false; toast('Three games in: the full playbook is open (27 plays, 19 defenses).'); } });
 
   // the funnel: which screen, and who (new or returning)
   useEffect(() => { setContext({ mode }); track('screen_view', { mode }); }, [mode]);

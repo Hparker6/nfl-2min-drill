@@ -1386,3 +1386,6 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .burst-bigPlay b { font-size: clamp(28px, 8cqw, 64px); color: #f5c518; }
 @keyframes fx-burst { 0% { opacity: 0; transform: scale(.4) rotate(-6deg); } 18% { opacity: 1; transform: scale(1.12) rotate(1deg); } 30% { transform: scale(1) rotate(0); } 78% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05); } }
 @media (prefers-reduced-motion: reduce) { .burst b { animation: fx-flash 1s ease-out both; } }
+/* the rookie playbook's line (and its link to the full playbook) shows on every screen size */
+.tab5-blurb.cp-simple { display: block !important; margin-top: 0; }
+.cp-simple .link { font-weight: 700; margin-left: 4px; }

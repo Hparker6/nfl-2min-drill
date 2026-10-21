@@ -119,6 +119,8 @@ export function GameScreen(p: Props) {
   const [impact, setImpact] = useState<{ id: number; kind: ImpactKind } | null>(null);
   const liveRef = useRef(false);            // the player took part in this game on this screen (not just reopened a finished one)
   const [touring, setTouring] = useState<'wait' | 'on' | 'done'>(p.tour ? 'wait' : 'done');
+  // the rookie playbook (new players): a few plays, the tell and momentum hidden. Career keeps the full playbook.
+  const rookie = settings.simple === true && sc.mode !== 'career';
 
   const shownAt = useRef(Date.now());       // when the current decision went on the board
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -604,7 +606,7 @@ export function GameScreen(p: Props) {
   } else if ((phase === 'deciding' && dec && isToss(dec.step)) || phase === 'coin') {
     side = <CoinToss s={view} teams={T} onCall={onCall} onChoose={onChoose} onContinue={() => { setPhase('auto'); proceed(); }} />;
   } else if (phase === 'deciding' && dec) {
-    side = <CallPanel dec={mainDec ?? dec} clock={mainDec && isClock ? dec : null} clockSel={clockSel} s={session.s} teams={T} selected={sel} edits={edits}
+    side = <CallPanel simple={rookie} dec={mainDec ?? dec} clock={mainDec && isClock ? dec : null} clockSel={clockSel} s={session.s} teams={T} selected={sel} edits={edits}
       scout={scoutNotes(session.s, session.log.map((l) => l.ev))} read={readChance(sc, session.s)}
       hints={isClock && !mainDec ? clockHints : hintMap} clockHints={clockHints} prev={prev} autoTempo={defaultTempo(dec)?.key}
       onClock={(o) => { setClockSel(o); setHintMap(null); }} onMajor={onSnap} onSelect={onSelect} onEdit={setEdits} onSnap={onSnap} />;
@@ -655,10 +657,10 @@ export function GameScreen(p: Props) {
           <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots} home={sc.home} look={settings.fieldLook}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
             {impact && <Impact key={impact.id} kind={impact.kind} colors={[T[0].color, T[0].color2]} onDone={() => setImpact((x) => (x?.id === impact.id ? null : x))} />}
-            {view.mo != null && <Momentum mo={view.mo} you={T[0].id} them={T[1].id} />}
+            {view.mo != null && !rookie && <Momentum mo={view.mo} you={T[0].id} them={T[1].id} />}
             {clutchNow && <div className="fchip-clutch" aria-live="polite"><i aria-hidden />Game on the line</div>}
-            {tellNow && <div className="fchip-tell" title={`What the defense shows before the snap. Your read is right about ${Math.round(readNow.p * 100)}% of the time.`}>Tell · {tellNow}</div>}
-            {phase === 'deciding' && readNow.crowd && <div className="fchip-crowd">Road crowd: harder read</div>}
+            {tellNow && !rookie && <div className="fchip-tell" title={`What the defense shows before the snap. Your read is right about ${Math.round(readNow.p * 100)}% of the time.`}>Tell · {tellNow}</div>}
+            {phase === 'deciding' && readNow.crowd && !rookie && <div className="fchip-crowd">Road crowd: harder read</div>}
             <div className="legend" aria-hidden>
               <span><i className="lg-o" />Offense: {T[view.off].name}</span>
               <span><i className="lg-d" />Defense: {T[view.off === 0 ? 1 : 0].name}</span>

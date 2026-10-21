@@ -159,6 +159,7 @@ export function SettingsModal({ store, update, onClose, onAccount }: { store: St
           </select>
         </label>
         <label className="check"><input type="checkbox" checked={st.autoNext !== false} onChange={(e) => set('autoNext', e.target.checked)} /> Go on to the next play by itself (tap the result to pause)</label>
+        <label className="check"><input type="checkbox" checked={st.simple === true} onChange={(e) => update((x) => { x.settings.simple = e.target.checked; x.settings.simpleChosen = true; })} /> Rookie playbook: six plays, four defenses, the extras hidden</label>
         <label className="check"><input type="checkbox" checked={st.hints} onChange={(e) => set('hints', e.target.checked)} /> Coach mode in Practice (show win chances before you call)</label>
         <label className="check"><input type="checkbox" checked={st.sound !== false} onChange={(e) => set('sound', e.target.checked)} /> Sound effects</label>
         <label className="check"><input type="checkbox" checked={st.music !== false} onChange={(e) => set('music', e.target.checked)} /> Background music</label>
