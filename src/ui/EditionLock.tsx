@@ -15,6 +15,7 @@ export function EditionLock({ title, blurb, points }: { title: string; blurb: st
 
 /** Everything the edition holds, for any lock that wants the full list. */
 export const EDITION_POINTS = [
+  'No ads, anywhere in the game',
   'Career Legacy: retirement, the Hall of Fame vote, the record book and the league’s history',
   'Three career slots',
   'The Gridiron Challenge ladder: eight original spots, three stars each',

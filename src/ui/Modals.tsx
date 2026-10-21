@@ -188,6 +188,7 @@ function AccountsPrivacy() {
         <li>Purchases are paid on Stripe’s own checkout page. We never see or store card details. We keep a record of each purchase (product, amount, date, Stripe’s reference numbers and whether it was refunded or disputed) and what it unlocks. Stripe keeps its own records under its own privacy policy.</li>
         <li>Deleting your account (Account → Delete) removes your email address, sessions, sign-in requests and what you own. Purchase records are kept without your email, for refunds, disputes and accounting.</li>
         <li>Game progress stays in your browser either way: an account restores a purchase on another device, not your saved games.</li>
+        <li>The Coach’s Edition is a one-time purchase for one account, delivered instantly. Refunds aren’t owed on a digital purchase, but one purchase per account is refunded on request within 14 days through Help &amp; refunds; a purchase after a refund is final. A chargeback removes the edition and closes purchases for that account. The full <a href="/terms/">terms</a> are short.</li>
       </ul>
     </>
   );

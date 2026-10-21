@@ -71,7 +71,7 @@
         // sign-in emails through Resend: the key is a secret (wrangler secret put RESEND_API_KEY --env staging); the
         // sender must be an address on a domain verified in Resend
         "MAIL_MODE": "resend",
-        "MAIL_FROM": "The 4th Call <signin@nfl-2min-drill.com>",
+        "MAIL_FROM": "The 4th Call <login@nfl-2min-drill.com>",
         "PAYMENTS": "on"
       }
     }

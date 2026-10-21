@@ -10,7 +10,7 @@ import { fetchMe, sendSupport, type SupportKind } from '../game/account';
 import { EDITION_NAME } from '../game/edition';
 
 const KINDS: { id: SupportKind; label: string; hint: string }[] = [
-  { id: 'refund', label: 'Refund request', hint: `Tell us the email you bought the ${EDITION_NAME} with and roughly when. Refunds are issued through Stripe to the card you paid with.` },
+  { id: 'refund', label: 'Refund request', hint: `Tell us the email you bought the ${EDITION_NAME} with and roughly when. One refund per account, within 14 days of the purchase; it goes back to the card you paid with, through Stripe.` },
   { id: 'bug', label: 'Something is broken', hint: 'What you did, what you expected, what happened instead. Phone or computer, and which browser, if you know.' },
   { id: 'account', label: 'Account or sign-in problem', hint: 'The email you use to sign in and what goes wrong (no code arrives, a purchase is missing on another device, and so on).' },
   { id: 'other', label: 'Something else', hint: 'Questions, ideas, anything.' },

@@ -1,10 +1,12 @@
 /**
  * One display ad, outside the game. It renders nothing unless an approved ad unit is configured (AD_UNIT, see
- * src/game/site.ts), and nothing while a game is on screen, so no ad sits near the play-calling controls. The label only
- * shows once AdSense has filled the slot, so a blocked or unfilled slot leaves nothing behind.
+ * src/game/site.ts), nothing while a game is on screen, so no ad sits near the play-calling controls, and nothing for
+ * an owner of the Coach's Edition (no ads is part of what it buys). The label only shows once AdSense has filled the
+ * slot, so a blocked or unfilled slot leaves nothing behind.
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import { AD_UNIT } from '../game/site';
+import { ownsEdition } from '../game/edition';
 
 declare global { interface Window { adsbygoogle?: unknown[] } }
 
@@ -17,7 +19,7 @@ export const useGameOnScreen = () => useSyncExternalStore(subscribe, () => games
 
 export function AdSlot() {
   const playing = useGameOnScreen();
-  if (!AD_UNIT || playing) return null;
+  if (!AD_UNIT || playing || ownsEdition()) return null;
   return <AdUnit client={AD_UNIT.client} slot={AD_UNIT.slot} />;
 }
 

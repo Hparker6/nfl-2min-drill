@@ -135,6 +135,7 @@ export default function App() {
           <a href="/leaderboard/">Leaderboard</a>
           <a href="/stats/">Stats</a>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
+          <a href="/terms/">Terms</a>
           {accountsShown() && <button onClick={() => setModal('support')}>Help &amp; refunds</button>}
           {FEEDBACK_URL && <a href={FEEDBACK_URL} target="_blank" rel="noopener">Feedback</a>}
           {SUPPORT_URL && <a href={SUPPORT_URL} target="_blank" rel="noopener">Support the developer</a>}

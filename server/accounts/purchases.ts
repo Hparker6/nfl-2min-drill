@@ -29,12 +29,22 @@ export async function entitlementsOf(db: D1Database, userId: string): Promise<st
   return r.results.map((x) => x.product);
 }
 
+/** Shown on Stripe's checkout page above the pay button (Stripe caps it at 1200 characters). The full terms are at /terms/. */
+export const TERMS_TEXT = 'One-time purchase of the Coach’s Edition for this account; no subscription. Delivered instantly, so refunds aren’t owed, but we’ll refund one purchase per account on request within 14 days: use Help & refunds in the game rather than your bank. Terms: nfl-2min-drill.com/terms';
+export const TERMS_TEXT_FINAL = 'One-time purchase of the Coach’s Edition for this account; no subscription. This account has had a refund before, so this purchase is final: no refund. Terms: nfl-2min-drill.com/terms';
+
 /** Start a checkout for the signed-in user (409 when they already own it). The price is ours, fixed on the server. */
 export async function createCheckout(db: D1Database, pay: PaymentsConfig, origin: string, s: Session, now: number, f: typeof fetch): Promise<Response> {
   if (!(await hit(db, LIMITS.checkoutPerUser, s.userId, now))) return fail(429, 'Too many checkout attempts. Try again later.');
   if ((await entitlementsOf(db, s.userId)).includes(PRODUCT.id)) return fail(409, 'You already own the Coach’s Edition.');
+  // the past with this account: a chargeback closes the door (the card's bank already called it fraud once, and
+  // another one costs more than the sale); a refund leaves it open, with the next purchase final (the terms say so)
+  const past = await db.prepare("SELECT SUM(status = 'dispute_lost') AS lost, SUM(status IN ('refunded', 'partially_refunded')) AS refunds FROM purchases WHERE user_id = ?")
+    .bind(s.userId).first<{ lost: number | null; refunds: number | null }>();
+  if (past?.lost) { audit('checkout.refused', { why: 'chargeback' }); return fail(403, 'Purchases aren’t available for this account. Use Help & refunds if you think that’s wrong.'); }
+  const again = !!past?.refunds;
   const cust = await db.prepare('SELECT stripe_customer_id FROM stripe_customers WHERE user_id = ?').bind(s.userId).first<{ stripe_customer_id: string }>();
-  const meta = { user_id: s.userId, product: PRODUCT.id };
+  const meta = { user_id: s.userId, product: PRODUCT.id, ...(again ? { final: '1' } : {}) };
   const stripe = stripeClient(pay.secretKey, f);
   const cs = await stripe.post<{ id: string; url: string }>('/v1/checkout/sessions', {
     mode: 'payment',
@@ -44,9 +54,11 @@ export async function createCheckout(db: D1Database, pay: PaymentsConfig, origin
     ...(cust ? { customer: cust.stripe_customer_id } : { customer_email: s.email, customer_creation: 'always' }),
     metadata: meta,
     payment_intent_data: { metadata: meta },
+    // the terms, where the buyer sees them before paying (a dispute asks whether they could)
+    custom_text: { submit: { message: again ? TERMS_TEXT_FINAL : TERMS_TEXT } },
     success_url: `${origin}/#purchase={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/#account`,
-  }, `checkout:${s.userId}:${cust ? 'c' : 'e'}:${Math.floor(now / 60_000)}`);
+  }, `checkout:${s.userId}:${cust ? 'c' : 'e'}:${again ? 'f' : 'n'}:${Math.floor(now / 60_000)}`);
   if (!cs?.url || !/^https:\/\/checkout\.stripe\.com\//.test(cs.url)) return fail(502, 'Checkout could not be started.');
   return json({ url: cs.url });
 }
@@ -72,6 +84,8 @@ interface CheckoutSession {
 }
 interface Charge { id: string; payment_intent: string | null; amount: number; amount_refunded: number; refunded: boolean }
 interface Dispute { id: string; payment_intent: string | null; charge: string; status: string }
+/** Radar's early fraud warning: the card's bank says the charge is likely fraud, usually days before a chargeback. */
+interface FraudWarning { id: string; payment_intent: string | null; charge: string; actionable: boolean; fraud_type: string }
 
 /** Why an event changed nothing, or what it did (kept with the event's id). */
 type Outcome = string;
@@ -158,6 +172,25 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
       if (d.status.startsWith('warning_')) return { stmts: [], outcome: `ignored: inquiry ${d.status}` };
       const status: PurchaseStatus = d.status === 'won' ? 'dispute_won' : d.status === 'lost' ? 'dispute_lost' : d.status === 'charge_refunded' ? 'refunded' : 'disputed';
       return { stmts: setStatus(db, p.id, p.status, status, now, `dispute ${d.status}`), outcome: status, guard: { id: p.id, status } };
+    }
+    case 'radar.early_fraud_warning.created': {
+      // the bank is about to charge it back ($15 on top of the sale): refund it first, which costs the sale alone,
+      // and take the edition away. A buyer can't trigger one of these; only the card's bank can.
+      const w = await stripe.get<FraudWarning>(`/v1/radar/early_fraud_warnings/${encodeURIComponent(ev.data.object.id)}`);
+      const p = await purchaseByIntent(db, w.payment_intent, ev, now);
+      if (!w.actionable) return { stmts: [], outcome: 'ignored: fraud warning not actionable (already refunded or disputed)' };
+      if (p.status !== 'paid' && p.status !== 'partially_refunded') return { stmts: [], outcome: `ignored: fraud warning on a ${p.status} purchase` };
+      try {
+        await stripe.post('/v1/refunds', { payment_intent: w.payment_intent!, reason: 'fraudulent', metadata: { why: 'early_fraud_warning', warning: w.id } }, `efw:${ev.id}`);
+      } catch (e) {
+        const st = (e as StripeError)?.status;
+        if (st >= 500 || st === 429) throw new RetryLater('refund not accepted yet');
+        // Stripe refused (already refunded, or the charge is under dispute): the matching event changes the status
+        audit('webhook.fraud_warning', { refunded: false, status: st });
+        return { stmts: [], outcome: `fraud warning: refund refused (${st})` };
+      }
+      audit('webhook.fraud_warning', { refunded: true, type: w.fraud_type });
+      return { stmts: setStatus(db, p.id, p.status, 'refunded', now, 'refunded on a fraud warning'), outcome: 'refunded: fraud warning', guard: { id: p.id, status: 'refunded' } };
     }
     default:
       return { stmts: [], outcome: 'ignored: not handled' };

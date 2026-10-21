@@ -70,7 +70,34 @@ Goal: the same checks passing on a real Worker, a real D1 and real email, with S
 - [ ] Check the staging Worker's logs (`npx wrangler tail --env staging`) during the run: no addresses, links, codes
       or keys should ever appear, only HTTP statuses.
 
+## Stage 2b: walk through it yourself on staging (20 minutes, before activating Stripe live)
+
+Everything below is on https://nfl-2min-drill-staging.houston-parker.workers.dev with Stripe's test card
+`4242 4242 4242 4242`, any future date, any CVC, any ZIP. Nothing here costs money. Do it on a phone at least once.
+
+- [ ] **Sign in** with an email you can read: the email arrives from `The 4th Call <login@nfl-2min-drill.com>`, the link
+      and the 6-digit code both work, and the Account panel shows the benefits list and the terms line.
+- [ ] **Buy it**: the Stripe page shows the terms text above the pay button, the card works, you land back in the game
+      with "Payment confirmed", and after "Unlock it now" the Coach's Edition features open and the ad slot is gone.
+- [ ] **Second device**: sign in with the same email elsewhere (another browser is fine): it's owned there too.
+- [ ] **Refund from the dashboard**: Stripe (sandbox) → Payments → the charge → Refund. Within a minute, reopen Account:
+      "not owned", and the ad slot is back. Buy again: the Stripe page now says this purchase is final.
+- [ ] **The support form** (footer → Help & refunds): send a refund request while signed in. Your inbox (SUPPORT_TO) gets
+      it with the reference, the purchase state and "refunds before: 1".
+- [ ] **A fraud warning** (optional, needs the Stripe CLI): `stripe trigger radar.early_fraud_warning.created` against
+      the staging webhook refunds and revokes a paid purchase on its own; `wrangler tail --env staging` shows
+      `webhook.fraud_warning refunded=true` and no email address.
+- [ ] **Delete the account** (Account → Delete): the edition is gone with it; a new sign-in with the same email starts fresh.
+- [ ] Note anything that confused you for even a second: it will confuse a buyer, and confused buyers ask for refunds.
+
 ## Stage 3: live (real money; only after the reviews)
+
+- [ ] **Stripe, live mode, before the first sale** (dashboard, your side): statement descriptor `THE 4TH CALL` (Settings →
+      Business → Public details), the Radar rule "Request 3D Secure if 3DS is recommended by Radar" turned on, customer
+      receipts on for successful payments and refunds (Settings → Emails), and the live webhook endpoint subscribed to
+      the same events as staging **plus `radar.early_fraud_warning.created`** (the auto-refund on a bank's fraud warning).
+      Optional: Terms of service URL `https://nfl-2min-drill.com/terms/` under Public details, which lets Checkout show
+      an "I agree" box as well as the terms text it already shows.
 
 Each item here is an owner decision or an external approval, not a code task, except the last two.
 

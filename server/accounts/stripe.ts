@@ -43,7 +43,7 @@ export class StripeError extends Error { constructor(public status: number, mess
 
 export function stripeClient(key: string, f: typeof fetch) {
   const call = async <T>(method: 'GET' | 'POST', path: string, form?: Form, idem?: string): Promise<T> => {
-    if (!/^\/v1\/(checkout\/sessions|charges|disputes)(\/[A-Za-z0-9_]{1,130})?$/.test(path)) throw new StripeError(0, 'path not allowed');
+    if (!/^\/v1\/(checkout\/sessions|charges|disputes|refunds|radar\/early_fraud_warnings)(\/[A-Za-z0-9_]{1,130})?$/.test(path)) throw new StripeError(0, 'path not allowed');
     const headers: Record<string, string> = { authorization: `Bearer ${key}`, 'stripe-version': '2024-06-20' };
     if (form) headers['content-type'] = 'application/x-www-form-urlencoded';
     if (idem) headers['idempotency-key'] = idem;

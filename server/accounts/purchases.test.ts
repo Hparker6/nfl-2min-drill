@@ -28,6 +28,7 @@ function fakeStripe() {
       const id = `cs_test_session${++n}abcdef`;
       return Response.json({ id, url: `https://checkout.stripe.com/c/pay/${id}` });
     }
+    if (method === 'POST' && path === '/v1/refunds') return Response.json({ id: `re_test_${++n}`, status: 'succeeded' });
     const id = decodeURIComponent(path.split('/').pop()!);
     const o = objects.get(id);
     return o ? Response.json(o) : Response.json({ error: { message: 'No such object' } }, { status: 404 });
@@ -251,6 +252,79 @@ describe('refunds and disputes', () => {
   it('unknown event types are acknowledged and ignored', async () => {
     const { env, stripe } = world();
     expect((await webhook(env, stripe.fetch, 'customer.created', 'cus_1', T0)).body).toMatchObject({ outcome: 'ignored: not handled' });
+  });
+
+  const warning = (o: Record<string, unknown> = {}) => ({ id: 'issfr_1', payment_intent: 'pi_test_1', charge: 'ch_1', actionable: true, fraud_type: 'made_with_stolen_card', ...o });
+
+  it('an early fraud warning refunds the purchase at once (before the chargeback) and revokes it', async () => {
+    const a = await bought();
+    a.stripe.objects.set('issfr_1', warning());
+    const w = await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_1', T0 + MIN, { id: 'evt_efw' });
+    expect(w.body).toMatchObject({ received: true, outcome: 'refunded: fraud warning' });
+    expect([a.status(), await a.owns()]).toEqual(['refunded', []]);
+    const refund = a.stripe.calls.find((c) => c.method === 'POST' && c.url.endsWith('/v1/refunds'))!;
+    expect(refund.body).toContain('payment_intent=pi_test_1');
+    expect(refund.body).toContain('reason=fraudulent');
+    expect(refund.headers['idempotency-key']).toBe('efw:evt_efw');
+    // the same warning again: nothing more is refunded
+    const again = await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_1', T0 + 2 * MIN, { id: 'evt_efw' });
+    expect(again.body).toEqual({ received: true, duplicate: true });
+    expect(a.stripe.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/v1/refunds'))).toHaveLength(1);
+    // Stripe's own charge.refunded follows: the purchase is already where it should be
+    a.stripe.objects.set('ch_1', { id: 'ch_1', payment_intent: 'pi_test_1', amount: 499, amount_refunded: 499, refunded: true });
+    const r = await webhook(a.env, a.stripe.fetch, 'charge.refunded', 'ch_1', T0 + 3 * MIN);
+    expect(r.body).toMatchObject({ outcome: 'refunded' });
+    expect([a.status(), await a.owns()]).toEqual(['refunded', []]);
+  });
+
+  it('a warning that isn’t actionable, or about a purchase already refunded or disputed, refunds nothing', async () => {
+    const a = await bought();
+    a.stripe.objects.set('issfr_1', warning({ actionable: false }));
+    expect((await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_1', T0)).body.outcome).toMatch(/^ignored: fraud warning not actionable/);
+    expect([a.status(), await a.owns()]).toEqual(['paid', ['coach_edition']]);
+    a.stripe.objects.set('dp_1', { id: 'dp_1', payment_intent: 'pi_test_1', charge: 'ch_1', status: 'needs_response' });
+    await webhook(a.env, a.stripe.fetch, 'charge.dispute.created', 'dp_1', T0 + MIN);
+    a.stripe.objects.set('issfr_2', warning({ id: 'issfr_2' }));
+    expect((await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_2', T0 + 2 * MIN)).body.outcome).toBe('ignored: fraud warning on a disputed purchase');
+    expect(a.stripe.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/v1/refunds'))).toHaveLength(0);
+  });
+
+  it('a refund Stripe refuses changes nothing; Stripe being down means try again later', async () => {
+    const a = await bought();
+    a.stripe.objects.set('issfr_1', warning());
+    const refusing = (async (input: RequestInfo | URL, init?: RequestInit) => (init?.method === 'POST' && String(input).endsWith('/v1/refunds') ? Response.json({ error: { message: 'Charge has already been refunded.' } }, { status: 400 }) : a.stripe.fetch(input, init))) as typeof fetch;
+    expect((await webhook(a.env, refusing, 'radar.early_fraud_warning.created', 'issfr_1', T0)).body.outcome).toBe('fraud warning: refund refused (400)');
+    expect([a.status(), await a.owns()]).toEqual(['paid', ['coach_edition']]);
+    const down = (async (input: RequestInfo | URL, init?: RequestInit) => (init?.method === 'POST' && String(input).endsWith('/v1/refunds') ? Response.json({}, { status: 503 }) : a.stripe.fetch(input, init))) as typeof fetch;
+    expect((await webhook(a.env, down, 'radar.early_fraud_warning.created', 'issfr_1', T0 + MIN, { id: 'evt_later' })).status).toBe(503);
+    expect(a.env.DB.raw.prepare('SELECT COUNT(*) AS n FROM webhook_events WHERE event_id = ?').get('evt_later')).toEqual({ n: 0 });
+  });
+
+  it('the checkout page carries the terms; after a refund the next purchase is marked final; after a chargeback the door is closed', async () => {
+    const w = world();
+    const cookie = await signInAs(w.env, 'pat@example.com', w.at(T0), w.box);
+    expect((await call(w.env, '/v1/checkout', { body: {}, cookie }, w.at(T0))).status).toBe(200);
+    w.stripe.objects.set('cs_test_paid0001abcdef', session(w.idOf('pat@example.com')));
+    await webhook(w.env, w.stripe.fetch, 'checkout.session.completed', 'cs_test_paid0001abcdef', T0);
+    const a = { ...w, cookie, status: () => (w.env.DB.raw.prepare('SELECT status FROM purchases').get() as { status: string }).status };
+    const first = a.stripe.calls.find((c) => c.method === 'POST' && c.url.endsWith('/v1/checkout/sessions'))!;
+    expect(decodeURIComponent(first.body)).toContain('custom_text[submit][message]=One-time purchase');
+    expect(decodeURIComponent(first.body)).toContain('one purchase per account');
+    expect(first.body).not.toContain('final');
+    a.stripe.objects.set('ch_1', { id: 'ch_1', payment_intent: 'pi_test_1', amount: 499, amount_refunded: 499, refunded: true });
+    await webhook(a.env, a.stripe.fetch, 'charge.refunded', 'ch_1', T0 + MIN);
+    const again = await call(a.env, '/v1/checkout', { body: {}, cookie: a.cookie }, a.at(T0 + 2 * MIN));
+    expect(again.status).toBe(200);
+    const second = a.stripe.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/v1/checkout/sessions')).pop()!;
+    expect(decodeURIComponent(second.body)).toContain('metadata[final]=1');
+    expect(decodeURIComponent(second.body)).toContain('this purchase is final');
+    // a chargeback lost
+    a.stripe.objects.set('dp_1', { id: 'dp_1', payment_intent: 'pi_test_1', charge: 'ch_1', status: 'lost' });
+    a.env.DB.raw.prepare("UPDATE purchases SET status = 'paid'").run();   // the refund above would otherwise shadow the dispute
+    await webhook(a.env, a.stripe.fetch, 'charge.dispute.closed', 'dp_1', T0 + 3 * MIN);
+    expect(a.status()).toBe('dispute_lost');
+    const closed = await call(a.env, '/v1/checkout', { body: {}, cookie: a.cookie }, a.at(T0 + 4 * MIN));
+    expect(closed.status).toBe(403);
   });
 
   it('ownership follows the purchase state', () => {

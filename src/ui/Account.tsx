@@ -10,6 +10,7 @@ import {
   checkoutStatus, COACH_EDITION, deleteAccount, fetchMe, requestSignIn, signOut, startCheckout, verify, type Me,
 } from '../game/account';
 import { EDITION_NAME, EDITION_PRICE } from '../game/edition';
+import { EDITION_POINTS } from './EditionLock';
 
 /** What the address bar brought: a sign-in link's token, a checkout to confirm, or a return from a cancelled checkout. Read once, then cleared. */
 export function takeAccountHash(): { token?: string; purchase?: string } | null {
@@ -131,7 +132,9 @@ function SignedIn({ me, busy, setBusy, setMsg, refresh, onClose }: {
     <div className="acct-form">
       <p>Signed in as <b>{me.email}</b>.</p>
       <p>{EDITION_NAME}: {owns ? <b className="acct-ok">owned</b> : 'not owned'}</p>
+      {!owns && me.payments !== 'off' && <ul className="ed-points">{EDITION_POINTS.map((p) => <li key={p}>{p}</li>)}</ul>}
       {!owns && me.payments === 'test' && <button className="btn primary" disabled={busy} onClick={buy}>Buy the {EDITION_NAME}: {EDITION_PRICE} (test mode)</button>}
+      {!owns && me.payments !== 'off' && <p className="muted small">One-time purchase for this account, no subscription. Delivered instantly; one refund per account within 14 days on request. <a href="/terms/">Terms</a>.</p>}
       {!owns && me.payments === 'off' && <p className="muted small">Purchases aren’t open.</p>}
       <p className="muted small">Bought it on another device? Signing in with the same email restores it here.</p>
       <div className="row">
