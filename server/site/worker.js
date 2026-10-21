@@ -15,19 +15,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import PCT from '../../src/data/percentiles.json';
 import { rivalsFor } from '../../src/game/rivals.ts';
+// names, callers and the possible-score check live in their own module (a Worker module exports only handlers and classes)
+import { callerOf, cleanName, possible } from './board.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'" },
 });
 
-// names are public on the board: letters, digits and a little punctuation, 20 characters, no obvious abuse
-const BLOCK = /\b(fuck\w*|shit\w*|cunt\w*|nigg\w*|fag\w*|bitch\w*|whore\w*|slut\w*|rape\w*|rapist|nazi\w*|hitler|porn\w*|dick|dicks|cock|cocks|pussy|asshole\w*|retard\w*)\b/i;
-function cleanName(s) {
-  const n = String(s ?? '').normalize('NFKC').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
-  if (!n) return 'Anonymous';
-  return BLOCK.test(n) ? 'Coach' : n;
-}
 
 
 /** One day's scores. */
@@ -98,6 +93,11 @@ async function api(request, env, url) {
   const board = env.DAY_BOARD.get(env.DAY_BOARD.idFromName(day));
   if (request.method === 'GET' && !m[2]) return json(await board.summary(day, url.searchParams.get('token')));
   if (request.method === 'POST' && m[2]) {
+    // from our own pages only, as JSON: another site can't post for its visitors (a JSON post from elsewhere needs a
+    // CORS preflight, which this Worker never answers)
+    const origin = request.headers.get('origin');
+    if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return json({ error: 'bad request' }, 415);
+    if (origin !== url.origin && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin ?? '')) return json({ error: 'forbidden' }, 403);
     // only today and yesterday (UTC) take scores, so old days stay fixed
     const now = Date.now(), dayMs = Date.parse(day + 'T00:00:00Z');
     if (!(now - dayMs < 2 * 864e5 && now - dayMs > -864e5)) return json({ error: 'day closed' }, 400);
@@ -106,15 +106,17 @@ async function api(request, env, url) {
     if (raw.length > 2048) return json({ error: 'too large' }, 413);
     let body;
     try { body = JSON.parse(raw); } catch { return json({ error: 'bad json' }, 400); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'bad json' }, 400);
     const token = String(body.token || '').slice(0, 64);
     const score = Number(body.score);
-    if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100) return json({ error: 'bad score' }, 400);
+    if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100 || !possible(Math.round(score), !!body.win)) return json({ error: 'bad score' }, 400);
     // the address only counts posts, and only as a salted hash: no IP is stored
-    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const ip = callerOf(request.headers.get('cf-connecting-ip') || 'unknown');
     const addr = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(day + ':' + ip)))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
     const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win }, addr);
     if (!sum) return json({ error: 'too many scores from this address today' }, 429);
-    await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum);
+    try { await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum); }
+    catch (e) { console.error(JSON.stringify({ audit: 'stats.update_failed', day, error: String(e?.message ?? e).slice(0, 120) })); }
     return json(sum);
   }
   return json({ error: 'method' }, 405);
