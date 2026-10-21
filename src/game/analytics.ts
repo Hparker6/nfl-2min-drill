@@ -58,10 +58,19 @@ export function leaveOnce(send: () => void) {
 
 export function initAnalytics() {
   if (!GA_ID || typeof document === 'undefined' || window.gtag || !analyticsAllowed(location.hostname)) return;
-  const s = document.createElement('script');
-  s.async = true;
-  s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
-  document.head.appendChild(s);
+  // the tag (177 KB) waits for the first tap or key, or 3.5 s, whichever comes first, so it never competes with the
+  // first screen; everything sent before then waits in the queue below and goes out when it loads
+  let loaded = false;
+  const load = () => {
+    if (loaded) return;
+    loaded = true;
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
+    document.head.appendChild(s);
+  };
+  for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, load, { once: true, passive: true });
+  setTimeout(load, 3500);
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() {
     // eslint-disable-next-line prefer-rest-params

@@ -348,7 +348,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .rv-calls li { border-left: 3px solid var(--gc); background: var(--panel-2); border-radius: 6px; }
 .rv-calls summary { display: grid; grid-template-columns: 20px 40px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 10px; cursor: pointer; list-style: none; font-size: 14px; }
 .rv-calls summary::-webkit-details-marker { display: none; }
-.rv-t { font: 600 14px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
+.rv-t { font: 700 14px var(--display); color: var(--muted); font-variant-numeric: tabular-nums; }
 .rv-call { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .rv-best { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .rv-best em { font-style: normal; color: var(--gc); font-weight: 600; }
@@ -361,7 +361,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .summary h2 { font-size: 30px; text-transform: uppercase; }
 .sum-spots { display: grid; gap: 6px; }
 .sum-spot { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 10px; background: var(--panel-2); border-radius: var(--r-sm); }
-.sum-score { font: 600 18px var(--display); letter-spacing: .02em; }
+.sum-score { font: 700 18px var(--display); letter-spacing: .02em; }
 .sum-grades { display: flex; gap: 6px; }
 .gcount { font: 700 14px var(--display); padding: 2px 8px; border-radius: 5px; background: color-mix(in srgb, var(--gc) 22%, transparent); color: var(--gc); }
 .arch { display: grid; gap: 2px; padding: 14px 16px; border-radius: var(--r-sm); background: var(--panel-2); border-left: 4px solid var(--accent); }
@@ -376,7 +376,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .pbp ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; max-height: 240px; overflow: auto; font-size: 13px; }
 .pbp li { padding: 5px 0; border-bottom: 1px solid var(--line); color: var(--ink-2); }
 .pbp li.tone-good { color: var(--good); } .pbp li.tone-bad { color: var(--bad); }
-.pbp-t { font: 600 13px var(--display); color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.pbp-t { font: 700 13px var(--display); color: var(--muted); margin-right: 6px; font-variant-numeric: tabular-nums; }
 
 /* ---------- forms ---------- */
 .form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
