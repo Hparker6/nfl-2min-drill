@@ -122,7 +122,7 @@ export default function App() {
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M5 20V11M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" /></svg>
             </button>
             <button className="icon" onClick={() => setModal('settings')} aria-label="Settings" title="Settings">
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M10.3 2.5h3.4l.5 2.4a7.6 7.6 0 0 1 1.9 1.1l2.3-.8 1.7 2.9-1.8 1.6a7.7 7.7 0 0 1 0 2.2l1.8 1.6-1.7 2.9-2.3-.8a7.6 7.6 0 0 1-1.9 1.1l-.5 2.4h-3.4l-.5-2.4a7.6 7.6 0 0 1-1.9-1.1l-2.3.8-1.7-2.9 1.8-1.6a7.7 7.7 0 0 1 0-2.2L4 8.1l1.7-2.9 2.3.8a7.6 7.6 0 0 1 1.9-1.1z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" fill="none" /></svg>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M10.73 4.71 L11.02 2.45 L12.98 2.45 L13.27 4.71 L16.26 5.95 L18.06 4.56 L19.44 5.94 L18.05 7.74 L19.29 10.73 L21.55 11.02 L21.55 12.98 L19.29 13.27 L18.05 16.26 L19.44 18.06 L18.06 19.44 L16.26 18.05 L13.27 19.29 L12.98 21.55 L11.02 21.55 L10.73 19.29 L7.74 18.05 L5.94 19.44 L4.56 18.06 L5.95 16.26 L4.71 13.27 L2.45 12.98 L2.45 11.02 L4.71 10.73 L5.95 7.74 L4.56 5.94 L5.94 4.56 L7.74 5.95Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" fill="none" /></svg>
             </button>
           </div>
         </div>
