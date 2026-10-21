@@ -103,14 +103,14 @@ function ConfirmPurchase({ sessionId, onOwned }: { sessionId: string; onOwned: (
       const s = await checkoutStatus(sessionId);
       if (stop) return;
       if (s === 'unreachable') { if (++misses.current >= 3) { setState('unreachable'); return; } }
-      else if (s?.owns) { setState('owned'); onOwned(); return; }
+      else if (s?.owns) { setState('owned'); onOwned(); setTimeout(() => location.reload(), 1600); return; }   // the edition unlocks by itself
       if (++tries.current >= 15) { setState('waiting'); return; }
       setTimeout(tick, 2000);
     };
     tick();
     return () => { stop = true; };
   }, [sessionId]);   // eslint-disable-line react-hooks/exhaustive-deps
-  if (state === 'owned') return <p className="acct-ok">Payment confirmed: the {EDITION_NAME} is yours. <button className="btn small" onClick={() => location.reload()}>Unlock it now</button></p>;
+  if (state === 'owned') return <p className="acct-ok">Payment confirmed: the {EDITION_NAME} is yours. Unlocking…</p>;
   if (state === 'waiting') return <p className="muted">Stripe hasn’t confirmed the payment yet. That can take a few minutes; reopen Account to check again. If you were charged and it still isn’t here after that, use <b>Help &amp; refunds</b> and quote <code>{sessionId.slice(-8)}</code>: nothing is lost, the purchase is on record with Stripe.</p>;
   if (state === 'unreachable') return <p className="acct-err" role="alert">The account server isn’t answering, so the payment can’t be confirmed right now. Your payment is safe with Stripe; reopen Account in a minute to check again.</p>;
   return <p className="muted">Confirming your payment with Stripe…</p>;
