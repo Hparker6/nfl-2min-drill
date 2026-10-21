@@ -110,15 +110,47 @@ Looking at records: `npx wrangler d1 execute DB --local --env dev --command "SEL
 - The branch's commit `c76f508` reverted the homepage `<title>` to the pre-SEO one. The owner knows; decide before
   this branch ever merges (it resets the SEO measurement window described in `marketing/GOOGLE_SEO_MEASUREMENT.md`).
 
-## 5. Next, in order
+## 5. What's left before the $4.99 goes live (updated 2026-10-21)
 
-1. Finish SETUP.md §5 checks 4, 7–14 locally and record them in LAUNCH_TODO.md (stage 1).
-2. Stage 2 (staging on Cloudflare): verify `nfl-2min-drill.com` in Resend (DNS from Resend's dashboard), apply the
-   migrations to the real D1 (`--env staging --remote`), deploy staging once to learn its URL, put that URL in
-   `SITE_ORIGIN`, set the five secrets with `wrangler secret put … --env staging`, add a Stripe test webhook endpoint
-   for `https://<staging>/v1/stripe/webhook`, set `PAYMENTS` on, redeploy, repeat the 14 checks there.
-3. Stage 3 (live) is the owner's: legal review, tax/merchant of record, Stripe live activation, production D1 and
-   secrets, the reviewed commit that adds production bindings and flips `LIVE_PAYMENTS_ALLOWED`, then the merge.
+Stages 1 (local sandbox) and 2 (staging) are done: on staging, sign-in email from `login@nfl-2min-drill.com`, a test
+purchase, auto-unlock, and a refund that revoked it automatically all work. What remains, in order:
+
+**The owner's (blocked on an EIN: do the Stripe part at home)**
+1. [ ] **Get the EIN**, then **activate Stripe live** (business details, bank account, identity). In the live dashboard:
+   - [ ] Product "The 4th Call: Coach's Edition", **one-time, $4.99 USD**. Send Claude its **price ID** (`price_…`, not a secret).
+   - [ ] Statement descriptor **`THE 4TH CALL`** (Settings → Business → Public details), so buyers recognize the charge.
+   - [ ] Radar rule **"Request 3D Secure if 3DS is recommended by Radar"** on.
+   - [ ] Customer receipts on for successful payments and refunds (Settings → Emails).
+   - [ ] Optional: switch off "buy now, pay later" methods (Settings → Payment methods). The code already allows cards only.
+   - The live **secret key** and **webhook secret** never go in a chat: paste them at `npx wrangler secret put …` prompts.
+2. [ ] **Turnstile widget** for `nfl-2min-drill.com` (Cloudflare dashboard → Turnstile → Add widget, mode Managed). Send
+   Claude the **site key** (public); keep the secret for `npx wrangler secret put TURNSTILE_SECRET`.
+3. [ ] **Delete the old Resend key** `re_BHVK…` (Resend → API Keys). The newer key is the one staging uses.
+4. [ ] **Finish the staging walkthrough** (LAUNCH_TODO.md stage 2b): send a Help & refunds request while signed in
+   (it should reach your inbox with "refunds before: 1"), then try Account → Delete my account.
+5. [ ] Optional, not blocking: a short IP-lawyer consult once sales pass a few hundred dollars (the real NFL team and
+   player names; Career is already a fictional league).
+
+**Claude's (can start on 6–9 before the EIN; 10–11 need the live keys)**
+6. [ ] **Give the bug-sweep engine rules their own start date** after the merge day. They ride on the overtime flag
+   (`otOn`, `OT_FROM = 2026-10-21`), and production `main` doesn't have them, so merging as is would change
+   dailies people already played on the live site (saved games would replay differently). Keep the legacy digest.
+7. [ ] **Production purchase screens:** the edition gate (`src/game/edition.ts`) is staging-only by design; switch it to
+   account-based ownership in production. The Buy button only shows when `payments === 'test'` (`Account.tsx`), and
+   the panel says "Preview… test mode": show the live button and drop the preview wording when payments are live.
+   The ad slot already hides for owners once the gate reads ownership.
+8. [ ] **Production database:** create the production D1, apply migrations 0001–0004 remotely.
+9. [ ] **Production config** (one reviewed commit): top-level D1 binding, `ACCOUNTS`, `SITE_ORIGIN=https://nfl-2min-drill.com`,
+   `MAIL_MODE=resend`, `MAIL_FROM=The 4th Call <login@nfl-2min-drill.com>`, `PAYMENTS`, the real Turnstile site key in the
+   build, and `LIVE_PAYMENTS_ALLOWED` flipped. Production secrets via `npx wrangler secret put` (no `--env`):
+   `AUTH_PEPPER` (new random value), `RESEND_API_KEY`, `STRIPE_SECRET_KEY` (live), `STRIPE_PRICE_ID`,
+   `STRIPE_WEBHOOK_SECRET`, `TURNSTILE_SECRET`, `SUPPORT_TO`.
+10. [ ] **Live webhook endpoint** `https://nfl-2min-drill.com/v1/stripe/webhook`, the same events as staging plus
+    `radar.early_fraud_warning.created`. Then the pre-launch list in server/accounts/SECURITY.md.
+11. [ ] **Merge `coachs-edition` into `main`** (that deploys everything on the branch at once: purchases, the career
+    work, the tour), with the owner's go-ahead. Decide the homepage `<title>` first (section 4, last bullet).
+12. [ ] **Final check, together:** one real $4.99 purchase, confirm the edition unlocks, refund it in the Stripe
+    dashboard, confirm it's removed. Then update this file and LAUNCH_TODO.md with what's live.
 
 ## 6. Where secrets go
 
