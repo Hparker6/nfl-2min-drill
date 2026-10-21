@@ -1363,7 +1363,7 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .tour-row .link { font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } .tour-pop { animation: none; } }
 /* the end-of-game ad: below the summary and its buttons, with room between, never touching them */
-.ad-slot.ad-end:has(ins[data-ad-status="filled"]) { margin: 28px auto 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ad-slot.ad-end:has(ins[data-ad-status="filled"]) { margin: 32px auto 32px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 
 /* auto-advance: the Next play button fills as the next play comes */
 .btn.next { position: relative; overflow: hidden; }

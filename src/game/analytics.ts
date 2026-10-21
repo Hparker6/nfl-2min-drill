@@ -76,6 +76,12 @@ export function initAnalytics() {
     // eslint-disable-next-line prefer-rest-params
     window.dataLayer!.push(arguments);
   };
+  // Consent Mode: in the EEA, the UK and Switzerland nothing is stored for ads or analytics until the visitor agrees in
+  // Google's consent message (AdSense → Privacy & messaging → European regulations); elsewhere the defaults stand
+  window.gtag('consent', 'default', {
+    ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied', wait_for_update: 500,
+    region: ['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE', 'IS', 'LI', 'NO', 'GB', 'CH'],
+  });
   window.gtag('js', new Date());
   window.gtag('config', GA_ID, { anonymize_ip: true, send_page_view: true });
   try {

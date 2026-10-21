@@ -31,6 +31,14 @@ use `public/ads.js` (their CSP allows no inline script). On `coachs-edition`, ow
 browser never loads the script. Next revenue step (owner): apply for AdSense's H5 Games Ads for rewarded ads ("watch
 an ad to continue your Survivor run").
 
+**Final sweep of `live-ads` (2026-10-22, `161f01d`):** a separate review found the new name filter turned real names
+into "Coach" (Harshita, Siriporn, Chris Luther, Josh17): fixed (whole words only), with those names as tests. Also:
+connect-src names Google's ad hosts (GA4's duplicate send stays blocked), more room around ads near buttons, Consent
+Mode defaults denied in the EEA/UK/CH. Same fixes on this branch. **Owner to-dos in AdSense:** keep Auto ads off; in
+Privacy & messaging, publish the **European regulations** message (Google requires a consent message to serve ads in
+the EEA, the UK and Switzerland). Known and left as is: posts from another site's build (an itch.io copy) are refused;
+the name filter drops some vowel signs in Devanagari/Thai names (as before).
+
 **What's left before the $4.99 sells:** section 5 below. In short: the owner gets an EIN, activates Stripe live, sets
 it up (product $4.99, descriptor THE 4TH CALL, Radar 3DS rule, receipts), creates a Turnstile widget; Claude then does
 the production config (item 9, needs the owner's explicit OK in the chat), the live webhook, the merge, and one real

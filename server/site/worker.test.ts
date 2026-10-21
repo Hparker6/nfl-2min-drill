@@ -69,11 +69,11 @@ describe('posting a score', () => {
 
 describe('names on the board', () => {
   it('keeps ordinary names, in any script', () => {
-    for (const n of ['Pat', 'Jo Ann', "D'Andre", 'Ana-María', '田中', 'Coach K', 'Dickens', 'Scunthorpe fan']) expect(cleanName(n)).toBe(n.slice(0, 20));
+    for (const n of ['Pat', 'Jo Ann', "D'Andre", 'Ana-María', '田中', 'Coach K', 'Dickens', 'Scunthorpe fan', 'Harshita', 'Akshita', 'Ishita', 'Kshitij', 'Yoshito', 'Hoshi Takeshi', 'Josh Ito', 'Siriporn', 'Thanaporn', 'Chris Luther', 'Russ Lutz', 'Ross Hitchcock', 'Wes Hitchens', 'Josh17', 'Ash17', 'Rush17', 'J. R. Smith', 'Sporn', 'Mukesh Itani']) expect(cleanName(n), n).toBe(n.slice(0, 20));
   });
   it('blanks, invisible letters and look-alike swear words become safe', () => {
     expect(cleanName('ㅤ')).toBe('Anonymous');        // U+3164, a Hangul filler that renders as nothing
     expect(cleanName('  ')).toBe('Anonymous');
-    for (const n of ['fuсk', 'f.u.c.k', 'f_u_c_k', 'sh1t', 'ꓑꓳꓣꓠ', 'SHIT', 'nazi']) expect(cleanName(n), n).toBe('Coach');
+    for (const n of ['fuсk', 'f.u.c.k', 'f_u_c_k', 'f u c k', 'ꓑꓳꓣꓠ', 'SHIT', 'nazi', 'shithead', 'Big Dick']) expect(cleanName(n), n).toBe('Coach');
   });
 });
