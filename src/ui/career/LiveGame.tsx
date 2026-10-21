@@ -114,7 +114,7 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
   const sc = useMemo(() => (view === 'play' ? momentScenario(c, liveRef.current) : null), [view]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const s = L.s;
-  const ds = drives(L.ev);
+  const ds = useMemo(() => drives(L.ev), [L.ev.length]);   // eslint-disable-line react-hooks/exhaustive-deps
   const feed = useMemo(() => {
     const out: { t: number; q: number; text: string; tone: string; key: number }[] = [];
     let q = 1;

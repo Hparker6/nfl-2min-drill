@@ -527,8 +527,9 @@ export function applySnap(s: State, res: PlayResult): boolean {
     if (!inc) s.dist -= res.yards;
   }
   if (s.down > 4) { changePoss(s, 100 - s.yl); return false; }
-  // out of bounds stops the clock only late in a half (the fourth quarter's rule for a late-game spot)
-  const late = s.t <= 120 && endOfHalf(s);
+  // out of bounds stops the clock only late in a half: the last 2:00 of the first half, and (the NFL's rule, with the
+  // finer rules) the last 5:00 of the fourth quarter. Older games use 2:00 for both.
+  const late = s.t <= (s.nr && (s.q == null || s.q === 4) ? 300 : 120) && endOfHalf(s);
   s.running = !(inc || warn || (res.oob && late));
   if (res.oob && !late) s.adj = -7;
   s.stage = 'pre';

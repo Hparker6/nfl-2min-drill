@@ -140,3 +140,17 @@ describe('when the finer rules start', () => {
     expect(NR_FROM > '2026-10-31').toBe(true);
   });
 });
+
+describe('out of bounds late in the fourth quarter', () => {
+  it('stops the clock inside 5:00 with the finer rules, and only inside 2:00 without', () => {
+    const a = spot({ t: 250 });
+    applySnap(a, res({ yards: 6, oob: true, dur: 5 }));
+    expect(a.running).toBe(false);
+    const b = spot({ t: 250 }, false);
+    applySnap(b, res({ yards: 6, oob: true, dur: 5 }));
+    expect(b.running).toBe(true);
+    const c = spot({ t: 320 });
+    applySnap(c, res({ yards: 6, oob: true, dur: 5 }));
+    expect(c.running).toBe(true);   // outside 5:00 the clock restarts
+  });
+});

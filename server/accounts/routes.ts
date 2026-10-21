@@ -16,7 +16,7 @@
  * Every POST from a browser must come from one of our origins, as JSON (http.ts checkWrite); the webhook is the
  * exception, and is authenticated by Stripe's signature instead.
  */
-import { accountsConfig, type AccountsEnv, type Config } from './config';
+import { accountsConfig, isLocal, type AccountsEnv, type Config } from './config';
 import { addressKey, checkWrite, clearSessionCookie, fail, json, readCookie, readJson, SESSION_COOKIE, sessionCookie } from './http';
 import { deleteAccount, maskEmail, normalizeEmail, startEmail, verifyCode, verifyLink, type AuthDeps, type SignedIn } from './auth';
 import { endAllSessions, endSession, readSession } from './sessions';
@@ -37,6 +37,31 @@ const offMailer: Mailer = { send: async () => false };
 export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, opts: RouteOpts = {}): Promise<Response> {
   const cfg = accountsConfig(env);
   if (!cfg) return NOT_FOUND();
+  if (isLocal(cfg.origin)) return localCookies(req, (r) => routeAccounts(r, cfg, url, opts));
+  return routeAccounts(req, cfg, url, opts);
+}
+
+/**
+ * Local development over plain http: Safari (unlike Chrome) won't keep a Secure cookie for http://localhost, and a
+ * __Host- cookie must be Secure. On a localhost origin only, the browser gets a plain dev cookie, translated to the
+ * real one on the way in and back on the way out. A deployed origin is always https (config.ts) and never gets here.
+ */
+const DEV_COOKIE = '4c_sid_dev';
+async function localCookies(req: Request, run: (r: Request) => Promise<Response>): Promise<Response> {
+  const c = req.headers.get('cookie');
+  let r = req;
+  if (c && c.includes(`${DEV_COOKIE}=`)) {
+    const h = new Headers(req.headers);
+    h.set('cookie', c.split(';').map((x) => (x.trim().startsWith(`${DEV_COOKIE}=`) ? x.replace(`${DEV_COOKIE}=`, `${SESSION_COOKIE}=`) : x)).join(';'));
+    r = new Request(req, { headers: h });
+  }
+  const res = await run(r);
+  const set = res.headers.get('set-cookie');
+  if (set && set.startsWith(`${SESSION_COOKIE}=`)) res.headers.set('set-cookie', set.replace(`${SESSION_COOKIE}=`, `${DEV_COOKIE}=`).replace('; Secure', ''));
+  return res;
+}
+
+async function routeAccounts(req: Request, cfg: Config, url: URL, opts: RouteOpts): Promise<Response> {
   const now = opts.now ?? Date.now();
   const p = url.pathname;
   try {

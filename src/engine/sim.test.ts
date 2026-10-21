@@ -51,11 +51,11 @@ describe('state transitions', () => {
     expect(s.off).toBe(1);
     expect(s.yl).toBe(100 - (40 + 20 - 5));
   });
-  it('incompletion stops the clock, out of bounds stops it only inside two minutes', () => {
+  it('incompletion stops the clock, out of bounds stops it only late (inside 5:00 of the fourth quarter)', () => {
     const a = spot({ t: 300 });
     applySnap(a, res({ kind: 'pass', complete: false }));
     expect(a.running).toBe(false);
-    const b = spot({ t: 300 });
+    const b = spot({ t: 400 });
     applySnap(b, res({ yards: 5, oob: true }));
     expect(b.running).toBe(true);
     const c = spot({ t: 90 });

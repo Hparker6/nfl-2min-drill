@@ -44,13 +44,15 @@ export default function App() {
   }, []);
   const [toastMsg, setToast] = useState<string | null>(null);
 
+  // a change runs exactly once, right away: React may run a state updater twice, and the changes here carry side
+  // effects (badges announced, analytics, the save itself), so they are applied to the latest store outside of one
+  const storeRef = useRef(store);
   const update = useCallback((fn: (s: Store) => void) => {
-    setStore((prev) => {
-      const next = structuredClone(prev);
-      fn(next);
-      saveStore(next);
-      return next;
-    });
+    const next = structuredClone(storeRef.current);
+    fn(next);
+    storeRef.current = next;
+    saveStore(next);
+    setStore(next);
   }, []);
 
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

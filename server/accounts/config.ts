@@ -62,7 +62,7 @@ export interface PaymentsConfig {
 /** The product, its price and currency. A checkout that doesn't match exactly grants nothing. */
 export const PRODUCT = { id: 'coach_edition', amount: 499, currency: 'usd' } as const;
 
-const isLocal = (o: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
+export const isLocal = (o: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o);
 
 /** The accounts config, or null when accounts are off (the routes then answer 404, as if they didn't exist). */
 export function accountsConfig(env: AccountsEnv): Config | null {
