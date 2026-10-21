@@ -85,6 +85,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
     <GameScreen
       key={sc.id}
       sc={sc}
+      tour={!store.seenTour && store.history.length === 0 ? { onDone: () => update((s) => { s.seenTour = true; }) } : undefined}
       saved={day.cur?.picks ?? []}
       settings={store.settings}
       hints={false}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { FIRST_GAME_TOUR, Tour } from './Tour';
 import { CALL, POS_ROUTES } from '../engine/data';
 import { DESIGN } from '../engine/formation';
 import { WEATHER, clone, leadOf } from '../engine/sim';
@@ -36,12 +37,19 @@ interface Props {
   startLabel?: string;
   briefExtra?: ReactNode;
   welcome?: ReactNode;         // first visit: a short "what is this" above the brief
+  /** First game: the tour of the screen, at the first call. `onDone` remembers it was seen (finished or skipped). */
+  tour?: { onDone: (finished: boolean) => void };
   onPicks: (p: Pick[]) => void;
   onDone: (r: SpotResult) => void;
   onContinue: () => void;
   continueLabel: string;
   /** Career: this screen plays one part of a full game (a drive). When it ends, hand the game back. */
-  segment?: { onEnd: (s: State, records: Record_[], log: Ev[]) => void; endLabel?: string };
+  segment?: {
+    onEnd: (s: State, records: Record_[], log: Ev[]) => void;
+    endLabel?: string;
+    /** Filled in by this screen: hand the game back now (the player changed their mind), once the play in motion is done. */
+    leave?: { current: (() => void) | null };
+  };
 }
 
 /**
@@ -110,6 +118,7 @@ export function GameScreen(p: Props) {
   const [result, setResult] = useState<SpotResult | null>(null);
   const [impact, setImpact] = useState<{ id: number; kind: ImpactKind } | null>(null);
   const liveRef = useRef(false);            // the player took part in this game on this screen (not just reopened a finished one)
+  const [touring, setTouring] = useState<'wait' | 'on' | 'done'>(p.tour ? 'wait' : 'done');
 
   const shownAt = useRef(Date.now());       // when the current decision went on the board
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -300,8 +309,9 @@ export function GameScreen(p: Props) {
     busyRef.current = true;
     try {
       for (let guard = 0; guard < 300; guard++) {
+        if (leftRef.current) return;   // handed back to the career game
         if (session.over) {
-          if (p.segment) { p.segment.onEnd(clone(session.s), session.records, session.log.map((l) => l.ev)); return; }
+          if (p.segment) { leftRef.current = true; p.segment.onEnd(clone(session.s), session.records, session.log.map((l) => l.ev)); return; }
           await finish(); return;
         }
         const d = session.decision();
@@ -315,6 +325,20 @@ export function GameScreen(p: Props) {
   }, [session, finish, present, animate]);
 
   useEffect(() => { gameOnScreen(true); return () => gameOnScreen(false); }, []);   // no ads while a game is up
+  // a career drive can be handed back before it ends: right away between plays, or as soon as the play in motion lands
+  const leftRef = useRef(false);
+  useEffect(() => {
+    const seg = p.segment;
+    if (!seg?.leave) return;
+    const go = () => {
+      if (leftRef.current) return;
+      if (busyRef.current) { setTimeout(go, 120); return; }
+      leftRef.current = true;
+      seg.onEnd(clone(session.s), session.records, session.log.map((l) => l.ev));
+    };
+    seg.leave.current = go;
+    return () => { if (seg.leave) seg.leave.current = null; };
+  }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (boot.lost) onPicks([]);
     field.current?.setup(session.s, {}, true);
@@ -596,8 +620,16 @@ export function GameScreen(p: Props) {
   const chip = replaying ? ['replay', '↺ Replay'] : phase === 'snapping' || phase === 'auto' ? ['live', 'Live'] : phase === 'result' ? ['result', 'Result'] : phase === 'over' ? ['result', 'Final']
     : phase === 'deciding' ? (sel ? ['sel', `Selected: ${sel.label}`] : ['ready', dec?.step === 'play' ? 'Pick a play' : 'Your call']) : ['ready', 'Pre-game'];
 
+  // the tour opens on the first real call, once the panel is drawn
+  useEffect(() => {
+    if (touring !== 'wait' || phase !== 'deciding' || !dec || isToss(dec.step)) return;
+    const id = setTimeout(() => setTouring('on'), 450);
+    return () => clearTimeout(id);
+  }, [touring, phase, dec]);
+
   return (
     <div className={`game${clutchNow ? ' clutch' : ''}`} ref={gameRef}>
+      {touring === 'on' && <Tour steps={FIRST_GAME_TOUR} onDone={(f) => { setTouring('done'); track('tour_done', { finished: f }); p.tour?.onDone(f); }} />}
       {p.meta}
       <Scoreboard s={view} teams={T} wp={wp} trail={trail} />
       <div className="arena">

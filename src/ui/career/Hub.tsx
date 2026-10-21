@@ -1,5 +1,7 @@
 /** The season hub: your next game, your quarterback, the league (schedule, standings, leaders, teams, playoffs). */
 import { useMemo, useState } from 'react';
+import { tv } from './tv';
+import { chipInk } from '../Scoreboard';
 import { passerRating, type Line } from '../../career/box';
 import {
   ABILITIES, ARCH, attrCost, buyAbility, levelOf, ordinal, upgrade, xpForLevel, XP_PER_SP, yourGameThisWeek, yourGames, youPlayer,
@@ -39,7 +41,7 @@ export function Hub({ c, commit, onPlay, onBye, onRetire, onExport, onSlots, ini
   if (editionShown()) tabs.push(['legacy', 'Legacy']);
   return (
     <div className="cr-page cr-hub">
-      <header className="cr-head" style={{ ['--tc' as string]: team.color, ['--tc2' as string]: team.color2 }}>
+      <header className="cr-head" style={{ ...tv(team), ['--hem' as string]: chipInk('#0b0f0d', team.color2) }}>
         <div className="cr-head-id">
           <span className="cr-chip">{team.id}</span>
           <div>
@@ -93,37 +95,58 @@ function Home({ c, commit, pic, onPlay, onBye, go }: { c: Career; commit: Commit
   const mvp = useMemo(() => race(c.league, c.season, c.history.length ? 'mvp' : 'oroy'), [c.season.games]);
   const eliminated = c.season.week > REG_WEEKS && !g && !alive(c.season, team.id);   // a top seed's wild-card bye is not elimination
   const targets = c.you.wantsTrade && c.season.week <= 9 ? tradeTargets(c) : [];
+  const line = c.season.stats[c.you.pid] ?? {};
+  const lv = levelOf(c.you.xp);
+  const x0 = xpForLevel(lv), x1 = xpForLevel(lv + 1);
+  const last = lastResult(c, team.id);
   return (
-    <div className="cr-grid">
-      <section className="cr-card cr-next">
-        {g ? <NextGame c={c} g={g} pic={pic} onPlay={onPlay} />
-          : eliminated ? (
-            <><div className="eyebrow">{WEEK_NAME(c.season.week)}</div><h2>Your season is over</h2><p className="muted">Watch the rest of the playoffs play out.</p><button className="btn primary big" onClick={onBye}>Sim {WEEK_NAME(c.season.week)}</button></>
-          ) : (
-            <><div className="eyebrow">{WEEK_NAME(c.season.week)}</div><h2>Bye week</h2><p className="muted">No game this week. Rest up, spend your points.</p><button className="btn primary big" onClick={onBye}>Sim the week</button></>
-          )}
-      </section>
-      <section className="cr-card">
-        <h3>This week's goals</h3>
-        <ul className="cr-goals">
-          {c.goals.map((x) => <li key={x.key} className={x.done ? 'done' : ''}><span>{x.text}</span><b>+{x.xp} XP</b></li>)}
-        </ul>
-        {c.you.sp > 0 && <button className="btn" onClick={() => go('player')}>Spend {c.you.sp} skill point{c.you.sp === 1 ? '' : 's'}</button>}
-      </section>
-      <section className="cr-card">
-        <h3>{CONF_NAME[team.conf]} {DIV_NAME[team.div]}</h3>
-        <table className="cr-t"><tbody>
-          {div.map((t) => <tr key={t.id} className={t.id === team.id ? 'you' : ''}><td><TeamTag t={t} /></td><td className="num">{rec(pic[t.id])}</td><td className="num muted">{pic[t.id]?.clinch ?? ''}</td></tr>)}
-        </tbody></table>
-        <button className="btn ghost small" onClick={() => go('standings')}>All standings</button>
-      </section>
-      <section className="cr-card">
-        <h3>{c.history.length ? 'MVP race' : 'Rookie of the Year race'}</h3>
-        <ol className="cr-race">
-          {mvp.map((r) => { const p = c.league.players[r.id]; return <li key={r.id} className={r.id === c.you.pid ? 'you' : ''}><span>{p.name}</span><em>{POS_LABEL[p.slot]} · {p.team}</em><b>{r.v}</b></li>; })}
-          {!mvp.length && <li className="muted">After week 1.</li>}
-        </ol>
-      </section>
+    <div className="cr-stack">
+      {g ? <GameDay c={c} g={g} pic={pic} onPlay={onPlay} />
+        : (
+          <section className="gd gd-off" style={{ ['--ta' as string]: team.color, ['--tb' as string]: team.color }}>
+            <div className="gd-l">
+              <div className="eyebrow">{WEEK_NAME(c.season.week)}</div>
+              <h2 className="gd-h">{eliminated ? 'Your season is over' : 'Bye week'}</h2>
+              <p className="gd-sub">{eliminated ? 'Watch the rest of the playoffs play out.' : 'No game this week. Rest up and spend your points.'}</p>
+            </div>
+            <div className="gd-r"><button className="btn primary big" onClick={onBye}>{eliminated ? `Sim ${WEEK_NAME(c.season.week)}` : 'Sim the week'}</button></div>
+          </section>
+        )}
+
+      <div className="cr-grid3">
+        <section className="cr-card">
+          <h3>This week's goals</h3>
+          <ul className="cr-goals">
+            {c.goals.map((x) => <li key={x.key} className={x.done ? 'done' : ''}><span>{x.text}</span><b>+{x.xp} XP</b></li>)}
+          </ul>
+        </section>
+        <section className="cr-card hm-you">
+          <h3>Your season <span className="muted small">{rec(pic[team.id])}</span></h3>
+          <div className="hm-line">
+            <span><b>{line.pc ?? 0}/{line.pa ?? 0}</b>comp</span>
+            <span><b>{(line.py ?? 0).toLocaleString('en-US')}</b>yards</span>
+            <span><b>{line.ptd ?? 0}</b>TD</span>
+            <span><b>{line.pint ?? 0}</b>INT</span>
+            <span><b>{passerRating(line)}</b>rating</span>
+          </div>
+          <div className="hm-lv">
+            <span>Level <b>{lv}</b></span>
+            <span className="cr-xp" aria-label={`${c.you.xp - x0} of ${x1 - x0} XP to the next level`}><i style={{ width: `${((c.you.xp - x0) / (x1 - x0)) * 100}%` }} /></span>
+            <span className="muted small">{x1 - c.you.xp} XP to go</span>
+          </div>
+          {last && <p className="hm-last">Last game: <b className={last.r}>{last.r === 'win' ? 'W' : last.r === 'loss' ? 'L' : 'T'} {last.us}-{last.them}</b> {last.home ? 'vs' : '@'} {last.opp}</p>}
+          {c.you.sp > 0 ? <button className="btn primary" onClick={() => go('player')}>Spend {c.you.sp} skill point{c.you.sp === 1 ? '' : 's'}</button>
+            : <button className="btn ghost small" onClick={() => go('player')}>Your quarterback</button>}
+        </section>
+        <section className="cr-card">
+          <h3>{CONF_NAME[team.conf]} {DIV_NAME[team.div]}</h3>
+          <table className="cr-t"><tbody>
+            {div.map((t) => <tr key={t.id} className={t.id === team.id ? 'you' : ''}><td><TeamTag t={t} /></td><td className="num">{rec(pic[t.id])}</td><td className="num muted">{pic[t.id]?.clinch ?? ''}</td></tr>)}
+          </tbody></table>
+          <button className="btn ghost small" onClick={() => go('standings')}>All standings</button>
+        </section>
+      </div>
+
       {targets.length > 0 && (
         <section className="cr-card cr-trade">
           <h3>Trade request</h3>
@@ -136,32 +159,80 @@ function Home({ c, commit, pic, onPlay, onBye, go }: { c: Career; commit: Commit
           <button className="btn ghost small" onClick={() => commit((x) => { x.you.wantsTrade = false; })}>Withdraw the request</button>
         </section>
       )}
-      <section className="cr-card cr-news">
-        <h3>Around the league</h3>
-        <ul>{c.news.slice(0, 10).map((n, i) => <li key={i} className={`tone-${n.tone ?? 'neutral'}`}>{n.text}</li>)}</ul>
-      </section>
+
+      <div className={mvp.length ? 'cr-grid2' : 'cr-stack'}>
+        {mvp.length > 0 && (
+          <section className="cr-card">
+            <h3>{c.history.length ? 'MVP race' : 'Rookie of the Year race'}</h3>
+            <ol className="cr-race">
+              {mvp.map((r) => { const p = c.league.players[r.id]; return <li key={r.id} className={r.id === c.you.pid ? 'you' : ''}><span>{p.name}</span><em>{POS_LABEL[p.slot]} · {p.team}</em><b>{r.v}</b></li>; })}
+            </ol>
+          </section>
+        )}
+        <section className="cr-card cr-news">
+          <h3>Around the league</h3>
+          <ul>{c.news.slice(0, 10).map((n, i) => <li key={i} className={`tone-${n.tone ?? 'neutral'}`}>{n.text}</li>)}</ul>
+        </section>
+      </div>
     </div>
   );
 }
 
-function NextGame({ c, g, pic, onPlay }: { c: Career; g: Game; pic: Record<string, StandingRow>; onPlay: Props['onPlay'] }) {
+/** Your team's most recent finished game this season, from your side. */
+function lastResult(c: Career, id: string): { r: 'win' | 'loss' | 'tie'; us: number; them: number; home: boolean; opp: string } | null {
+  const g = [...c.season.games].reverse().find((x) => x.score && (x.home === id || x.away === id));
+  if (!g?.score) return null;
+  const home = g.home === id;
+  const us = g.score[home ? 0 : 1], them = g.score[home ? 1 : 0];
+  return { r: us > them ? 'win' : us < them ? 'loss' : 'tie', us, them, home, opp: teamById(c.league, home ? g.away : g.home).city };
+}
+
+/** Game day: the matchup big, how the two teams compare, what's at stake, and the ways to play it. */
+function GameDay({ c, g, pic, onPlay }: { c: Career; g: Game; pic: Record<string, StandingRow>; onPlay: Props['onPlay'] }) {
   const me = youPlayer(c);
   const oppId = g.home === me.team ? g.away : g.home;
   const opp = teamById(c.league, oppId), mine = teamById(c.league, me.team!);
   const oi = teamInfo(c.league, opp), mi = teamInfo(c.league, mine);
   const wx = gameWeather(g.home, g.week, c.seed);
   const site = g.kind === 'final' ? 'Neutral site' : g.home === me.team ? 'Home' : `At ${opp.city}`;
+  const rows: [string, number, number][] = [['Overall', mi.rat.ovr, oi.rat.ovr], ['Offense', mi.rat.off, oi.rat.off], ['Defense', mi.rat.def, oi.rat.def]];
   return (
-    <>
-      <div className="eyebrow">{WEEK_NAME(g.week)}{g.kind === 'final' ? ` · ${FINAL_NAME}` : ''} · {site}{wx !== 'clear' ? ` · ${WEATHER[wx].name}` : ''}</div>
-      <div className="cr-vs">
-        <TeamBlock t={mine} r={pic[mine.id]} ovr={mi.rat} />
-        <span className="cr-at">{g.home === me.team ? 'vs' : '@'}</span>
-        <TeamBlock t={opp} r={pic[opp.id]} ovr={oi.rat} />
+    <section className="gd" style={{ ['--ta' as string]: mine.color, ['--tb' as string]: opp.color }}>
+      <div className="gd-l">
+        <div className="eyebrow">{WEEK_NAME(g.week)}{g.kind === 'final' ? ` · ${FINAL_NAME}` : ''} · {site}{wx !== 'clear' ? ` · ${WEATHER[wx].name}` : ''}</div>
+        <div className="gd-vs">
+          <GDTeam t={mine} r={pic[mine.id]} />
+          <span className="gd-at">{g.home === me.team ? 'vs' : '@'}</span>
+          <GDTeam t={opp} r={pic[opp.id]} right />
+        </div>
+        <div className="gd-cmp" aria-label="How the teams compare">
+          {rows.map(([k, a, b]) => {
+            const w = Math.max(18, Math.min(82, 50 + (a - b) * 3));
+            return (
+              <div key={k} className="gd-row">
+                <b className={a > b ? 'up' : ''}>{a}</b>
+                <span className="gd-bar" aria-label={`${k}: ${a} to ${b}`}><i style={{ width: `${w}%` }} /><em>{k}</em></span>
+                <b className={b > a ? 'up' : ''}>{b}</b>
+              </div>
+            );
+          })}
+        </div>
+        <Storylines c={c} g={g} mine={mine} opp={opp} pic={pic} />
       </div>
-      <Storylines c={c} g={g} mine={mine} opp={opp} pic={pic} />
-      <PlayButtons onPlay={onPlay} />
-    </>
+      <div className="gd-r">
+        <PlayButtons onPlay={onPlay} />
+        <p className="gd-note">Change your mind any time: switch between every snap and the moments, or sim the rest, during the game.</p>
+      </div>
+    </section>
+  );
+}
+
+function GDTeam({ t, r, right }: { t: CTeam; r?: StandingRow; right?: boolean }) {
+  return (
+    <div className={`gd-team${right ? ' right' : ''}`} style={tv(t)}>
+      <span className="cr-chip big">{t.id}</span>
+      <span className="gd-tn"><b>{t.city}</b><small>{t.name} · {rec(r)}</small></span>
+    </div>
   );
 }
 
@@ -185,17 +256,7 @@ function Storylines({ c, g, mine, opp, pic }: { c: Career; g: Game; mine: CTeam;
   return <ul className="cr-story">{lines.slice(0, 3).map((l) => <li key={l}>{l}</li>)}</ul>;
 }
 
-function TeamBlock({ t, r, ovr }: { t: CTeam; r?: StandingRow; ovr: { ovr: number; off: number; def: number } }) {
-  return (
-    <div className="cr-tb" style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
-      <span className="cr-chip big">{t.id}</span>
-      <b>{t.city}</b><span>{t.name} · {rec(r)}</span>
-      <span className="cr-grades"><em>OVR <b>{ovr.ovr}</b></em><em>OFF <b>{ovr.off}</b></em><em>DEF <b>{ovr.def}</b></em></span>
-    </div>
-  );
-}
-
-export const TeamTag = ({ t }: { t: CTeam }) => <span className="cr-tag" style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}><i>{t.id}</i>{t.city}</span>;
+export const TeamTag = ({ t }: { t: CTeam }) => <span className="cr-tag" style={tv(t)}><i>{t.id}</i>{t.city}</span>;
 
 function PlayerTab({ c, commit }: { c: Career; commit: Commit }) {
   const me = youPlayer(c);
@@ -275,7 +336,7 @@ function GameRow({ c, g, mark }: { c: Career; g: Game; mark?: boolean }) {
   return (
     <div className={`lg-game${mark ? ' you' : ''}`}>
       {([[a, g.score?.[1], aw], [h, g.score?.[0], hw]] as const).map(([t, pts, w], i) => (
-        <div key={i} className={`lg-side${done && !w ? ' dim' : ''}`} style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+        <div key={i} className={`lg-side${done && !w ? ' dim' : ''}`} style={tv(t)}>
           <i className="lg-chip">{t.id}</i><span>{t.city}</span><b>{done ? pts : ''}</b>
         </div>
       ))}
@@ -305,7 +366,7 @@ function Schedule({ c }: { c: Career }) {
             const res = us == null ? '' : us > them! ? 'W' : us < them! ? 'L' : 'T';
             const r = pic[opp.id];
             return (
-              <li key={w} className={w === c.season.week ? 'now' : ''} style={{ ['--tc' as string]: opp.color, ['--tc2' as string]: opp.color2 }}>
+              <li key={w} className={w === c.season.week ? 'now' : ''} style={tv(opp)}>
                 <span className="lg-wk">{g.kind === 'reg' ? w : WEEK_NAME(w).replace(' round', '')}</span>
                 <span className="lg-at">{home ? 'vs' : '@'}</span>
                 <i className="lg-chip">{opp.id}</i>
@@ -385,7 +446,7 @@ function StandTable({ rows, pic, you, seeded }: { c: Career; rows: CTeam[]; pic:
       <thead><tr>{seeded && <th className="num">#</th>}<th>Team</th><th className="num">W-L</th><th className="num">PCT</th><th className="num hide-sm">Div</th><th className="num hide-sm">PF</th><th className="num hide-sm">PA</th><th className="num">Diff</th><th className="num">Strk</th></tr></thead>
       <tbody>
         {rows.map((t, i) => { const r = pic[t.id]; const diff = (r?.pf ?? 0) - (r?.pa ?? 0); return (
-          <tr key={t.id} className={t.id === you ? 'you' : ''} style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+          <tr key={t.id} className={t.id === you ? 'you' : ''} style={tv(t)}>
             {seeded && <td className="num"><span className="lg-seed">{i + 1}</span></td>}
             <td><span className="lg-team"><i className="lg-chip">{t.id}</i><span>{t.city}</span>{r?.clinch ? <em className={`lg-cl c-${r.clinch}`}>{r.clinch}</em> : null}</span></td>
             <td className="num"><b>{rec(r)}</b></td>
@@ -430,7 +491,7 @@ function Leaders({ c }: { c: Career }) {
           const top = rows[0], p = c.league.players[top.id], t = p.team ? teamById(c.league, p.team) : null;
           const youAt = rows.findIndex((r) => r.id === c.you.pid);
           return (
-            <section key={k} className={`cr-card ld-card${open === k ? ' on' : ''}`} style={t ? { ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 } : undefined}>
+            <section key={k} className={`cr-card ld-card${open === k ? ' on' : ''}`} style={t ? tv(t) : undefined}>
               <div className="ld-head"><h3>{label}</h3><button className="btn ghost small" onClick={() => setOpen(open === k ? null : k)}>{open === k ? 'Close' : 'Top 15'}</button></div>
               <div className={`ld-top${top.id === c.you.pid ? ' you' : ''}`}>
                 {t && <i className="lg-chip big">{t.id}</i>}
@@ -452,7 +513,7 @@ function Leaders({ c }: { c: Career }) {
           <h3>{C[1]} <span className="muted small">{c.season.year} regular season · top 15</span></h3>
           <table className="lg-t"><tbody>
             {all[C[0]].slice(0, 15).map((r, i) => { const p = c.league.players[r.id]; const t = p.team ? teamById(c.league, p.team) : null; return (
-              <tr key={r.id} className={r.id === c.you.pid ? 'you' : ''} style={t ? { ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 } : undefined}>
+              <tr key={r.id} className={r.id === c.you.pid ? 'you' : ''} style={t ? tv(t) : undefined}>
                 <td className="num muted">{i + 1}</td><td><b>{p.name}</b> <span className="muted small">{POS_LABEL[p.slot]}</span></td><td>{t && <span className="lg-team"><i className="lg-chip">{t.id}</i><span className="hide-sm">{t.city}</span></span>}</td>
                 <td className="num"><b>{fmt(statValue(r.line, C[0]), C[0])}</b></td><td className="muted small hide-sm">{C[2](r.line)}</td>
               </tr>
@@ -495,7 +556,7 @@ function TeamTab({ c }: { c: Career }) {
   };
   return (
     <div className="cr-stack">
-      <section className="cr-card tm-hero" style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+      <section className="cr-card tm-hero" style={tv(t)}>
         <span className="cr-chip big">{t.id}</span>
         <div className="tm-id">
           <div className="eyebrow">{CONF_NAME[t.conf]} {DIV_NAME[t.div]}{r ? ` · ${rec(r)}` : ''}{r?.seed ? ` · ${ordinal(r.seed)} seed` : ''}</div>
@@ -530,7 +591,7 @@ function TeamTab({ c }: { c: Career }) {
             <ul className="tm-depth">
               {slots.map((slot) => { const p = c.league.players[t.roster[slot]]; return p ? (
                 <li key={slot} className={p.id === c.you.pid ? 'you' : ''}>
-                  <span className="tm-num" style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>{p.number}</span>
+                  <span className="tm-num" style={tv(t)}>{p.number}</span>
                   <span className="tm-p"><b>{p.name}</b><small>{POS_LABEL[slot]} · age {p.age}{p.exp === 0 ? ' · rookie' : ''}</small></span>
                   <span className={`tm-ovr t-${tier(p.rating)}`}>{p.rating}</span>
                 </li>
@@ -543,7 +604,7 @@ function TeamTab({ c }: { c: Career }) {
         <h3>Power rankings <span className="muted small">ratings, plus results once games are played</span></h3>
         <ol className="tm-power">
           {power.map((x, i) => (
-            <li key={x.t.id} className={`${x.t.id === me.team ? 'you' : ''}${x.t.id === id ? ' sel' : ''}`} style={{ ['--tc' as string]: x.t.color, ['--tc2' as string]: x.t.color2 }}>
+            <li key={x.t.id} className={`${x.t.id === me.team ? 'you' : ''}${x.t.id === id ? ' sel' : ''}`} style={tv(x.t)}>
               <span className={`tm-rk${i < 3 ? ' top' : ''}`}>{i + 1}</span>
               <button className="tm-pw" onClick={() => setId(x.t.id)}><i className="lg-chip">{x.t.id}</i><span>{x.t.city} <small>{x.t.name}</small></span></button>
               <span className="tm-rec">{rec(x.rec)}</span>

@@ -51,6 +51,7 @@ export interface Store {
   surv: { best: number; runs: number; run?: SurvivorRun };
   history: SpotResult[];
   seenHelp: boolean;
+  seenTour?: boolean;   // the first-game tour was shown (finished or skipped)
   badges?: Record<string, string>;   // badge id → the date it was earned
   ladder?: LadderProgress;           // the Gridiron Challenge (Coach's Edition): best stars per rung
 }

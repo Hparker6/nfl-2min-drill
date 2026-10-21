@@ -137,3 +137,19 @@ Four review passes (server, UI, engine, career/renderers) plus two fuzz harnesse
 - Engine (date-gated by `State.nr`, on from the OT_FROM daily and in Survivor/Practice/full games; older dailies replay unchanged, legacy digest `d98bb4e7` still holds): scramble into own end zone is a safety; untimed down after a defensive foul at 0:00; no try after a walk-off touchdown; blocked punt fallen on in the end zone / return past the goal line scores; kneel-out counts the two-minute warning; OT second possession that scores but stays behind ends without a kickoff; hold penalty inside the 20 rounds down (never yl 0); grading seconds across a period change. Tests: `src/engine/rules.test.ts`.
 - Decision for the owner: out-of-bounds stops the clock only inside 2:00 (NFL: 5:00 of the 4th). Documented choice; not changed.
 - Deferred (low): Daily/Survivor side effects inside `setStore` updaters; dev-only `Secure` cookie on Safari; LiveGame render perf.
+
+## Career and first-game polish (2026-10-21, on this branch, staging only)
+- **Change your mind mid-game** (`src/ui/career/LiveGame.tsx`): an "Every snap / The moments" switch at the top of a live
+  career game; inside a drive you took over, "Sim this drive", "Just the moments" (from every snap) and "Sim to the end"
+  (the play in motion finishes first: `GameScreen` `segment.leave`); the moment prompt has "Sim to the end" too. XP only
+  depends on sim vs played, so switching costs nothing.
+- **Live tracker** (`src/ui/career/Tracker.tsx`): a drive chart (every snap of the drive on its own row: passes arc,
+  runs straight, incompletions ×, losses and turnovers red, the ball gliding to its spot), the last play called big, a
+  flash on scores and picks, your QB's live line, the drives with a bar of where each went. Taller on phones.
+- **Hub**: Home rebuilt around a game-day panel (matchup, OVR/OFF/DEF compared, storylines, the play buttons), then
+  goals / your season / division; the awards race shows once it has data; the header is the team's color band. Team
+  chips everywhere in career go through `tv()` (readable text on any team color). Postgame score in the same band.
+  Fixed: "2:60" in the scoring list (`mmss`, `fmtSecs`).
+- **First-game tour** (`src/ui/Tour.tsx`): up to six spotlight notes at a brand-new player's first Daily call (steps
+  whose part isn't on screen skip themselves), "Skip tour", Escape, remembered in `store.seenTour`.
+- Phone header: the Coach's Edition button is a star there, and the mode tabs' column shrinks instead of overlapping.

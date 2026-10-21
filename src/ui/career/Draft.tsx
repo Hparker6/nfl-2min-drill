@@ -5,6 +5,7 @@
  * so the night has a pace instead of a progress bar.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { tv } from './tv';
 import { ARCH, ordinal, rookieDeal, type Career } from '../../career/career';
 import { LEAGUE_NAME, teamById, teamInfo } from '../../career/league';
 import { finishMediaDay, mediaQuestions, MEDIA_RIGHT, MEDIA_WRONG } from '../../career/media';
@@ -231,7 +232,7 @@ function GreenRoom({ c, onYourPick }: { c: Career; onYourPick: () => void }) {
         {shown < last - 4 && <button className="btn ghost small" onClick={() => { setShown(Math.max(shown, last - 4)); setBeat('clock'); }}>Skip ahead to the last few picks</button>}
       </section>
       <div className="dn-room">
-        <section className={`cr-card dn-clock${trade ? ' trade' : ''}${hot ? ' hot' : ''} beat-${beat}`} style={{ ['--tc' as string]: clockTeam.color, ['--tc2' as string]: clockTeam.color2 }} aria-live="polite">
+        <section className={`cr-card dn-clock${trade ? ' trade' : ''}${hot ? ' hot' : ''} beat-${beat}`} style={tv(clockTeam)} aria-live="polite">
           {trade && tradeTeam ? (
             <>
               <div className="dn-alert">Trade alert</div>
@@ -300,7 +301,7 @@ function PhoneCall({ c, team, onDone }: { c: Career; team: CTeam; onDone: () => 
   ];
   return (
     <div className="cr-page">
-      <section className="cr-card dn-phone" style={{ ['--tc' as string]: team.color, ['--tc2' as string]: team.color2 }}>
+      <section className="cr-card dn-phone" style={tv(team)}>
         <div className={`dn-handset${answered ? '' : ' ringing'}`} aria-hidden><span className="cr-chip big">{team.id}</span></div>
         <div className="eyebrow">{answered ? 'On the line' : 'Incoming call'}</div>
         <h2>{team.city} {team.name}</h2>
@@ -331,7 +332,7 @@ function Announce({ c, team, onDone }: { c: Career; team: CTeam; onDone: () => v
   useEffect(() => { if (step === 3) { audio.play('win'); } }, [step]);
   return (
     <div className="cr-page">
-      <section className="cr-card dn-stage" style={{ ['--tc' as string]: team.color, ['--tc2' as string]: team.color2 }}>
+      <section className="cr-card dn-stage" style={tv(team)}>
         {step >= 3 && <div className="impact impact-draft" aria-hidden><Confetti n={36} /></div>}
         <div className="eyebrow">The {d.year} {LEAGUE_NAME} Draft · Round {d.yourPick <= 32 ? 1 : 2}</div>
         <p className={`dn-say${step >= 0 ? ' on' : ''}`}>With the {ordinal(d.yourPick)} pick in the {d.year} {LEAGUE_NAME} Draft,</p>
@@ -358,7 +359,7 @@ function Welcome({ c, team, onDone }: { c: Career; team: CTeam; onDone: () => vo
   const star = Object.entries(team.roster).filter(([slot]) => slot !== 'QB').map(([, id]) => c.league.players[id]).filter(Boolean).sort((a, b) => b.rating - a.rating)[0];
   return (
     <div className="cr-page">
-      <section className="cr-card dn-welcome" style={{ ['--tc' as string]: team.color, ['--tc2' as string]: team.color2 }}>
+      <section className="cr-card dn-welcome" style={tv(team)}>
         <span className="cr-chip big">{team.id}</span>
         <div className="eyebrow">{o.tier} · {ordinal(o.rank)} of 32 by overall</div>
         <h1>Welcome to <em>{team.city}</em></h1>

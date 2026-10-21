@@ -111,7 +111,7 @@ export default function App() {
             ))}
           </nav>
           <div className="top-r">
-            {accountsShown() && <button className="top-edition" onClick={() => setModal('account')} title={`${EDITION_NAME}: ${EDITION_PRICE}, once`}>{EDITION_NAME}</button>}
+            {accountsShown() && <button className="top-edition" onClick={() => setModal('account')} title={`${EDITION_NAME}: ${EDITION_PRICE}, once`} aria-label={EDITION_NAME}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path d="M12 2.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 16.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor" /></svg><span className="te-txt">{EDITION_NAME}</span></button>}
             <button className="icon" onClick={toggleSound} aria-pressed={anySound} aria-label={anySound ? 'Mute sound and music' : 'Turn sound and music on'} title={anySound ? 'Mute' : 'Sound on'}>
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />{anySound ? <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}</svg>
             </button>

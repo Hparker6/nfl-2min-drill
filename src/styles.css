@@ -79,6 +79,9 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .top-r { display: flex; justify-content: flex-end; align-items: center; gap: 2px; }
 .top-edition { margin-right: 8px; border: 0; border-radius: 999px; padding: 7px 14px; background: var(--accent); color: var(--accent-ink); cursor: pointer; font: 700 13px var(--display); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; transition: background .16s; }
 .top-edition:hover { background: #ffd43a; }
+.top-edition { display: inline-flex; align-items: center; gap: 6px; }
+/* phones: the button is the star alone, so the mode tabs keep their room */
+@media (max-width: 640px) { .top-edition { padding: 0; width: 32px; height: 32px; justify-content: center; margin-right: 2px; } .top-edition .te-txt { display: none; } }
 .shell { max-width: 1680px; margin: 0 auto; padding: 12px 24px 24px; }
 .page { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
 .foot { max-width: 1680px; margin: 0 auto; padding: 8px 24px 24px; color: var(--muted); font-size: 12px; text-align: center; }
@@ -1324,6 +1327,8 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 
 /* small phones: the header fits the screen (the mode tabs shrink first, and scroll inside themselves at worst) */
 @media (max-width: 999px) { .modes { min-width: 0; overflow-x: auto; scrollbar-width: none; } .modes::-webkit-scrollbar { display: none; } .modes button { flex: none; } }
+/* the middle column gives way (the tabs scroll inside it), so the logo and the icons never get covered */
+@media (max-width: 999px) { .top-in { grid-template-columns: auto minmax(0, 1fr) auto; } .modes { justify-self: center; max-width: 100%; } }
 @media (max-width: 430px) {
   .top-in { padding: 0 10px; gap: 6px; }
   .top-r .icon { width: 32px; height: 32px; }
@@ -1340,3 +1345,20 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .acct-err { color: var(--bad); }
 .acct-ok { color: var(--good); }
 .acct-del { display: grid; gap: 8px; border: 1px solid var(--r); border-radius: var(--r-sm); padding: 10px; }
+
+/* the first-game tour: a spotlight on one part of the screen, a note beside it */
+.tour { position: fixed; inset: 0; z-index: 80; }
+.tour-block { position: absolute; inset: 0; }
+.tour-dim { position: absolute; inset: 0; background: rgba(4, 8, 6, .62); }
+.tour-spot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(4, 8, 6, .62), 0 0 0 3px var(--accent); transition: top .3s var(--ease), left .3s var(--ease), width .3s var(--ease), height .3s var(--ease); pointer-events: none; }
+.tour-pop { position: absolute; background: var(--panel); color: var(--ink); border: 1px solid var(--line-2); border-radius: 14px; padding: 16px 18px 14px; box-shadow: 0 18px 50px rgba(0, 0, 0, .45); display: grid; gap: 8px; animation: cg-in .25s var(--ease); }
+.tour-pop.arrow-up::before, .tour-pop.arrow-down::after { content: ''; position: absolute; left: calc(var(--ax) - 9px); width: 18px; height: 18px; background: var(--panel); border: 1px solid var(--line-2); transform: rotate(45deg); }
+.tour-pop.arrow-up::before { top: -10px; border-right: 0; border-bottom: 0; }
+.tour-pop.arrow-down::after { bottom: -10px; border-left: 0; border-top: 0; }
+.tour-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.tour-top h3 { font-size: 22px; text-transform: uppercase; }
+.tour-n { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tour-pop p { margin: 0; font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+.tour-row { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+.tour-row .link { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } .tour-pop { animation: none; } }
