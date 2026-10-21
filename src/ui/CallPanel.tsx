@@ -335,7 +335,7 @@ export function CallPanel(p: Props) {
             return (
               <button key={o.key} className={`dbtn${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} disabled={needClock} onClick={() => onSnap(o)}>
                 <span className="dbtn-txt">
-                  <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}</span>
+                  <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline">★ Playbook</em>}</span>
                   {o.sub && <span className="dbtn-sub">{o.sub}</span>}
                 </span>
                 {wp != null && <span className="opt-wp">{(wp * 100).toFixed(1)}%</span>}
@@ -370,6 +370,7 @@ export function CallPanel(p: Props) {
           <MiniPlay play={o.choice.play} side={sel ? edits.side : undefined} routes={sel ? edits.routes : undefined} target={sel ? edits.target : undefined} mods={sel ? edits.mods : undefined} />
           {f && <span className="pc-form">{FORMATION_NAME[f] ?? f}</span>}
           <span className="pc-tag">{wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}</span>
+          {o.premium && <span className="pc-pb" title="From the Coach's Playbook">★ Playbook</span>}
         </span>
         <span className="pc-name"><kbd>{i + 1}</kbd>{o.label}</span>
         <span className="pc-sub">{o.sub}</span>
@@ -407,7 +408,7 @@ export function CallPanel(p: Props) {
           return (
             <button key={o.key} className={`sbtn${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={() => onSelect(o)} aria-pressed={sel}>
               <MiniPlay play={o.key} />
-              <span><span className="sbtn-name"><kbd>{list.length + j + 1}</kbd>{o.label}</span><span className="sbtn-sub">{o.sub}</span></span>
+              <span><span className="sbtn-name"><kbd>{list.length + j + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline">★</em>}</span><span className="sbtn-sub">{o.sub}</span></span>
               {wp != null && <span className="opt-wp">{(wp * 100).toFixed(1)}%</span>}
             </button>
           );

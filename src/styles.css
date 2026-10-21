@@ -1389,3 +1389,7 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 /* the rookie playbook's line (and its link to the full playbook) shows on every screen size */
 .tab5-blurb.cp-simple { display: block !important; margin-top: 0; }
 .cp-simple .link { font-weight: 700; margin-left: 4px; }
+/* the Coach's Playbook's plays wear a small gold star */
+.pc-pb { position: absolute; left: 8px; bottom: 6px; font: 700 10px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 2px 7px; }
+.pc-pb.inline { position: static; margin-left: 6px; font-style: normal; vertical-align: middle; }
+.pb-badge { font-style: normal; margin-left: 5px; color: var(--accent); font-size: 12px; }

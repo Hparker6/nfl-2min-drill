@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FIRST_GAME_TOUR, Tour } from './Tour';
+import { ownsEdition } from '../game/edition';
 import { CALL, POS_ROUTES } from '../engine/data';
 import { DESIGN } from '../engine/formation';
 import { WEATHER, clone, leadOf } from '../engine/sim';
@@ -83,7 +84,10 @@ export function defaultTempo(d: Decision): Opt | null {
 }
 
 export function GameScreen(p: Props) {
-  const { sc, saved, settings, hints, onPicks, onDone } = p;
+  const { saved, settings, hints, onPicks, onDone } = p;
+  // the Coach's Playbook opens for an owner of the Coach's Edition: its plays and kicks join the options (the AI never
+  // calls them, so the game plays out the same for everyone until one is chosen)
+  const sc = useMemo(() => (ownsEdition() && !p.sc.start.pb ? { ...p.sc, start: { ...p.sc.start, pb: true } } : p.sc), [p.sc]);
   // a saved spot that cannot be replayed (say, after an update changed the game) starts over instead of breaking
   const boot = useMemo(() => {
     try { return { session: new Session(sc, saved), lost: false }; } catch { return { session: new Session(sc, []), lost: saved.length > 0 }; }

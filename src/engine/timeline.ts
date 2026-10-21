@@ -377,14 +377,15 @@ export function choreograph(inp: ChoreoInput): Timeline {
     }
 
     // ---- after the throw: the ball and the reactions
-    const thrower = qbA === 'lateral' ? 'o:WR2' : 'o:QB';
+    const latKey = 'o:' + (design?.lateralTo ?? 'WR2');
+    const thrower = qbA === 'lateral' ? latKey : 'o:QB';
     if (qbA === 'lateral') {
-      // the quarterback tosses back to the receiver, who throws
-      const w0 = start['o:WR2'];
-      const latPt: Pt = [CX + 6, -4.5];
-      ag['o:WR2'].script = timed([w0, latPt], 0.1, 0.55);
-      ag['o:WR2'].goal = () => latPt;
-      events.push({ t: 0.6, kind: 'lateral', who: 'o:WR2' });
+      // the quarterback tosses back to the receiver (or the back), who throws
+      const w0 = start[latKey];
+      const latPt: Pt = design?.lateralTo === 'RB' ? [CX - 5, -5.6] : [CX + 6, -4.5];
+      ag[latKey].script = timed([w0, latPt], 0.1, 0.55);
+      ag[latKey].goal = () => latPt;
+      events.push({ t: 0.6, kind: 'lateral', who: latKey });
     }
 
     const result = { tEnd: 0, tackler: '' };
@@ -449,9 +450,9 @@ export function choreograph(inp: ChoreoInput): Timeline {
     simulateAll(ag, { yt, throwT: sack ? 99 : throwT, catchT: sack ? 99 : catchT, sackT, isPass: true, look, carrierPath, res, r, events, result, qbKey: 'o:QB', sacker, rushers, gain });
     // the ball: snap to the passer, the throw (with height), then with whoever has it
     carrier.push({ t: 0.12, key: 'o:QB' });
-    if (qbA === 'lateral') carrier.push({ t: 0.55, key: 'o:WR2' });
+    if (qbA === 'lateral') carrier.push({ t: 0.55, key: latKey });
     carrier.sort((a, b) => a.t - b.t);
-    buildBall(ball, ag, carrier, { snapTo: 'o:QB', throwT: sack ? undefined : throwT, catchT: sack ? undefined : catchT, catchPt, complete: !!res.complete, intercepted: !!res.intercepted, depth, end: result.tEnd, lateral: qbA === 'lateral' ? { t: 0.55, to: 'o:WR2' } : undefined, start: start['o:C'] });
+    buildBall(ball, ag, carrier, { snapTo: 'o:QB', throwT: sack ? undefined : throwT, catchT: sack ? undefined : catchT, catchPt, complete: !!res.complete, intercepted: !!res.intercepted, depth, end: result.tEnd, lateral: qbA === 'lateral' ? { t: 0.55, to: latKey } : undefined, start: start['o:C'] });
     const decisive = sack ? sackT : res.complete || scramble ? result.tEnd : catchT;
     return finish(ag, ball, events, carrier, result, decisive, { throwT: sack ? undefined : throwT, catchT: sack ? undefined : catchT, pressureT });
   }

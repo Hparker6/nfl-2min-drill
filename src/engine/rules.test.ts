@@ -154,3 +154,38 @@ describe('out of bounds late in the fourth quarter', () => {
     expect(c.running).toBe(true);   // outside 5:00 the clock restarts
   });
 });
+
+describe('the Coach\u2019s Playbook kicks and plays', () => {
+  it('a surprise onside and a squib are recovered about one time in five; a plain onside about one in eight', async () => {
+    const { genScenario: gen } = await import('./scenario');
+    const rat = gen('pb:kick', 'practice').start.rat;
+    const rate = (kick: 'onside' | 'surprise' | 'squib') => {
+      let got = 0;
+      for (let i = 0; i < 4000; i++) {
+        const s = kickoffState(rat, { seed: i, qLen: 120 });
+        Object.assign(s, { stage: 'kick', kicker: 0, safetyKick: false, t: 100 });
+        let x = (i * 2654435761) >>> 0;
+        advance(s, () => { x = (x * 1103515245 + 12345) >>> 0; return (x >>> 8) / 16777216; }, { kick });
+        if (s.off === 0) got++;
+      }
+      return got / 4000;
+    };
+    expect(rate('onside')).toBeGreaterThan(0.09); expect(rate('onside')).toBeLessThan(0.15);
+    expect(rate('surprise')).toBeGreaterThan(0.17); expect(rate('surprise')).toBeLessThan(0.23);
+    expect(rate('squib')).toBeGreaterThan(0.17); expect(rate('squib')).toBeLessThan(0.23);
+  });
+  it('the playbook plays are offered only when the state opens them, the fake punt only on fourth down', async () => {
+    const { Session } = await import('../game/session');
+    const { customScenario: cs } = await import('./scenario');
+    const sc = cs({ you: 'KC', them: 'BUF', side: 'off', t: 200, lead: -3, yl: 45, down: 4, dist: 3, to: [2, 2], running: false, home: 0 }, 'pb:opts');
+    const first = (ses: InstanceType<typeof Session>) => { let d = ses.decision(); for (let k = 0; k < 5 && !d; k++) { ses.auto(); d = ses.decision(); } return d!.options.map((o) => o.key); };
+    const keys = (pb: boolean) => first(new Session({ ...sc, start: { ...sc.start, pb } }, []));
+    expect(keys(false)).not.toContain('hook_ladder');
+    expect(keys(false)).not.toContain('fake_punt');
+    expect(keys(true)).toEqual(expect.arrayContaining(['hook_ladder', 'statue', 'hb_pass', 'fake_punt']));
+    const sc1 = cs({ you: 'KC', them: 'BUF', side: 'off', t: 200, lead: -3, yl: 45, down: 1, dist: 10, to: [2, 2], running: false, home: 0 }, 'pb:opts1');
+    const k1 = first(new Session({ ...sc1, start: { ...sc1.start, pb: true } }, []));
+    expect(k1).toContain('statue');
+    expect(k1).not.toContain('fake_punt');
+  });
+});

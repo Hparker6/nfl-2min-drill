@@ -210,4 +210,10 @@ Four review passes (server, UI, engine, career/renderers) plus two fuzz harnesse
   AdSense, the script loads only where an ad shows, footer + end-of-game placements, unit `4281334746`, `ads.txt`).
   To ship: `git push origin live-ads:main`, or merge https://github.com/Hparker6/nfl-2min-drill/pull/new/live-ads.
   The same changes are on this branch (the ad slot also skips Coach's Edition owners here). Keep AdSense Auto ads off.
+- 2026-10-22 **The Coach's Playbook** (Coach's Edition): Hook and ladder, Statue of Liberty, Halfback pass, Fake punt
+  (fourth down, with the field goal and punt), Surprise onside (1 in 5 recovered; a plain onside is 1 in 8) and Squib
+  kick (1 in 5 recovered, otherwise a short field). `Call.premium`; offered when `State.pb` (GameScreen sets it for an
+  owner); the AI never calls them, so every saved game and digest is unchanged. Honest odds, graded like every call;
+  balance in `scripts/playbook.gen.test.ts` (a playbook play is the best call in about 7% of spots). A Daily made with
+  one is starred on the leaderboard (`SpotResult.pb` → the score post's `pb` → the Durable Object's `pb` column).
 

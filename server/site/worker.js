@@ -42,6 +42,8 @@ export class DayBoard extends DurableObject {
       this.sql.exec(`CREATE TABLE IF NOT EXISTS scores (tok TEXT PRIMARY KEY, name TEXT, score INTEGER, grades TEXT, win INTEGER, t INTEGER);
         CREATE INDEX IF NOT EXISTS by_score ON scores (score DESC, t ASC);
         CREATE TABLE IF NOT EXISTS posts (addr TEXT PRIMARY KEY, n INTEGER)`);
+      // a score made with the Coach's Playbook is marked on the board (the column arrived after the table)
+      try { this.sql.exec('ALTER TABLE scores ADD COLUMN pb INTEGER DEFAULT 0'); } catch { /* already there */ }
       // the first version kept the day as one object: move it into the table once
       const old = await ctx.storage.get('scores');
       if (old && typeof old === 'object') {
@@ -60,7 +62,7 @@ export class DayBoard extends DurableObject {
       day, count, bands,
       rank: mine ? q('SELECT COUNT(*) AS n FROM scores WHERE score > ?', mine.score)[0].n + 1 : null,
       tied: mine ? q('SELECT COUNT(*) AS n FROM scores WHERE score = ?', mine.score)[0].n - 1 : 0,
-      best: q('SELECT name, score FROM scores ORDER BY score DESC, t ASC LIMIT 10'),
+      best: q('SELECT name, score, pb FROM scores ORDER BY score DESC, t ASC LIMIT 10').map((r) => (r.pb ? { name: r.name, score: r.score, pb: true } : { name: r.name, score: r.score })),
       average: count ? Math.round(average * 10) / 10 : 0,
     };
   }
@@ -69,9 +71,9 @@ export class DayBoard extends DurableObject {
     const n = this.sql.exec('SELECT n FROM posts WHERE addr = ?', addr).toArray()[0]?.n ?? 0;
     if (n >= POSTS_PER_ADDRESS) return null;
     this.sql.exec('INSERT INTO posts VALUES (?, 1) ON CONFLICT(addr) DO UPDATE SET n = n + 1', addr);
-    this.sql.exec(`INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(tok) DO UPDATE SET name = excluded.name, score = excluded.score, grades = excluded.grades, win = excluded.win`,
-    entry.token, entry.name, entry.score, entry.grades, entry.win ? 1 : 0, Date.now());
+    this.sql.exec(`INSERT INTO scores (tok, name, score, grades, win, t, pb) VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tok) DO UPDATE SET name = excluded.name, score = excluded.score, grades = excluded.grades, win = excluded.win, pb = excluded.pb`,
+    entry.token, entry.name, entry.score, entry.grades, entry.win ? 1 : 0, Date.now(), entry.pb ? 1 : 0);
     return this.summary(day, entry.token);
   }
 }
@@ -122,7 +124,7 @@ async function api(request, env, url) {
     // the address only counts posts, and only as a salted hash: no IP is stored
     const ip = callerOf(request.headers.get('cf-connecting-ip') || 'unknown');
     const addr = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(day + ':' + ip)))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
-    const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win }, addr);
+    const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win, pb: body.pb === true }, addr);
     if (!sum) return json({ error: 'too many scores from this address today' }, 429);
     try { await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum); }
     catch (e) { console.error(JSON.stringify({ audit: 'stats.update_failed', day, error: String(e?.message ?? e).slice(0, 120) })); }
@@ -214,7 +216,7 @@ function boardTable(best, rivalDay) {
   rows.sort((a, b) => b.score - a.score || (a.bench ? 1 : 0) - (b.bench ? 1 : 0));
   const tr = rows.map((e) => e.bench
     ? `<tr class="bench"><td class="rk"><span class="rank" aria-hidden="true">·</span></td><td>${esc(e.name)}<span class="badge">${esc(e.tag)}</span></td><td class="num score">${e.score}</td></tr>`
-    : `<tr class="r${e.rank}"><td class="rk"><span class="rank">${e.rank}</span></td><td>${esc(e.name)}</td><td class="num score">${e.score}</td></tr>`).join('');
+    : `<tr class="r${e.rank}"><td class="rk"><span class="rank">${e.rank}</span></td><td>${esc(e.name)}${e.pb ? '<span class="badge" title="Played with the Coach&#39;s Playbook">★ Playbook</span>' : ''}</td><td class="num score">${e.score}</td></tr>`).join('');
   return `<div class="panel"><table><thead><tr><th class="rk">#</th><th>Coach</th><th class="num">Score</th></tr></thead><tbody>${tr}</tbody></table></div>`;
 }
 

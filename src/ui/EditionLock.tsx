@@ -19,6 +19,7 @@ export function EditionLock({ title, blurb, points }: { title: string; blurb: st
 /** Everything the edition holds, for any lock that wants the full list. */
 export const EDITION_POINTS = [
   'No ads, anywhere in the game',
+  'The Coach’s Playbook: hook and ladder, Statue of Liberty, halfback pass, fake punt, surprise onside and squib kicks',
   'Career Legacy: retirement, the Hall of Fame vote, the record book and the league’s history',
   'Three career slots',
   'The Gridiron Challenge ladder: eight original spots, three stars each',

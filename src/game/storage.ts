@@ -33,6 +33,7 @@ export interface SpotResult {
   aiLost: number;        // what the AI coach would have given up on the same decisions
   tags: string[];        // what kind of calls were made (for the coach profile)
   baseWp?: number;       // how often the simulated coach wins from the starting spot (absent on old saves)
+  pb?: boolean;          // a Coach's Playbook play or kick was called (shown with a star on the Daily leaderboard)
   facts?: GameFacts;     // what badges read: the spot you took over, fourth downs, takeaways… (absent on old saves)
 }
 

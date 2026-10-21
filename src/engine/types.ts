@@ -22,7 +22,8 @@ export type DefClock = 'timeout' | 'let';
 export type Special = 'kneel' | 'fg' | 'punt' | 'spike';
 export type StChoice = 'block' | 'safe' | 'return' | 'rush';
 export type PatChoice = 'xp' | 'two';
-export type KickChoice = 'deep' | 'onside';
+/** surprise: an onside kick nobody expects (1 in 5 recovered); squib: a low bouncer (1 in 5 recovered, otherwise a short field). Both Coach's Playbook. */
+export type KickChoice = 'deep' | 'onside' | 'surprise' | 'squib';
 /** Weather. Rare on purpose: most games are clear. See sim.ts WEATHER for what each one does. */
 export type Weather = 'clear' | 'rain' | 'snow' | 'wind';
 /** Ways to adjust a pass call: fake the run first, roll the quarterback out, or work the sideline. */
@@ -92,6 +93,7 @@ export interface State {
   coin?: { call: Coin; face: Coin; won: Team; pick?: Team };   // overtime's toss: the call, how it landed, who won, and who chooses now
   otPlay?: boolean;       // a late-game spot that ends tied plays overtime (the playoff rules); absent on older dailies, where a weighted coin settles it
   twoPlay?: boolean;      // a two-point try is a snap from the 2 that someone calls; absent on older games, where it's a weighted coin
+  pb?: boolean;           // the Coach's Playbook is open to team 0 (the Coach's Edition): its plays and kicks are offered
   nr?: boolean;           // the finer NFL rules: an untimed down after a defensive foul at 0:00, no try after a walk-off touchdown, kicks
                           // recovered or returned past the goal line score, the two-minute warning counts in a kneel-out, out of bounds
                           // stops the clock in the last 5:00 of the fourth quarter (not 2:00); absent on older games
@@ -160,7 +162,7 @@ export type Ev =
   | { type: 'warning'; t: number }
   | { type: 'expire'; t: number }
   | { type: 'snap'; off: Team; yl0: number; down0: number; dist0: number; t0: number; t: number; res: PlayResult; first: boolean; try?: boolean }   // try: a two-point try's snap
-  | { type: 'kick'; kind: 'kickoff' | 'onside' | 'free'; kicker: Team; recover: Team; touchback: boolean; td: boolean; yl: number; t: number }
+  | { type: 'kick'; kind: 'kickoff' | 'onside' | 'free'; kicker: Team; recover: Team; touchback: boolean; td: boolean; yl: number; t: number; squib?: boolean; surprise?: boolean }
   | { type: 'pat'; off: Team; two: boolean; good: boolean; t: number; played?: boolean; def2?: boolean }   // played: the try was a snap (already drawn); def2: the defense returned it for two
   | { type: 'twotry'; off: Team; t: number }   // going for two: the try is a snap from the 2
   | { type: 'adjust'; call: string; counter: Look; t: number }   // their defense adjusts to the call you keep running

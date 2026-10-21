@@ -95,6 +95,8 @@ export interface Design {
   develop: number;
   /** the play side is fixed by the design (+1 right, -1 left), or decided at the snap */
   side?: 1 | -1;
+  /** passes with a lateral first (qb 'lateral'): who takes it and throws (the second receiver unless set) */
+  lateralTo?: 'WR2' | 'RB';
 }
 
 export const DESIGN: Record<string, Design> = {
@@ -130,6 +132,11 @@ export const DESIGN: Record<string, Design> = {
   reverse: { formation: 'gun', scheme: 'stretch', qb: 'handoff', carrier: 'WR2', hole: -11, rb: 'fake', te: 'block', develop: 1.0 },
   wr_pass: { formation: 'gun', scheme: 'pass', qb: 'lateral', rb: 'block', te: 'route', develop: 1.9 },
   direct: { formation: 'wildcat', scheme: 'gap', qb: 'hand', carrier: 'RB', hole: 3.5, rb: 'carry', te: 'block', develop: 0.15 },
+  // ---- the Coach's Playbook
+  hook_ladder: { formation: 'trips', scheme: 'pass', qb: 'gun3', rb: 'route', te: 'route', develop: 1.15 },
+  statue: { formation: 'gun', scheme: 'stretch', qb: 'handoff', carrier: 'RB', hole: -9, rb: 'carry', te: 'block', develop: 1.35 },
+  hb_pass: { formation: 'single', scheme: 'pass', qb: 'lateral', lateralTo: 'RB', rb: 'block', te: 'route', develop: 2.1 },
+  fake_punt: { formation: 'wildcat', scheme: 'zone', qb: 'hand', carrier: 'RB', hole: -2.5, rb: 'carry', te: 'block', develop: 0.2 },
 };
 
 /** Everything that makes a call the play it is. Two calls with the same signature would be the same play. */

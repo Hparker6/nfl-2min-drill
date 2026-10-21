@@ -178,12 +178,21 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
     let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * PM.yacMul * Wx.yac * (mods.oob ? 0.55 : 1));
     if (r() < 0.018 * PM.bigYac) yac += 12 + Math.round(r() * 30);
     if (route === 'screen' && famOf(look) === 'blitz') yac += 2;
+    // hook and ladder: the lateral breaks free about three times in five, is on the ground about one time in eleven
+    let pitchLost = false;
+    if (c.ladder) {
+      const lr = r();
+      if (lr < 0.09) { pitchLost = true; yac = Math.min(yac, 1); }
+      else if (lr < 0.71) yac += 4 + Math.round(-Math.log(1 - r() * 0.999) * 9);
+      else yac = Math.min(yac, 2);
+    }
     let y = catchY + yac;
     if (s.yl + y <= 0) y = 1 - s.yl;
     y = Math.min(y, yt);
     res.yards = y;
-    res.td = y >= yt;
-    if (!res.td && r() < 0.006 * Wx.fumble) { res.fumble = true; res.turnover = true; }
+    res.td = !pitchLost && y >= yt;
+    if (pitchLost) { res.fumble = true; res.turnover = true; }
+    else if (!res.td && r() < 0.006 * Wx.fumble) { res.fumble = true; res.turnover = true; }
     // working the sideline: he gets out most of the time, for fewer yards
     res.oob = !res.td && !res.turnover && r() < (mods.oob ? 0.85 : RT.oob);
     res.dur = drop.release + fl + Math.max(yac, 0) / 6 + 0.8;
@@ -703,10 +712,16 @@ function kickStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
     s.safetyKick = false;
     yl = clip(Math.round(40 + gauss(r) * 6), 20, 60);
     dur = 6;
-  } else if ((ch?.kick ?? aiKick(s)) === 'onside') {
+  } else if ((ch?.kick ?? aiKick(s)) === 'onside' || ch?.kick === 'surprise') {
     kind = 'onside';
     dur = 3;
-    if (r() < 0.12) { recover = k; yl = 47; } else yl = 53;
+    // a surprise onside (the Coach's Playbook) catches them in their return set: one in five
+    if (r() < (ch?.kick === 'surprise' ? 0.2 : 0.12)) { recover = k; yl = 47; } else yl = 53;
+  } else if (ch?.kick === 'squib') {
+    // a low bouncer (the Coach's Playbook): an up-man mishandles it one time in five, otherwise a short field, no return
+    kind = 'kickoff';
+    dur = 5;
+    if (r() < 0.2) { recover = k; yl = 58; } else yl = clip(Math.round(31 + gauss(r) * 4), 22, 40);
   } else {
     kind = 'kickoff';
     if (r() < 0.58) { touchback = true; yl = 35; dur = 0; } else {
@@ -731,7 +746,7 @@ function kickStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
     s.stage = 'pre';
     endCheck(s);
   }
-  ev?.push({ type: 'kick', kind, kicker: k, recover, touchback, td, yl, t: s.t });
+  ev?.push({ type: 'kick', kind, kicker: k, recover, touchback, td, yl, t: s.t, ...(ch?.kick === 'squib' ? { squib: true } : ch?.kick === 'surprise' ? { surprise: true } : {}) });
   if (!warned && s.warned) ev?.push({ type: 'warning', t: s.t });
 }
 

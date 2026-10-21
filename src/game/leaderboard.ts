@@ -12,7 +12,7 @@ export interface Board {
   rank: number | null;      // your rank (1 = best), null when not submitted
   tied: number;             // others with your score
   bands: number[];          // counts in 0-9, 10-19, …, 90-100
-  best: { name: string; score: number }[];
+  best: { name: string; score: number; pb?: boolean }[];   // pb: made with the Coach's Playbook
   average: number;
 }
 
@@ -40,12 +40,13 @@ function asBoard(x: unknown): Board | 'failed' {
   return b && typeof b === 'object' && typeof b.count === 'number' && Array.isArray(b.bands) && Array.isArray(b.best) ? b : 'failed';
 }
 
-export async function submitScore(day: string, name: string, score: number, grades: string, win: boolean): Promise<BoardAnswer> {
+/** `pb`: the game used the Coach's Playbook (the board marks the score with a star). */
+export async function submitScore(day: string, name: string, score: number, grades: string, win: boolean, pb = false): Promise<BoardAnswer> {
   if (!ON) return null;
   try {
     const r = await fetch(`${URL}/v1/day/${day}/score`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token: token(), name: name.slice(0, 20), score: Math.round(score), grades: grades.slice(0, 64), win }),
+      body: JSON.stringify({ token: token(), name: name.slice(0, 20), score: Math.round(score), grades: grades.slice(0, 64), win, ...(pb ? { pb: true } : {}) }),
     });
     if (r.status === 429) return 'limited';
     if (!r.ok) return 'failed';
@@ -66,7 +67,7 @@ export async function fetchBoard(day: string): Promise<BoardAnswer> {
 export const bandOf = (score: number) => Math.min(9, Math.floor(score / 10));
 export const BAND_LABELS = ['0', '10', '20', '30', '40', '50', '60', '70', '80', '90'];
 
-export interface DaySummary { count: number; average: number; best: { name: string; score: number }[]; bands: number[] }
+export interface DaySummary { count: number; average: number; best: { name: string; score: number; pb?: boolean }[]; bands: number[] }
 export interface Stats { days: Record<string, DaySummary> }
 
 export async function fetchStats(): Promise<Stats | 'failed' | null> {

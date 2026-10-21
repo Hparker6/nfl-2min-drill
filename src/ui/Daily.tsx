@@ -140,7 +140,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
     const nick = store.settings.nickname;
     if (nick) track('leaderboard_submit', { performance: rt.performance, win: result.win });
     setBoardErr(false);
-    (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win) : fetchBoard(date)).then((b) => { if (!live) return; if (b === 'failed' || b === 'limited') setBoardErr(b); else if (b) setBoard(b); });
+    (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win, !!result.pb) : fetchBoard(date)).then((b) => { if (!live) return; if (b === 'failed' || b === 'limited') setBoardErr(b); else if (b) setBoard(b); });
     return () => { live = false; };
   }, [on, date, rt.performance, store.settings.nickname, boardTry]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -192,7 +192,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
   const vs = versusRivals(rt.performance, rivals);
   const aiBands = BAND_LABELS.map((_, i) => rivals.filter((x) => bandOf(x.score) === i).length);
   const maxBand = Math.max(1, ...(board?.bands ?? []).map((n, i) => n + aiBands[i]), ...aiBands);
-  const bestRows = [...(board?.best ?? []).map((b, i) => ({ name: b.name, score: b.score, rank: i + 1, ai: false, style: '' })), ...rivals.map((x) => ({ name: x.name, score: x.score, rank: 0, ai: true, style: x.style }))]
+  const bestRows = [...(board?.best ?? []).map((b, i) => ({ name: b.name, score: b.score, rank: i + 1, ai: false, style: '', pb: !!b.pb })), ...rivals.map((x) => ({ name: x.name, score: x.score, rank: 0, ai: true, style: x.style, pb: false }))]
     .sort((a, b) => b.score - a.score || (a.ai ? 1 : 0) - (b.ai ? 1 : 0)).slice(0, 10);
 
   return (
@@ -269,11 +269,11 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
                 </div>
                 <p className="muted small">Today's average: {board.average} · yours: {rt.performance}</p>
                 <ol className="best">
-                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked</em></span>
+                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked, ★ Coach's Playbook</em></span>
                   {bestRows.map((b, i) => (
                     <li key={i} className={b.ai ? 'ai' : ''}>
                       <span>{b.ai ? '·' : b.rank}</span>
-                      <span>{b.name}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
+                      <span>{b.name}{b.pb && <i className="pb-badge" title="Played with the Coach's Playbook">★</i>}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
                       <b>{b.score}</b>
                     </li>
                   ))}

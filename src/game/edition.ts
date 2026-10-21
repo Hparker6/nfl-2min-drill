@@ -1,5 +1,6 @@
 /**
- * The Coach's Edition: the one-time unlock (Career Legacy, more career slots, the Gridiron Challenge ladder).
+ * The Coach's Edition: the one-time unlock (no ads, the Coach's Playbook, Career Legacy, more career slots, the Gridiron
+ * Challenge ladder).
  *
  * On the live site the edition shows only once its server sells it for real (/v1/me answers payments 'live'): until
  * then every screen looks and plays exactly as before, so the code can ship ahead of the switch. Then it is owned when

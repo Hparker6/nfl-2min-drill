@@ -97,7 +97,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
             {sel.best.length > 0 && (
               <>
                 <div className="k">Top ten</div>
-                <ol className="best">{sel.best.map((b, k) => <li key={k}><span>{k + 1}</span><span>{b.name}</span><b>{b.score}</b></li>)}</ol>
+                <ol className="best">{sel.best.map((b, k) => <li key={k}><span>{k + 1}</span><span>{b.name}{b.pb && <i className="pb-badge" title="Played with the Coach's Playbook">★</i>}</span><b>{b.score}</b></li>)}</ol>
               </>
             )}
           </>
