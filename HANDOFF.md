@@ -205,4 +205,9 @@ Four review passes (server, UI, engine, career/renderers) plus two fuzz harnesse
   fade left white text on white). The NFL's 5:00 out-of-bounds rule (with `nr`, from NR_FROM for dailies). `App.update`
   applies each change once. Local Safari sign-in (plain dev cookie on localhost only). Clutch ratings built once per
   game. Career stays a fictional league for launch (owner's call, option 3); real teams can come later.
+- 2026-10-22 **Ready for the live site, waiting on the owner's push** (Claude Code's permission check blocks pushes to
+  `main`): branch `live-ads` = `main` + the leaderboard integrity fix (`bb78514`) + ads on (`71c83bb`: CSP allows
+  AdSense, the script loads only where an ad shows, footer + end-of-game placements, unit `4281334746`, `ads.txt`).
+  To ship: `git push origin live-ads:main`, or merge https://github.com/Hparker6/nfl-2min-drill/pull/new/live-ads.
+  The same changes are on this branch (the ad slot also skips Coach's Edition owners here). Keep AdSense Auto ads off.
 

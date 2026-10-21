@@ -17,7 +17,7 @@ export const SUPPORT_URL = url('VITE_SUPPORT_URL');
 /** The site's AdSense account (public: it is in every page's head). */
 export const ADSENSE_CLIENT = 'ca-pub-2581780385461126';
 /** The display ad unit's slot ID (public too), from AdSense → Ads → By ad unit. Empty: no ad slots show. */
-export const ADSENSE_SLOT = '';
+export const ADSENSE_SLOT = '4281334746';   // initial_ad_unit (display, responsive)
 const client = env('VITE_ADSENSE_CLIENT') || ADSENSE_CLIENT;
 const slot = env('VITE_ADSENSE_SLOT') || ADSENSE_SLOT;
 /** The ad unit, or null: a real-looking publisher ID and a numeric slot ID, and ads not turned off. */
