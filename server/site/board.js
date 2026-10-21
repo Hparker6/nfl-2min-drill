@@ -1,17 +1,20 @@
 /** The leaderboard's checks: the names it shows, who counts as one caller, and which scores a game can produce. */
-// names are public on the board: letters, digits and a little punctuation, 20 characters, no obvious abuse
+// names are public on the board: letters, digits and a little punctuation, 20 characters, no obvious abuse.
+// Whole words only (\b): a word hiding inside a real name (Scunthorpe, Harshita, Siriporn) is left alone.
 const BLOCK = /\b(fuck\w*|shit\w*|cunt\w*|nigg\w*|fag\w*|bitch\w*|whore\w*|slut\w*|rape\w*|rapist|nazi\w*|hitler|porn\w*|dick|dicks|cock|cocks|pussy|asshole\w*|retard\w*)\b/i;
-// the same words with the separators taken out and look-alikes folded (f.u.c.k, sh1t, Cyrillic letters): no \b here,
-// so only words long or rare enough not to sit inside an ordinary name
-const SQUASHED = /(fuck|shit|nigg|whore|slut|rapist|hitler|porn|pussy|asshole|retard|bitch)/i;   // not cunt or nazi: Scunthorpe, Ignazio
-const LOOKALIKE = { 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ѕ': 's', 'к': 'k', 'н': 'h', 'т': 't', 'м': 'm', 'в': 'b', 'ꓑ': 'p', 'ꓳ': 'o', 'ꓣ': 'r', 'ꓠ': 'n', 'ꓢ': 's', 'ꓡ': 'l', 'ꓔ': 't', 'ꓕ': 't', '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's' };
+// Cyrillic and Lisu letters that look Latin, folded before the check (fuсk with a Cyrillic с). Letters only: digits
+// stay digits, so a name with a number in it is never read as a word.
+const LOOKALIKE = { 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ѕ': 's', 'к': 'k', 'н': 'h', 'т': 't', 'м': 'm', 'в': 'b', 'ꓑ': 'p', 'ꓳ': 'o', 'ꓣ': 'r', 'ꓠ': 'n', 'ꓢ': 's', 'ꓡ': 'l', 'ꓔ': 't', 'ꓕ': 't' };
 // Hangul fillers and other blanks that NFKC keeps as "letters" but render as nothing
-const INVISIBLE = /[\u115F\u1160\u3164\uFFA0\u2800\u180E\u200B-\u200F\u2060-\u2064\uFEFF]/gu;
+const INVISIBLE = /[ᅟᅠㅤﾠ⠀᠎​-‏⁠-⁤﻿]/gu;
 export function cleanName(s) {
   const n = String(s ?? '').normalize('NFKC').replace(INVISIBLE, '').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
   if (!n || !/[\p{L}\p{N}]/u.test(n)) return 'Anonymous';
-  const squashed = [...n.toLowerCase()].map((ch) => LOOKALIKE[ch] ?? ch).join('').replace(/[^a-z]/g, '');
-  return BLOCK.test(n) || SQUASHED.test(squashed) ? 'Coach' : n;
+  // the check also reads a copy with look-alikes folded and spelled-out letters joined (f.u.c.k, f_u_c_k, f u c k):
+  // only runs of single letters are joined, so "J. R. Smith" and "Jo Ann" stay as they are
+  const folded = [...n].map((ch) => LOOKALIKE[ch.toLowerCase()] ?? ch).join('')
+    .replace(/(?:^|(?<=[\s._'-]))(?:\p{L}[\s._'-]){3,}\p{L}(?=$|[\s._'-])/gu, (m) => m.replace(/[\s._'-]/g, ''));
+  return BLOCK.test(n) || BLOCK.test(folded) ? 'Coach' : n;
 }
 
 /** The caller for the post limit: an IPv4 address, or an IPv6 /64 (one connection usually holds a whole /64). */
