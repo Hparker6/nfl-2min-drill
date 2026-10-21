@@ -1364,3 +1364,25 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 @media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } .tour-pop { animation: none; } }
 /* the end-of-game ad: below the summary and its buttons, with room between, never touching them */
 .ad-slot.ad-end:has(ins[data-ad-status="filled"]) { margin: 28px auto 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+
+/* auto-advance: the Next play button fills as the next play comes */
+.btn.next { position: relative; overflow: hidden; }
+.btn.next > span, .btn.next > kbd { position: relative; }
+.next-fill { position: absolute; inset: 0; transform-origin: left; transform: scaleX(0); background: color-mix(in srgb, var(--accent) 38%, transparent); animation: next-fill linear forwards; }
+@keyframes next-fill { to { transform: scaleX(1); } }
+.res-held { font-size: 12px; color: var(--muted); align-self: center; }
+@media (prefers-reduced-motion: reduce) { .next-fill { animation: none; transform: scaleX(.5); } }
+.res-held { grid-column: 1 / -1; }
+
+/* big moments: the word bursts onto the field */
+.impact-bigPlay::before, .impact-converted::before, .impact-stop::before { background: radial-gradient(ellipse at center, rgba(99, 213, 138, .26), transparent 70%); animation: fx-flash 1.2s ease-out; }
+.impact-tdFor::before { background: radial-gradient(ellipse at center, color-mix(in srgb, var(--tc, #f5c518) 45%, transparent), transparent 72%); }
+.burst { position: absolute; left: 50%; top: 44%; z-index: 3; transform: translate(-50%, -50%); pointer-events: none; text-align: center; white-space: nowrap; }
+.burst b { display: block; font: 800 clamp(34px, 11cqw, 96px)/.95 var(--display); text-transform: uppercase; letter-spacing: .03em; color: #fff;
+  text-shadow: 0 4px 0 rgba(0, 0, 0, .35), 0 0 28px rgba(0, 0, 0, .45); animation: fx-burst 1.4s var(--ease) both; }
+.burst-tdFor b { color: var(--tc2, #fff); -webkit-text-stroke: 2px var(--tc, #0b0f0d); text-shadow: 0 6px 0 var(--tc, rgba(0, 0, 0, .4)), 0 0 40px rgba(0, 0, 0, .5); font-size: clamp(40px, 14cqw, 120px); animation-duration: 1.9s; }
+.burst-giveaway b { color: #ff8a80; }
+.burst-takeaway b, .burst-stop b, .burst-converted b { color: #9ff0bd; }
+.burst-bigPlay b { font-size: clamp(28px, 8cqw, 64px); color: #f5c518; }
+@keyframes fx-burst { 0% { opacity: 0; transform: scale(.4) rotate(-6deg); } 18% { opacity: 1; transform: scale(1.12) rotate(1deg); } 30% { transform: scale(1) rotate(0); } 78% { opacity: 1; } 100% { opacity: 0; transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .burst b { animation: fx-flash 1s ease-out both; } }

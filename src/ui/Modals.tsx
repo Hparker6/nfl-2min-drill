@@ -158,9 +158,11 @@ export function SettingsModal({ store, update, onClose, onAccount }: { store: St
             <option value="instant">Skip animations</option>
           </select>
         </label>
+        <label className="check"><input type="checkbox" checked={st.autoNext !== false} onChange={(e) => set('autoNext', e.target.checked)} /> Go on to the next play by itself (tap the result to pause)</label>
         <label className="check"><input type="checkbox" checked={st.hints} onChange={(e) => set('hints', e.target.checked)} /> Coach mode in Practice (show win chances before you call)</label>
         <label className="check"><input type="checkbox" checked={st.sound !== false} onChange={(e) => set('sound', e.target.checked)} /> Sound effects</label>
         <label className="check"><input type="checkbox" checked={st.music !== false} onChange={(e) => set('music', e.target.checked)} /> Background music</label>
+        <label className="check"><input type="checkbox" checked={st.haptics !== false} onChange={(e) => set('haptics', e.target.checked)} /> Vibration on big plays (phones)</label>
         <label className="field-look"><span>Field look</span>
           <select value={st.fieldLook ?? 'classic'} onChange={(e) => set('fieldLook', e.target.value as FieldLook)}>
             {LOOKS_FIELD.map((l) => { const open = Object.keys(store.badges ?? {}).length >= l.need; return <option key={l.id} value={l.id} disabled={!open}>{l.name}{open ? '' : ` (${l.need} badges)`}</option>; })}

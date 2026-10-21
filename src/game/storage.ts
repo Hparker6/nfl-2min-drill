@@ -13,6 +13,8 @@ export interface Settings {
   sound?: boolean;       // sound effects (on unless set to false)
   music?: boolean;       // the light background music (on unless set to false)
   fieldLook?: FieldLook; // the field's look (badges unlock more)
+  autoNext?: boolean;    // after a play's result and grade, go on by itself (on unless set to false)
+  haptics?: boolean;     // phones: a buzz on the big moments (on unless set to false)
 }
 
 export interface SpotResult {

@@ -24,7 +24,7 @@ describe('what a moment sounds and looks like', () => {
   });
   it('a stop on downs is a crowd reaction, not a turnover sting', () => {
     expect(cueFor(snap(0, { turnover: true, yards: 1 }))).toEqual({ sound: 'groan', impact: null });
-    expect(cueFor(snap(1, { turnover: true, yards: 1 }))).toEqual({ sound: 'cheer', impact: null });
+    expect(cueFor(snap(1, { turnover: true, yards: 1 }))).toEqual({ sound: 'cheer', impact: 'stop' });   // their fourth down stopped: celebrated
   });
   it('ordinary plays are quiet: a whistle, a chime for a first down, a hit for a sack', () => {
     expect(cueFor(snap(0, {}))).toEqual({ sound: 'whistle', impact: null });
@@ -38,5 +38,17 @@ describe('what a moment sounds and looks like', () => {
   });
   it('the audio engine is a safe no-op where Web Audio does not exist', () => {
     expect(() => { audio.configure({ sound: true, music: true }); audio.unlock(); audio.play('win'); }).not.toThrow();
+  });
+});
+
+import { describe as d2, expect as e2, it as i2 } from 'vitest';
+d2('the new big moments', () => {
+  const snap = (off: 0 | 1, res: Record<string, unknown>, o: Record<string, unknown> = {}) => ({ type: 'snap', off, yl0: 40, down0: 1, dist0: 10, t0: 100, t: 94, first: false, ...o, res: { kind: 'run', call: 'power', look: 'zone', carrier: 'RB', yards: 4, oob: false, td: false, safety: false, turnover: false, dur: 5, side: 1, ...res } }) as never;
+  i2('your 20-yard gain, your fourth down made, their fourth down stopped', () => {
+    e2(cueFor(snap(0, { yards: 24 }))).toEqual({ sound: 'cheer', impact: 'bigPlay' });
+    e2(cueFor(snap(0, { yards: 3 }, { down0: 4, first: true }))).toEqual({ sound: 'cheer', impact: 'converted' });
+    e2(cueFor(snap(1, { turnover: true, yards: 1 }))).toEqual({ sound: 'cheer', impact: 'stop' });
+    e2(cueFor(snap(1, { kind: 'punt', turnover: true, yards: 40 })).impact).toBeNull();
+    e2(cueFor(snap(1, { yards: 24 })).impact).toBeNull();   // their big play isn't celebrated
   });
 });

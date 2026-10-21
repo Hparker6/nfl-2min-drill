@@ -21,7 +21,7 @@ import { SpotReview } from './Review';
 import { tellsOf, type Preview } from './field';
 import { AdSlot, gameOnScreen } from './AdSlot';
 import { audio } from '../game/audio';
-import { cueFor, finalCue, type ImpactKind } from '../game/fx';
+import { cueFor, finalCue, HAPTIC, type ImpactKind } from '../game/fx';
 import { Impact } from './Impact';
 import { CoinToss } from './CoinToss';
 
@@ -133,9 +133,11 @@ export function GameScreen(p: Props) {
   /** A big moment on the field: the overlay, and a shake for the ones that hurt (not under reduced motion). */
   const fire = useCallback((kind: ImpactKind) => {
     setImpact({ id: ++uid, kind });
+    // a phone feels it (Android; iPhones have no vibration API for the web, so nothing happens there)
+    if (settings.haptics !== false && !reduced && typeof navigator !== 'undefined' && 'vibrate' in navigator) { try { navigator.vibrate(HAPTIC[kind]); } catch { /* not allowed here */ } }
     const el = stageRef.current;
     if (el && kind === 'giveaway' && !reduced) { el.classList.remove('fx-shake'); void el.offsetWidth; el.classList.add('fx-shake'); }
-  }, [reduced]);
+  }, [reduced, settings.haptics]);
   /** The sound of a moment, and its impact on the field (replays get the sound only). */
   const react = useCallback((ev: Ev, withImpact = true) => {
     const c = cueFor(ev);
@@ -531,6 +533,18 @@ export function GameScreen(p: Props) {
 
   const next = () => { if (!replaying && (last?.grade || last?.failed)) { track('next_play', { mode: sc.mode }); proceed(); } };
 
+  // auto-advance: the result and its grade stay up long enough to read (longer for a costly call, which has more to
+  // say), then the next play comes on its own. Touching the result, opening Why?, or a replay holds it.
+  const [held, setHeld] = useState(false);
+  useEffect(() => { setHeld(false); }, [last]);
+  const autoMs = !last || !(last.grade || last.failed) ? 0 : (settings.speed === 'normal' ? 4200 : 2600) + (last.grade && (last.grade.g === 'o' || last.grade.g === 'r') ? 1600 : 0);
+  const autoOn = settings.autoNext !== false && phase === 'result' && !!autoMs && !held && !replaying;
+  useEffect(() => {
+    if (!autoOn) return;
+    const id = setTimeout(() => { if (!document.hidden) next(); else setHeld(true); }, autoMs);
+    return () => clearTimeout(id);
+  }, [autoOn, autoMs, last]);   // eslint-disable-line react-hooks/exhaustive-deps
+
   /** Overtime's toss: the call (then the coin lands on screen), and the winner's choice. Neither is graded. */
   const tossPick = (step: 'toss' | 'otpick', key: string) => {
     const d = session.decision();
@@ -603,7 +617,8 @@ export function GameScreen(p: Props) {
       </section>
     );
   } else if (phase === 'result' && last) {
-    side = <ResultCard last={last} s={view} teams={T} onNext={next} onReplay={replay} replaying={replaying} over={session.over} overLabel={p.segment ? p.segment.endLabel ?? 'Continue' : undefined} />;
+    side = <ResultCard last={last} s={view} teams={T} onNext={next} onReplay={() => { setHeld(true); replay(); }} replaying={replaying} over={session.over} overLabel={p.segment ? p.segment.endLabel ?? 'Continue' : undefined}
+      auto={autoOn ? autoMs : 0} held={held && settings.autoNext !== false} onHold={() => setHeld(true)} />;
   } else if (phase === 'over' && result) {
     side = <>
       <SpotReview result={result} session={session} trail={trail} onContinue={p.onContinue} continueLabel={p.continueLabel}
@@ -639,7 +654,7 @@ export function GameScreen(p: Props) {
         <div className="stage" ref={stageRef}>
           <FieldView ref={field} teams={T} onTap={onTap} banner={banner} offense={view.off} weather={view.weather} byRating={!settings.plainDots} home={sc.home} look={settings.fieldLook}>
             <div className={`fchip ${chip[0]}`}>{chip[0] === 'live' && <i />}{chip[1]}</div>
-            {impact && <Impact key={impact.id} kind={impact.kind} onDone={() => setImpact((x) => (x?.id === impact.id ? null : x))} />}
+            {impact && <Impact key={impact.id} kind={impact.kind} colors={[T[0].color, T[0].color2]} onDone={() => setImpact((x) => (x?.id === impact.id ? null : x))} />}
             {view.mo != null && <Momentum mo={view.mo} you={T[0].id} them={T[1].id} />}
             {clutchNow && <div className="fchip-clutch" aria-live="polite"><i aria-hidden />Game on the line</div>}
             {tellNow && <div className="fchip-tell" title={`What the defense shows before the snap. Your read is right about ${Math.round(readNow.p * 100)}% of the time.`}>Tell · {tellNow}</div>}
@@ -667,9 +682,9 @@ export function GameScreen(p: Props) {
   );
 }
 
-interface RCProps { last: Last; s: State; teams: [import('../engine/types').TeamInfo, import('../engine/types').TeamInfo]; onNext: () => void; onReplay: () => void; replaying: boolean; over: boolean; overLabel?: string }
+interface RCProps { last: Last; s: State; teams: [import('../engine/types').TeamInfo, import('../engine/types').TeamInfo]; onNext: () => void; onReplay: () => void; replaying: boolean; over: boolean; overLabel?: string; auto?: number; held?: boolean; onHold?: () => void }
 
-function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLabel }: RCProps) {
+function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLabel, auto = 0, held, onHold }: RCProps) {
   const g = last.grade;
   const head = last.head;
   const others = last.lines.filter((l) => l !== head);
@@ -681,7 +696,8 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLab
     return last.pre && snap ? defenseVerdict(last.pre, snap) : null;
   }, [last.pre, last.evs]);
   return (
-    <section className="result" aria-live="polite">
+    // any touch on the result (reading it, opening Why?) holds the auto-advance; the buttons do their own thing
+    <section className="result" aria-live="polite" onPointerDown={(e) => { if (!(e.target as HTMLElement).closest('.res-actions')) onHold?.(); }} onFocus={(e) => { if (!(e.target as HTMLElement).closest('.res-actions')) onHold?.(); }}>
       {head && (
         <div className={`res-head tone-${head.tone}`}>
           <span className="res-big">{head.banner ?? 'Result'}</span>
@@ -728,7 +744,11 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLab
       )}
       <div className="res-actions">
         {canReplay && <button className="btn ghost replay" onClick={onReplay} disabled={replaying}>↺ Replay<kbd>R</kbd></button>}
-        <button className="btn next" onClick={onNext} disabled={(!g && !last.failed) || replaying}>{over ? overLabel ?? 'See the final' : 'Next play'}<kbd>Enter</kbd></button>
+        <button className={`btn next${auto ? ' auto' : ''}`} onClick={onNext} disabled={(!g && !last.failed) || replaying}>
+          {auto > 0 && <i className="next-fill" key={`${auto}:${last.label}`} style={{ animationDuration: `${auto}ms` }} aria-hidden />}
+          <span>{over ? overLabel ?? 'See the final' : 'Next play'}</span><kbd>Enter</kbd>
+        </button>
+        {held && !replaying && <span className="res-held">Paused · tap Next play when ready</span>}
       </div>
     </section>
   );
