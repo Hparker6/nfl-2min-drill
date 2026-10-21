@@ -42,7 +42,7 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
   try {
     if (p === '/v1/stripe/webhook') {
       if (req.method !== 'POST' || !cfg.payments) return NOT_FOUND();
-      return await handleWebhook(cfg.db, cfg.payments, req, now, opts.fetch ?? fetch);
+      return await handleWebhook(cfg.db, cfg.payments, req, now, opts.fetch ?? fetch, cfg.pepper);
     }
     if (req.method === 'GET') {
       if (p === '/v1/me') return await me(cfg, req, now);
@@ -97,7 +97,7 @@ export async function handleAccounts(req: Request, env: AccountsEnv, url: URL, o
     }
     if (p === '/v1/checkout') {
       if (!cfg.payments) return fail(503, 'Purchases are not open.');
-      return await withSession(cfg, req, now, async (s) => { const r = await createCheckout(cfg.db, cfg.payments!, cfg.origin, s, now, opts.fetch ?? fetch); audit('checkout.started', { status: r.status, live: cfg.payments!.live }); return r; });
+      return await withSession(cfg, req, now, async (s) => { const r = await createCheckout(cfg.db, cfg.payments!, cfg.origin, s, now, opts.fetch ?? fetch, cfg.pepper); audit('checkout.started', { status: r.status, live: cfg.payments!.live }); return r; });
     }
     if (p === '/v1/support') {
       const body = await readJson(req, 12288);

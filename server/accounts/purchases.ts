@@ -15,12 +15,17 @@ import type { D1Database, D1PreparedStatement } from './d1';
 import { PRODUCT, type PaymentsConfig } from './config';
 import { fail, json, readCapped } from './http';
 import { hit, LIMITS } from './ratelimit';
-import { stripeClient, verifyStripeSignature, type StripeError } from './stripe';
+import { StripeError, stripeClient, verifyStripeSignature } from './stripe';
 import type { Session } from './sessions';
 import { audit } from './audit';
+import { sha256 } from './crypto';
 
 export type PurchaseStatus = 'paid' | 'refunded' | 'partially_refunded' | 'disputed' | 'dispute_won' | 'dispute_lost';
 const ACTIVE: PurchaseStatus[] = ['paid', 'partially_refunded', 'dispute_won'];
+/** The past that closes the door (with `purchases.fraud`, a refund we made on the issuer's fraud warning): a chargeback, or a dispute still open. */
+const CLOSES: PurchaseStatus[] = ['dispute_lost', 'disputed'];
+/** The buyer's address as the one-way hash kept on purchases (the same hash as the support form's rate limit). */
+export const emailHash = (pepper: string, email: string) => sha256(`${pepper}:email:${email}`);
 export const entitlementFor = (s: PurchaseStatus): 'active' | 'revoked' => (ACTIVE.includes(s) ? 'active' : 'revoked');
 
 /** The products a user owns now. */
@@ -34,15 +39,15 @@ export const TERMS_TEXT = 'One-time purchase of the Coach’s Edition for this a
 export const TERMS_TEXT_FINAL = 'One-time purchase of the Coach’s Edition for this account; no subscription. This account has had a refund before, so this purchase is final: no refund. Terms: nfl-2min-drill.com/terms';
 
 /** Start a checkout for the signed-in user (409 when they already own it). The price is ours, fixed on the server. */
-export async function createCheckout(db: D1Database, pay: PaymentsConfig, origin: string, s: Session, now: number, f: typeof fetch): Promise<Response> {
+export async function createCheckout(db: D1Database, pay: PaymentsConfig, origin: string, s: Session, now: number, f: typeof fetch, pepper: string): Promise<Response> {
   if (!(await hit(db, LIMITS.checkoutPerUser, s.userId, now))) return fail(429, 'Too many checkout attempts. Try again later.');
   if ((await entitlementsOf(db, s.userId)).includes(PRODUCT.id)) return fail(409, 'You already own the Coach’s Edition.');
-  // the past with this account: a chargeback closes the door (the card's bank already called it fraud once, and
-  // another one costs more than the sale); a refund leaves it open, with the next purchase final (the terms say so)
-  const past = await db.prepare("SELECT SUM(status = 'dispute_lost') AS lost, SUM(status IN ('refunded', 'partially_refunded')) AS refunds FROM purchases WHERE user_id = ?")
-    .bind(s.userId).first<{ lost: number | null; refunds: number | null }>();
-  if (past?.lost) { audit('checkout.refused', { why: 'chargeback' }); return fail(403, 'Purchases aren’t available for this account. Use Help & refunds if you think that’s wrong.'); }
-  const again = !!past?.refunds;
+  // the past with this account, or with this address under an account since deleted: a chargeback or an issuer's
+  // fraud warning closes the door (another one costs more than the sale); a refund leaves it open, with the next
+  // purchase final (the terms say so)
+  const past = await purchaseHistory(db, s.userId, await emailHash(pepper, s.email));
+  if (past.closed) { audit('checkout.refused', { why: 'closed' }); return fail(403, 'Purchases aren’t available for this account. Use Help & refunds if you think that’s wrong.'); }
+  const again = past.refunds > 0;
   const cust = await db.prepare('SELECT stripe_customer_id FROM stripe_customers WHERE user_id = ?').bind(s.userId).first<{ stripe_customer_id: string }>();
   const meta = { user_id: s.userId, product: PRODUCT.id, ...(again ? { final: '1' } : {}) };
   const stripe = stripeClient(pay.secretKey, f);
@@ -61,6 +66,18 @@ export async function createCheckout(db: D1Database, pay: PaymentsConfig, origin
   }, `checkout:${s.userId}:${cust ? 'c' : 'e'}:${again ? 'f' : 'n'}:${Math.floor(now / 60_000)}`);
   if (!cs?.url || !/^https:\/\/checkout\.stripe\.com\//.test(cs.url)) return fail(502, 'Checkout could not be started.');
   return json({ url: cs.url });
+}
+
+/** Refunds and fraud in the past of this account, and of this address under any account since deleted. */
+export async function purchaseHistory(db: D1Database, userId: string | null, emailHash: string): Promise<{ refunds: number; disputes: number; closed: boolean }> {
+  const closes = CLOSES.map((s) => `'${s}'`).join(', ');
+  const r = await db.prepare(
+    `SELECT SUM(status IN ('refunded', 'partially_refunded')) AS refunds,
+            SUM(status IN ('disputed', 'dispute_won', 'dispute_lost')) AS disputes,
+            SUM(status IN (${closes}) OR fraud = 1) AS closed
+       FROM purchases WHERE user_id = ? OR email_hash = ?`,
+  ).bind(userId, emailHash).first<{ refunds: number | null; disputes: number | null; closed: number | null }>();
+  return { refunds: r?.refunds ?? 0, disputes: r?.disputes ?? 0, closed: !!r?.closed };
 }
 
 /** What our records say about a checkout of this user's (the success page polls this). */
@@ -92,7 +109,7 @@ type Outcome = string;
 /** Not ready: answer 5xx so Stripe sends it again later (it retries for days). */
 class RetryLater extends Error {}
 
-export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Request, now: number, f: typeof fetch): Promise<Response> {
+export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Request, now: number, f: typeof fetch, pepper: string): Promise<Response> {
   const body = await readCapped(req, 256 * 1024);
   if (body === null) return fail(413, 'too large');
   if (!(await verifyStripeSignature(body, req.headers.get('stripe-signature'), pay.webhookSecret, now))) return fail(400, 'bad signature');
@@ -108,14 +125,14 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
   let outcome: Outcome;
   let guard: { id: string; status: PurchaseStatus } | undefined;
   try {
-    ({ stmts, outcome, guard } = await apply(db, pay, stripe, ev, now));
+    ({ stmts, outcome, guard } = await apply(db, pay, stripe, ev, now, pepper));
   } catch (e) {
     if (e instanceof RetryLater) return fail(503, e.message);
     if (e instanceof NotOurs) { stmts = []; outcome = `ignored: ${e.message}`; }
     // signed by Stripe, but about something Stripe doesn't have (another account's object, or deleted): nothing to do
-    if ((e as StripeError)?.status === 404) { stmts = []; outcome = 'ignored: Stripe has no such object'; }
+    else if ((e as StripeError)?.status === 404) { stmts = []; outcome = 'ignored: Stripe has no such object'; }
     else if ((e as StripeError)?.status >= 500 || (e as StripeError)?.status === 429) return fail(503, 'stripe unavailable');
-    else throw e;
+    else throw e;   // anything else (a network failure, a bug): 500, and Stripe sends the event again
   }
   stmts.push(guard
     ? db.prepare('INSERT INTO webhook_events (event_id, type, received_at, outcome) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM purchases WHERE id = ? AND status = ?)').bind(ev.id, ev.type, now, outcome, guard.id, guard.status)
@@ -133,7 +150,7 @@ export async function handleWebhook(db: D1Database, pay: PaymentsConfig, req: Re
 }
 
 /** `guard`: the event row is only written if the purchase ended in this state; otherwise another delivery won the race and Stripe is asked to send this one again. */
-async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typeof stripeClient>, ev: StripeEvent, now: number): Promise<{ stmts: D1PreparedStatement[]; outcome: Outcome; guard?: { id: string; status: PurchaseStatus } }> {
+async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typeof stripeClient>, ev: StripeEvent, now: number, pepper: string): Promise<{ stmts: D1PreparedStatement[]; outcome: Outcome; guard?: { id: string; status: PurchaseStatus } }> {
   switch (ev.type) {
     case 'checkout.session.completed':
     case 'checkout.session.async_payment_succeeded': {
@@ -141,13 +158,13 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
       const why = checkoutProblem(cs, pay);
       if (why) return { stmts: [], outcome: `ignored: ${why}` };
       const userId = cs.client_reference_id!;
-      const user = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+      const user = await db.prepare('SELECT id, email FROM users WHERE id = ?').bind(userId).first<{ id: string; email: string }>();
       const existing = await db.prepare('SELECT id FROM purchases WHERE checkout_session_id = ?').bind(cs.id).first<{ id: string }>();
       const purchaseId = existing?.id ?? crypto.randomUUID();
       const stmts = [
-        db.prepare(`INSERT INTO purchases (id, user_id, product, checkout_session_id, payment_intent_id, amount, currency, livemode, status, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?) ON CONFLICT (checkout_session_id) DO NOTHING`)
-          .bind(purchaseId, user ? userId : null, PRODUCT.id, cs.id, cs.payment_intent, cs.amount_total!, cs.currency!, cs.livemode ? 1 : 0, now, now),
+        db.prepare(`INSERT INTO purchases (id, user_id, email_hash, product, checkout_session_id, payment_intent_id, amount, currency, livemode, status, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', ?, ?) ON CONFLICT (checkout_session_id) DO NOTHING`)
+          .bind(purchaseId, user ? userId : null, user ? await emailHash(pepper, user.email) : null, PRODUCT.id, cs.id, cs.payment_intent, cs.amount_total!, cs.currency!, cs.livemode ? 1 : 0, now, now),
       ];
       if (user && cs.customer) stmts.push(db.prepare('INSERT INTO stripe_customers (user_id, stripe_customer_id) VALUES (?, ?) ON CONFLICT DO NOTHING').bind(userId, cs.customer));
       if (user) stmts.push(recompute(db, purchaseId, now, 'purchase'));
@@ -167,7 +184,11 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
     case 'charge.dispute.funds_reinstated': {
       const d = await stripe.get<Dispute>(`/v1/disputes/${encodeURIComponent(ev.data.object.id)}`);
       const p = await purchaseByIntent(db, d.payment_intent, ev, now);
-      if (p.status === 'refunded') return { stmts: [], outcome: 'ignored: already refunded' };
+      // a refunded purchase has nothing left to suspend; a chargeback lost on top of it still closes the door
+      if (p.status === 'refunded') {
+        if (d.status !== 'lost') return { stmts: [], outcome: 'ignored: already refunded' };
+        return { stmts: setStatus(db, p.id, p.status, 'dispute_lost', now, 'dispute lost after a refund'), outcome: 'dispute_lost', guard: { id: p.id, status: 'dispute_lost' } };
+      }
       // an inquiry (warning_*) withdraws no funds and often closes without becoming a chargeback: it changes nothing
       if (d.status.startsWith('warning_')) return { stmts: [], outcome: `ignored: inquiry ${d.status}` };
       const status: PurchaseStatus = d.status === 'won' ? 'dispute_won' : d.status === 'lost' ? 'dispute_lost' : d.status === 'charge_refunded' ? 'refunded' : 'disputed';
@@ -183,14 +204,18 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
       try {
         await stripe.post('/v1/refunds', { payment_intent: w.payment_intent!, reason: 'fraudulent', metadata: { why: 'early_fraud_warning', warning: w.id } }, `efw:${ev.id}`);
       } catch (e) {
-        const st = (e as StripeError)?.status;
-        if (st >= 500 || st === 429) throw new RetryLater('refund not accepted yet');
+        // not Stripe's answer (the network failed, or the request never left): 500, so Stripe sends the event again
+        if (!(e instanceof StripeError)) throw e;
+        // Stripe is down, throttling, or still working on this same key from another delivery: later
+        if (e.status >= 500 || e.status === 429 || e.status === 409) throw new RetryLater('refund not accepted yet');
         // Stripe refused (already refunded, or the charge is under dispute): the matching event changes the status
-        audit('webhook.fraud_warning', { refunded: false, status: st });
-        return { stmts: [], outcome: `fraud warning: refund refused (${st})` };
+        audit('webhook.fraud_warning', { refunded: false, status: e.status });
+        return { stmts: [], outcome: `fraud warning: refund refused (${e.status})` };
       }
       audit('webhook.fraud_warning', { refunded: true, type: w.fraud_type });
-      return { stmts: setStatus(db, p.id, p.status, 'refunded', now, 'refunded on a fraud warning'), outcome: 'refunded: fraud warning', guard: { id: p.id, status: 'refunded' } };
+      const stmts = setStatus(db, p.id, p.status, 'refunded', now, 'refunded on a fraud warning');
+      stmts.unshift(db.prepare('UPDATE purchases SET fraud = 1 WHERE id = ?').bind(p.id));   // closes purchases for this buyer
+      return { stmts, outcome: 'refunded: fraud warning', guard: { id: p.id, status: 'refunded' } };
     }
     default:
       return { stmts: [], outcome: 'ignored: not handled' };

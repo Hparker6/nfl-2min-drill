@@ -2,6 +2,8 @@
  * The account API (server/accounts/routes.ts) from the browser. Same-origin only: the session is an HttpOnly cookie
  * the page never sees. Every answer is the server's; nothing here can grant ownership.
  */
+import { forgetEditionState } from './edition';
+
 export type Payments = 'off' | 'test' | 'live';
 export type Me =
   | { state: 'off' }                                         // this server has no accounts (production today)
@@ -36,6 +38,7 @@ export async function fetchMe(): Promise<Me> {
 /** The server's last word on what this browser's account owns (for the edition gate; the server re-checks everything). */
 function rememberOwns(owns: string[]) {
   try { localStorage.setItem(OWNS_KEY, JSON.stringify(owns)); } catch { /* storage off */ }
+  forgetEditionState();   // a refund or a purchase elsewhere shows on the next screen, not the next page load
 }
 export function lastKnownOwns(): string[] {
   try { const v = JSON.parse(localStorage.getItem(OWNS_KEY) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }

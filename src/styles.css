@@ -76,7 +76,9 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .modes button { border: 0; background: none; border-radius: 7px; padding: 7px 18px; cursor: pointer; font: 700 15px var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); transition: background .16s, color .16s; }
 .modes button:hover { color: var(--ink); }
 .modes button.on { background: var(--ink); color: var(--bg); }
-.top-r { display: flex; justify-content: flex-end; gap: 2px; }
+.top-r { display: flex; justify-content: flex-end; align-items: center; gap: 2px; }
+.top-edition { margin-right: 8px; border: 0; border-radius: 999px; padding: 7px 14px; background: var(--accent); color: var(--accent-ink); cursor: pointer; font: 700 13px var(--display); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; transition: background .16s; }
+.top-edition:hover { background: #ffd43a; }
 .shell { max-width: 1680px; margin: 0 auto; padding: 12px 24px 24px; }
 .page { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
 .foot { max-width: 1680px; margin: 0 auto; padding: 8px 24px 24px; color: var(--muted); font-size: 12px; text-align: center; }
@@ -548,6 +550,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 @media (max-width: 999px) {
   .top-r .icon { width: 34px; height: 34px; }
   .top-r { gap: 0; }
+  .top-edition { padding: 6px 10px; font-size: 12px; margin-right: 4px; }
   /* the field is above the list on phones, so the footer shows the selected play's shape */
   .cp-sel-mini { display: block; float: left; margin: 2px 10px 0 0; }
   .cp-sel-mini .mini { width: 46px; height: 38px; }

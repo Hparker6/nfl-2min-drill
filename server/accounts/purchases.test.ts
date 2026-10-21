@@ -327,6 +327,57 @@ describe('refunds and disputes', () => {
     expect(closed.status).toBe(403);
   });
 
+  it('the refund call failing on the network is a 500 (Stripe retries), not a swallowed warning', async () => {
+    const a = await bought();
+    a.stripe.objects.set('issfr_1', warning());
+    const broken = (async (input: RequestInfo | URL, init?: RequestInit) => { if (init?.method === 'POST' && String(input).endsWith('/v1/refunds')) throw new TypeError('fetch failed'); return a.stripe.fetch(input, init); }) as typeof fetch;
+    const r = await webhook(a.env, broken, 'radar.early_fraud_warning.created', 'issfr_1', T0, { id: 'evt_net' });
+    expect(r.status).toBe(500);
+    expect(a.env.DB.raw.prepare('SELECT COUNT(*) AS n FROM webhook_events WHERE event_id = ?').get('evt_net')).toEqual({ n: 0 });
+    expect([a.status(), await a.owns()]).toEqual(['paid', ['coach_edition']]);
+    // a 409 (the same idempotency key still in flight elsewhere) is also "later"
+    const busy = (async (input: RequestInfo | URL, init?: RequestInit) => (init?.method === 'POST' && String(input).endsWith('/v1/refunds') ? Response.json({ error: { message: 'in use' } }, { status: 409 }) : a.stripe.fetch(input, init))) as typeof fetch;
+    expect((await webhook(a.env, busy, 'radar.early_fraud_warning.created', 'issfr_1', T0 + MIN, { id: 'evt_busy' })).status).toBe(503);
+  });
+
+  it('a fraud-warning refund closes purchases for the account, and its own charge.refunded keeps it marked as fraud', async () => {
+    const a = await bought();
+    a.stripe.objects.set('issfr_1', warning());
+    await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_1', T0);
+    expect(a.env.DB.raw.prepare('SELECT status, fraud FROM purchases').get()).toEqual({ status: 'refunded', fraud: 1 });
+    a.stripe.objects.set('ch_1', { id: 'ch_1', payment_intent: 'pi_test_1', amount: 499, amount_refunded: 499, refunded: true });
+    await webhook(a.env, a.stripe.fetch, 'charge.refunded', 'ch_1', T0 + MIN);
+    expect([a.status(), await a.owns()]).toEqual(['refunded', []]);
+    expect(a.env.DB.raw.prepare('SELECT fraud FROM purchases').get()).toEqual({ fraud: 1 });
+    expect((await call(a.env, '/v1/checkout', { body: {}, cookie: a.cookie }, a.at(T0 + 2 * MIN))).status).toBe(403);
+    // the issuer files the dispute anyway and it is lost: recorded, not ignored
+    a.stripe.objects.set('dp_1', { id: 'dp_1', payment_intent: 'pi_test_1', charge: 'ch_1', status: 'lost' });
+    expect((await webhook(a.env, a.stripe.fetch, 'charge.dispute.closed', 'dp_1', T0 + 3 * MIN)).body.outcome).toBe('dispute_lost');
+    expect(a.status()).toBe('dispute_lost');
+  });
+
+  it('deleting the account and signing in again with the same email keeps the refund and chargeback past', async () => {
+    const a = await bought();
+    a.stripe.objects.set('dp_1', { id: 'dp_1', payment_intent: 'pi_test_1', charge: 'ch_1', status: 'lost' });
+    await webhook(a.env, a.stripe.fetch, 'charge.dispute.closed', 'dp_1', T0 + MIN);
+    expect((await call(a.env, '/v1/me/delete', { body: { email: 'pat@example.com' }, cookie: a.cookie }, a.at(T0 + 2 * MIN))).status).toBe(200);
+    const cookie = await signInAs(a.env, 'pat@example.com', a.at(T0 + 3 * MIN), a.box);
+    expect((await call(a.env, '/v1/checkout', { body: {}, cookie }, a.at(T0 + 3 * MIN))).status).toBe(403);
+    // another address is a different person
+    const other = await signInAs(a.env, 'sam@example.com', a.at(T0 + 4 * MIN), a.box);
+    expect((await call(a.env, '/v1/checkout', { body: {}, cookie: other }, a.at(T0 + 4 * MIN))).status).toBe(200);
+  });
+
+  it('an old event about a charge that was never ours is recorded as ignored, with a 200, not retried', async () => {
+    const { env, stripe } = world();
+    stripe.objects.set('ch_old', { id: 'ch_old', payment_intent: 'pi_not_ours', amount: 499, amount_refunded: 499, refunded: true });
+    const body = JSON.stringify({ id: 'evt_old', type: 'charge.refunded', livemode: false, created: Math.floor((T0 - 2 * 60 * MIN) / 1000), data: { object: { id: 'ch_old' } } });
+    const r = await call(env, '/v1/stripe/webhook', { raw: body, origin: null, headers: { 'stripe-signature': await signed(body, T0) } }, { now: T0, fetch: stripe.fetch });
+    expect(r.status).toBe(200);
+    expect(r.body.outcome).toBe('ignored: no such purchase');
+    expect(env.DB.raw.prepare('SELECT COUNT(*) AS n FROM webhook_events').get()).toEqual({ n: 1 });
+  });
+
   it('ownership follows the purchase state', () => {
     expect(['paid', 'partially_refunded', 'dispute_won'].map((s) => entitlementFor(s as never))).toEqual(['active', 'active', 'active']);
     expect(['refunded', 'disputed', 'dispute_lost'].map((s) => entitlementFor(s as never))).toEqual(['revoked', 'revoked', 'revoked']);

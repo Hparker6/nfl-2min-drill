@@ -16,6 +16,7 @@ import { sha256 } from './crypto';
 import { sendNotice, type Notice } from './mailer';
 import type { MailConfig } from './config';
 import { audit } from './audit';
+import { emailHash, purchaseHistory } from './purchases';
 
 export const KINDS = ['refund', 'bug', 'account', 'other'] as const;
 export type SupportKind = (typeof KINDS)[number];
@@ -66,10 +67,11 @@ export async function submitSupport(d: SupportDeps, body: Record<string, unknown
   if (userId) {
     const p = await d.db.prepare('SELECT status, amount, currency, created_at FROM purchases WHERE user_id = ? ORDER BY created_at DESC LIMIT 1').bind(userId)
       .first<{ status: string; amount: number; currency: string; created_at: number }>();
-    // the rule is one refund per account: the owner sees at a glance whether this one was used
-    const past = await d.db.prepare("SELECT SUM(status IN ('refunded', 'partially_refunded')) AS refunds, SUM(status IN ('disputed', 'dispute_lost', 'dispute_won')) AS disputes FROM purchases WHERE user_id = ?")
-      .bind(userId).first<{ refunds: number | null; disputes: number | null }>();
-    purchase = p ? `${p.status}, ${(p.amount / 100).toFixed(2)} ${p.currency.toUpperCase()}, ${new Date(p.created_at).toISOString().slice(0, 10)} · refunds before: ${past?.refunds ?? 0}, disputes: ${past?.disputes ?? 0}` : 'signed in, no purchase';
+    // the rule is one refund per account: the owner sees at a glance whether this one was used (by this account, or by
+    // this address under an account since deleted)
+    const past = await purchaseHistory(d.db, userId, await emailHash(d.pepper, email));
+    purchase = (p ? `${p.status}, ${(p.amount / 100).toFixed(2)} ${p.currency.toUpperCase()}, ${new Date(p.created_at).toISOString().slice(0, 10)}` : 'signed in, no purchase')
+      + ` · refunds before: ${past.refunds}, disputes: ${past.disputes}${past.closed ? ', PURCHASES CLOSED (fraud or chargeback)' : ''}`;
   }
   const subject = `[4th Call support] ${kind} · ${ref}`;
   const text = [

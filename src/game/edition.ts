@@ -56,3 +56,5 @@ export const ownsEdition = () => editionState() === 'owned';
 
 /** Tests: set the state directly. */
 export function setEditionForTest(s: EditionState | null) { cached = s; }
+/** The server answered about ownership (account.ts): the next read works it out again. */
+export function forgetEditionState() { cached = null; }

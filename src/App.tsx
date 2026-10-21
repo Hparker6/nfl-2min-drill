@@ -4,7 +4,8 @@ import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
 import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
-import { accountsShown, editionShown } from './game/edition';
+import { accountsShown, EDITION_NAME, EDITION_PRICE, editionShown } from './game/edition';
+import { fetchMe } from './game/account';
 import { AccountModal, takeAccountHash } from './ui/Account';
 import { SupportModal } from './ui/Support';
 import { Everyone } from './ui/Everyone';
@@ -31,6 +32,14 @@ export default function App() {
   // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
   const [accountFrom, setAccountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
   useEffect(() => { if (accountFrom) setModal('account'); }, [accountFrom]);
+  // what the account owns, asked at start and whenever the tab comes back: a refund made elsewhere shows up here
+  useEffect(() => {
+    if (!accountsShown()) return;
+    const ask = () => { if (document.visibilityState === 'visible') fetchMe(); };
+    ask();
+    document.addEventListener('visibilitychange', ask);
+    return () => document.removeEventListener('visibilitychange', ask);
+  }, []);
   const [toastMsg, setToast] = useState<string | null>(null);
 
   const update = useCallback((fn: (s: Store) => void) => {
@@ -102,6 +111,7 @@ export default function App() {
             ))}
           </nav>
           <div className="top-r">
+            {accountsShown() && <button className="top-edition" onClick={() => setModal('account')} title={`${EDITION_NAME}: ${EDITION_PRICE}, once`}>{EDITION_NAME}</button>}
             <button className="icon" onClick={toggleSound} aria-pressed={anySound} aria-label={anySound ? 'Mute sound and music' : 'Turn sound and music on'} title={anySound ? 'Mute' : 'Sound on'}>
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />{anySound ? <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}</svg>
             </button>
@@ -112,7 +122,7 @@ export default function App() {
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M5 20V11M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" /></svg>
             </button>
             <button className="icon" onClick={() => setModal('settings')} aria-label="Settings" title="Settings">
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="2" fill="none" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M10.3 2.5h3.4l.5 2.4a7.6 7.6 0 0 1 1.9 1.1l2.3-.8 1.7 2.9-1.8 1.6a7.7 7.7 0 0 1 0 2.2l1.8 1.6-1.7 2.9-2.3-.8a7.6 7.6 0 0 1-1.9 1.1l-.5 2.4h-3.4l-.5-2.4a7.6 7.6 0 0 1-1.9-1.1l-2.3.8-1.7-2.9 1.8-1.6a7.7 7.7 0 0 1 0-2.2L4 8.1l1.7-2.9 2.3.8a7.6 7.6 0 0 1 1.9-1.1z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" fill="none" /></svg>
             </button>
           </div>
         </div>
