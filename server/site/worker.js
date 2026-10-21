@@ -166,9 +166,8 @@ function page({ path, title, description, h1, body, jsonld, eyebrow }) {
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/pages.css" />
 ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>` : ''}
-<!-- Google AdSense site verification: loads the AdSense script only; no ad units are placed -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2581780385461126"
-     crossorigin="anonymous"></script>
+<!-- Google AdSense: the account tag; /ads.js fills this page's ad slots (and skips them for Coach's Edition owners) -->
+<meta name="google-adsense-account" content="ca-pub-2581780385461126" />
 </head><body>
 <header class="top"><div class="top-in">
 <a class="brand" href="/" aria-label="The 4th Call home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="18" height="18"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="currentColor"/></g></svg></span><span>The <em>4th</em> Call</span></a>
@@ -177,6 +176,7 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(
 <main>${eyebrow ? `<p class="eyebrow">${eyebrow}</p>` : ''}<h1>${h1}</h1>${body}</main>
 <footer><div class="in"><span class="brandline">The <em>4th</em> Call</span><nav aria-label="More"><a href="/">Play</a><a href="/how-to-play/">How to play</a><a href="/leaderboard/">Leaderboard</a><a href="/stats/">Stats</a></nav>
 An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0). Scores are reported by each player's browser.</div></footer>
+<script src="/ads.js" defer></script>
 </body></html>`;
 }
 
@@ -196,6 +196,8 @@ const untilNext = () => {
   const h = Math.floor(ms / 36e5), m = Math.floor((ms % 36e5) / 6e4);
   return `${h}h ${String(m).padStart(2, '0')}m`;
 };
+/** One display ad on a page (filled by /ads.js; nothing at all for a Coach's Edition owner or an ad blocker). */
+const AD_SLOT = '<aside class="ad-slot" aria-label="Advertisement"><span class="ad-k">Advertisement</span><ins class="adsbygoogle ad-page" style="display:block" data-ad-client="ca-pub-2581780385461126" data-ad-slot="4281334746" data-ad-format="auto" data-full-width-responsive="true"></ins></aside>';
 const shortDay = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 /** Players and AI rivals in one table: players ranked 1, 2, 3…; rivals sit at their score, badged and unranked. */
@@ -233,6 +235,7 @@ async function leaderboardPage(env) {
 <h2>Today's board</h2>
 ${boardTable(t.best, today)}
 <p class="note">${t.count ? '' : 'No scores yet today: be the first on the board. Play the Daily, then post your name. '}Rows marked <span class="badge" style="margin:0">AI</span> are the day's AI rivals: computer play-callers whose scores come from the game's simulated play-callers, a different group each day. They are not players, are not ranked, and don't count in the numbers above.</p>
+${AD_SLOT}
 ${t.count ? `<h2>How today's scores spread out</h2>${bandBars(t.bands)}` : ''}
 <h2>Yesterday's best</h2>
 ${yest}
@@ -267,6 +270,7 @@ async function statsPage(env) {
 ${bestEver ? `<p>The best score so far is <b>${bestEver.score}</b>, by <b>${esc(bestEver.name)}</b> on Daily #${dayNumber(bestEver.day)} (${esc(fmtDay(bestEver.day))}).</p>` : ''}
 <h2>Day by day</h2>
 ${table}
+${AD_SLOT}
 <h2>Scores to beat</h2>
 <p>Simulated play-callers set the bar: across ${SIM.length} simulated games, the top 10% scored <b>${simAt(0.9)}</b> or better and the average was <b>${simAt(0.5)}</b>. Your end-of-game screen shows how you compare.</p>
 <h2>About the numbers</h2>

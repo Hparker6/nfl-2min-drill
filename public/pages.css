@@ -146,3 +146,9 @@ footer .brandline em { font-style: normal; color: var(--accent); }
 /* the rank column only needs room for its badge */
 .panel .rk { width: 64px; }
 @media (max-width: 640px) { .panel .rk { width: 44px; } .panel td:first-child { white-space: nowrap; } }
+/* ad slots (filled by /ads.js): no space and no label until Google fills them */
+.ad-slot { width: 100%; max-width: 728px; margin: 0 auto; min-width: 0; }
+.ad-slot:has(ins[data-ad-status="filled"]) { margin: 28px auto; }
+.ad-slot .ad-k { display: none; margin-bottom: 4px; color: var(--muted); font: 600 10px var(--body, system-ui); letter-spacing: .08em; text-transform: uppercase; }
+.ad-slot:has(ins[data-ad-status="filled"]) .ad-k { display: block; }
+.ad-slot ins.adsbygoogle[data-ad-status="unfilled"] { display: none !important; }
