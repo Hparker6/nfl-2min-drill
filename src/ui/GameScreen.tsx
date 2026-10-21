@@ -477,7 +477,7 @@ export function GameScreen(p: Props) {
     gradesRef.current.add(gp);
     gp.finally(() => gradesRef.current.delete(gp)).catch(() => {});
     // a grade that lands after the game is over must not write back: the next game's saved picks would be this game's
-    const settle = (g: Grade) => { if (doneRef.current) return; session.setGrade(recIdx, g); onPicks(session.picks); setTrail((t) => [...t, g.bestWp]); };
+    const settle = (g: Grade) => { if (doneRef.current || leftRef.current) return; session.setGrade(recIdx, g); onPicks(session.picks); setTrail((t) => [...t, g.bestWp]); };
     const playedOut = evs.some((e) => e.type === 'snap' || e.type === 'kick' || e.type === 'pat');
     try {
       if (!playedOut) {

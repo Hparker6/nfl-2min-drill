@@ -31,7 +31,8 @@ function token(): string {
 }
 
 /** `null`: the leaderboard is off on this site. `'failed'`: it is on but didn't answer (say so; never show "loading" forever). */
-export type BoardAnswer = Board | 'failed' | null;
+/** 'limited': the board takes no more scores from this connection today (shared networks reach the cap). */
+export type BoardAnswer = Board | 'failed' | 'limited' | null;
 
 /** A board the page can render; anything else (a captive portal, a changed API) is a failure, not a crash. */
 function asBoard(x: unknown): Board | 'failed' {
@@ -46,6 +47,7 @@ export async function submitScore(day: string, name: string, score: number, grad
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ token: token(), name: name.slice(0, 20), score: Math.round(score), grades: grades.slice(0, 64), win }),
     });
+    if (r.status === 429) return 'limited';
     if (!r.ok) return 'failed';
     return asBoard(await r.json());
   } catch { return 'failed'; }

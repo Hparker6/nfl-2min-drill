@@ -177,8 +177,9 @@ export function DriveList({ ds, teams }: { ds: Drive[]; teams: [TeamInfo, TeamIn
 /** A score in the events just played: the flash over the field. */
 export function scoreFlash(ev: Ev[]): { key: number; text: string; team: 0 | 1 } | null {
   // the try and the kickoff that follow a score don't cut its flash short (the flash plays once, by its event's index)
-  for (let i = ev.length - 1; i >= Math.max(0, ev.length - 3); i--) {
+  for (let i = ev.length - 1; i >= Math.max(0, ev.length - 6); i--) {
     const e = ev[i];
+    if (e.type === 'snap' && e.try) continue;   // a two-point try belongs to the touchdown before it
     if (e.type === 'snap') {
       const r = e.res;
       if (r.td) return { key: i, text: 'Touchdown', team: e.off };

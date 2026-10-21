@@ -207,6 +207,7 @@ export function CallPanel(p: Props) {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       if ((e.target as HTMLElement)?.closest?.('[role="dialog"]')) return;   // a modal is open: its keys are its own
+      if (document.querySelector('.tour')) return;   // the first-game tour is up: no calls under it
       const n = Number(e.key);
       if (n >= 1 && n <= keyed.length) {
         e.preventDefault();

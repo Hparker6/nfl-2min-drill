@@ -26,11 +26,30 @@ const json = (data, status = 200) => new Response(JSON.stringify(data), {
 
 // names are public on the board: letters, digits and a little punctuation, 20 characters, no obvious abuse
 const BLOCK = /\b(fuck\w*|shit\w*|cunt\w*|nigg\w*|fag\w*|bitch\w*|whore\w*|slut\w*|rape\w*|rapist|nazi\w*|hitler|porn\w*|dick|dicks|cock|cocks|pussy|asshole\w*|retard\w*)\b/i;
-function cleanName(s) {
-  const n = String(s ?? '').normalize('NFKC').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
-  if (!n) return 'Anonymous';
-  return BLOCK.test(n) ? 'Coach' : n;
+// the same words with the separators taken out and look-alikes folded (f.u.c.k, sh1t, Cyrillic letters): no \b here,
+// so only words long or rare enough not to sit inside an ordinary name
+const SQUASHED = /(fuck|shit|nigg|whore|slut|rapist|hitler|porn|pussy|asshole|retard|bitch)/i;   // not cunt or nazi: Scunthorpe, Ignazio
+const LOOKALIKE = { 'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x', 'і': 'i', 'ѕ': 's', 'к': 'k', 'н': 'h', 'т': 't', 'м': 'm', 'в': 'b', 'ꓑ': 'p', 'ꓳ': 'o', 'ꓣ': 'r', 'ꓠ': 'n', 'ꓢ': 's', 'ꓡ': 'l', 'ꓔ': 't', 'ꓕ': 't', '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't', '@': 'a', '$': 's' };
+// Hangul fillers and other blanks that NFKC keeps as "letters" but render as nothing
+const INVISIBLE = /[\u115F\u1160\u3164\uFFA0\u2800\u180E\u200B-\u200F\u2060-\u2064\uFEFF]/gu;
+export function cleanName(s) {
+  const n = String(s ?? '').normalize('NFKC').replace(INVISIBLE, '').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
+  if (!n || !/[\p{L}\p{N}]/u.test(n)) return 'Anonymous';
+  const squashed = [...n.toLowerCase()].map((ch) => LOOKALIKE[ch] ?? ch).join('').replace(/[^a-z]/g, '');
+  return BLOCK.test(n) || SQUASHED.test(squashed) ? 'Coach' : n;
 }
+
+/** The caller for the post limit: an IPv4 address, or an IPv6 /64 (one connection usually holds a whole /64). */
+export function callerOf(ip) {
+  if (!ip || !ip.includes(':')) return ip || 'unknown';
+  const [head, tail = ''] = ip.toLowerCase().split('::');
+  const h = head ? head.split(':') : [], t = tail ? tail.split(':') : [];
+  const full = [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t];
+  return full.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':') + '::/64';
+}
+
+/** A Daily performance score is 55% decisions and 45% the result (src/game/rating.ts): a win is at least 34, a loss at most 66. */
+const possible = (score, win) => (win ? score >= 34 : score <= 66);
 
 
 /** One day's scores. */
@@ -107,6 +126,11 @@ async function api(request, env, url) {
     return json(await board.summary(day, tok && /^[a-f0-9]{8,64}$/.test(tok) ? tok : null));
   }
   if (request.method === 'POST' && m[2]) {
+    // from our own pages only, as JSON: another site can't post for its visitors (a JSON post from elsewhere needs a
+    // CORS preflight, which this Worker never answers)
+    const origin = request.headers.get('origin');
+    if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return json({ error: 'bad request' }, 415);
+    if (origin !== url.origin && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin ?? '')) return json({ error: 'forbidden' }, 403);
     // only today and yesterday (UTC) take scores, so old days stay fixed
     const now = Date.now(), dayMs = Date.parse(day + 'T00:00:00Z');
     if (!(now - dayMs < 2 * 864e5 && now - dayMs > -864e5)) return json({ error: 'day closed' }, 400);
@@ -115,15 +139,17 @@ async function api(request, env, url) {
     if (raw === null) return json({ error: 'too large' }, 413);
     let body;
     try { body = JSON.parse(raw); } catch { return json({ error: 'bad json' }, 400); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'bad json' }, 400);
     const token = String(body.token || '').slice(0, 64);
     const score = Number(body.score);
-    if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100) return json({ error: 'bad score' }, 400);
+    if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100 || !possible(Math.round(score), !!body.win)) return json({ error: 'bad score' }, 400);
     // the address only counts posts, and only as a salted hash: no IP is stored
-    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const ip = callerOf(request.headers.get('cf-connecting-ip') || 'unknown');
     const addr = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(day + ':' + ip)))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
     const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win }, addr);
     if (!sum) return json({ error: 'too many scores from this address today' }, 429);
-    await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum);
+    try { await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum); }
+    catch (e) { console.error(JSON.stringify({ audit: 'stats.update_failed', day, error: String(e?.message ?? e).slice(0, 120) })); }
     return json(sum);
   }
   return json({ error: 'method' }, 405);

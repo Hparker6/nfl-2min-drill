@@ -52,7 +52,8 @@ async function localCookies(req: Request, run: (r: Request) => Promise<Response>
   let r = req;
   if (c && c.includes(`${DEV_COOKIE}=`)) {
     const h = new Headers(req.headers);
-    h.set('cookie', c.split(';').map((x) => (x.trim().startsWith(`${DEV_COOKIE}=`) ? x.replace(`${DEV_COOKIE}=`, `${SESSION_COOKIE}=`) : x)).join(';'));
+    // an old Secure cookie Chrome kept from before would come first and win: drop it, the dev one is the session
+    h.set('cookie', c.split(';').filter((x) => !x.trim().startsWith(`${SESSION_COOKIE}=`)).map((x) => (x.trim().startsWith(`${DEV_COOKIE}=`) ? x.replace(`${DEV_COOKIE}=`, `${SESSION_COOKIE}=`) : x)).join(';'));
     r = new Request(req, { headers: h });
   }
   const res = await run(r);

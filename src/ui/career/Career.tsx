@@ -28,6 +28,13 @@ export function CareerMode({ app }: { app: AppSettings }) {
   return <CareerBoundary slot={startSlot()}><CareerInner app={app} /></CareerBoundary>;
 }
 
+/** This week's game when it's finished and the week hasn't moved on: its postgame shows instead of the hub. */
+function pendingPost(c: Career | null): string | null {
+  if (!c || c.live || c.phase !== 'season') return null;
+  const g = yourGameThisWeek(c);
+  return g?.score ? g.id : null;
+}
+
 /** The slot to open: the last one played, or slot 1 without the Coach's Edition (slots 2 and 3 are its). */
 const startSlot = () => (ownsEdition() ? activeSlot() : 1);
 
@@ -36,7 +43,9 @@ function CareerInner({ app }: { app: AppSettings }) {
   const slotRef = useRef(slot);
   const [c, setC] = useState<Career | null>(() => loadCareer(slotRef.current));
   const [slots, setSlots] = useState(false);   // the career slots screen (Coach's Edition)
-  const [post, setPost] = useState<string | null>(null);      // the game id whose postgame is showing
+  // the game id whose postgame is showing: also after a refresh, or leaving and coming back, so a finished game can't be played again
+  const [post, setPost] = useState<string | null>(() => pendingPost(loadCareer(slotRef.current)));
+  const [paused, setPaused] = useState(false);   // Save & exit: the game in progress waits on the hub
   const [busy, setBusy] = useState<string | null>(null);
   const [unsaved, setUnsaved] = useState(false);
   const [setAside, setSetAside] = useState(() => unreadableSaves(slotRef.current));   // an unreadable save in this slot, set aside by loadCareer
@@ -59,9 +68,11 @@ function CareerInner({ app }: { app: AppSettings }) {
     slotRef.current = n;
     setActiveSlot(n);
     setSlot(n);
-    setPost(null);
+    const nc = loadCareer(n);
+    setPost(pendingPost(nc));
+    setPaused(false);
     setUnsaved(false);
-    setC(loadCareer(n));
+    setC(nc);
     setSetAside(unreadableSaves(n));
     setSlots(false);
   };
@@ -81,19 +92,19 @@ function CareerInner({ app }: { app: AppSettings }) {
       setUnsaved(!saveCareer(nc, slotRef.current));
       setC(nc);
       track('career_start', { arch: o.arch });
-    })} onLoad={(nc) => { saveCareer(nc, slotRef.current); setC(nc); }} onSlots={toSlots} slot={slot} />
+    })} onLoad={(nc) => { setUnsaved(!saveCareer(nc, slotRef.current)); setPost(pendingPost(nc)); setC(nc); }} onSlots={toSlots} slot={slot} />
     </>;
   }
 
   const banner = unsaved ? <p className="notice">This browser isn't letting the game save (storage full or blocked). Your career plays on, but download a save from Settings to keep it.</p> : null;
 
-  // a game in progress
-  if (c.live) {
+  // a game in progress (unless it's paused: Save & exit)
+  if (c.live && !paused) {
     return (
       <LiveGameView key={c.live.gameId} c={c} app={app}
         save={(live) => commit((x) => { x.live = live; })}
-        onLeave={() => commit(() => {})}
-        onFinal={(how) => {
+        onLeave={() => setPaused(true)}
+        onFinal={(how: 'moments' | 'full' | 'sim') => {
           const id = c.live!.gameId;
           commit((x) => { finishLive(x, how); });
           setPost(id);
@@ -111,8 +122,12 @@ function CareerInner({ app }: { app: AppSettings }) {
   }
 
   const play = (mode: 'moments' | 'full' | 'sim') => {
+    // a paused game is resumed, never replaced
+    if (c.live) { setPaused(false); return; }
     const g = c.phase === 'college' ? COLLEGE_GAME : yourGameThisWeek(c);
     if (!g) return;
+    // already played (it has a score): the week moves on instead of the game being played again
+    if (g.score) { work('Simming the rest of the week…', () => commit((x) => closeWeek(x))); return; }
     if (mode === 'sim') {
       work('Simming your game…', () => { commit((x) => { simYourGame(x, gameOf(x, g.id)); }); setPost(g.id); });
       return;
@@ -123,7 +138,13 @@ function CareerInner({ app }: { app: AppSettings }) {
   };
 
   if (c.phase === 'retired') return <Retired c={c} onSlots={() => setSlots(true)} />;
-  if (c.phase === 'college') return <>{banner}<CollegeIntro c={c} onPlay={play} /></>;
+  const resume = c.live && paused ? (
+    <div className="cr-paused" role="status">
+      <span><b>Game in progress</b> · {c.live.s.score[0]}-{c.live.s.score[1]}, {c.live.s.q && c.live.s.q > 4 ? 'overtime' : `Q${c.live.s.q ?? 4}`}</span>
+      <button className="btn primary small" onClick={() => setPaused(false)}>Resume game</button>
+    </div>
+  ) : null;
+  if (c.phase === 'college') return <>{banner}{resume}<CollegeIntro c={c} onPlay={play} /></>;
   if (c.phase === 'draft') return <>{banner}<DraftNight c={c} commit={commit} onDone={() => work('Setting up your rookie season…', () => commit((x) => joinTeam(x)))} /></>;
   if (c.phase === 'offseason') {
     const onRetire = () => commit((x) => { retire(x); const e = hallEntry(x, ARCH[x.you.arch].name); if (e) addToHall(e); });
@@ -133,7 +154,7 @@ function CareerInner({ app }: { app: AppSettings }) {
   if (c.season.week > 22) {
     return <>{banner}<SeasonDone c={c} onOffseason={() => work('Awards, retirements, free agency…', () => commit((x) => { endSeason(x); runOffseason(x); }))} /></>;
   }
-  return <>{banner}<Hub key={hubTab} initialTab={hubTab} c={c} commit={commit} onPlay={play} onBye={() => work('Simming the week…', () => commit((x) => closeWeek(x)))}
+  return <>{banner}{resume}<Hub key={hubTab} initialTab={hubTab} c={c} commit={commit} onPlay={play} onBye={() => work('Simming the week…', () => commit((x) => closeWeek(x)))}
     onRetire={() => { if (confirm('Start over? This career will be deleted from this browser.')) { saveCareer(null, slotRef.current); setC(null); } }}
     onSlots={toSlots}
     onExport={() => download(exportCareer(c), `the-4th-call-career-${c.you.name.replace(/\W+/g, '-').toLowerCase()}.json`)} /></>;

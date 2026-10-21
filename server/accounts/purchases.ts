@@ -199,8 +199,11 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
       // and take the edition away. A buyer can't trigger one of these; only the card's bank can.
       const w = await stripe.get<FraudWarning>(`/v1/radar/early_fraud_warnings/${encodeURIComponent(ev.data.object.id)}`);
       const p = await purchaseByIntent(db, w.payment_intent, ev, now);
-      if (!w.actionable) return { stmts: [], outcome: 'ignored: fraud warning not actionable (already refunded or disputed)' };
-      if (p.status !== 'paid' && p.status !== 'partially_refunded') return { stmts: [], outcome: `ignored: fraud warning on a ${p.status} purchase` };
+      // the mark that closes purchases for this buyer goes on first, whatever happens to the refund (a retry after a
+      // refund that went through finds the warning no longer actionable, and must not lose it)
+      const mark = db.prepare('UPDATE purchases SET fraud = 1 WHERE id = ?').bind(p.id);
+      if (!w.actionable) return { stmts: [mark], outcome: 'fraud warning: marked; not actionable (already refunded or disputed)' };
+      if (p.status !== 'paid' && p.status !== 'partially_refunded') return { stmts: [mark], outcome: `fraud warning: marked; ${p.status} purchase` };
       try {
         await stripe.post('/v1/refunds', { payment_intent: w.payment_intent!, reason: 'fraudulent', metadata: { why: 'early_fraud_warning', warning: w.id } }, `efw:${ev.id}`);
       } catch (e) {
@@ -210,11 +213,11 @@ async function apply(db: D1Database, pay: PaymentsConfig, stripe: ReturnType<typ
         if (e.status >= 500 || e.status === 429 || e.status === 409) throw new RetryLater('refund not accepted yet');
         // Stripe refused (already refunded, or the charge is under dispute): the matching event changes the status
         audit('webhook.fraud_warning', { refunded: false, status: e.status });
-        return { stmts: [], outcome: `fraud warning: refund refused (${e.status})` };
+        return { stmts: [mark], outcome: `fraud warning: marked; refund refused (${e.status})` };
       }
       audit('webhook.fraud_warning', { refunded: true, type: w.fraud_type });
       const stmts = setStatus(db, p.id, p.status, 'refunded', now, 'refunded on a fraud warning');
-      stmts.unshift(db.prepare('UPDATE purchases SET fraud = 1 WHERE id = ?').bind(p.id));   // closes purchases for this buyer
+      stmts.unshift(mark);
       return { stmts, outcome: 'refunded: fraud warning', guard: { id: p.id, status: 'refunded' } };
     }
     default:

@@ -127,7 +127,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
   const vsAi = result.aiLost - result.lost;
   const pct = simulatedPercentile(rt.performance);
   const [board, setBoard] = useState<Board | null>(null);
-  const [boardErr, setBoardErr] = useState(false);
+  const [boardErr, setBoardErr] = useState<false | 'failed' | 'limited'>(false);
   const [boardTry, setBoardTry] = useState(0);
   const [name, setName] = useState(store.settings.nickname ?? '');
   const [editing, setEditing] = useState(!store.settings.nickname);
@@ -140,7 +140,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
     const nick = store.settings.nickname;
     if (nick) track('leaderboard_submit', { performance: rt.performance, win: result.win });
     setBoardErr(false);
-    (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win) : fetchBoard(date)).then((b) => { if (!live) return; if (b === 'failed') setBoardErr(true); else if (b) setBoard(b); });
+    (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win) : fetchBoard(date)).then((b) => { if (!live) return; if (b === 'failed' || b === 'limited') setBoardErr(b); else if (b) setBoard(b); });
     return () => { live = false; };
   }, [on, date, rt.performance, store.settings.nickname, boardTry]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -251,8 +251,8 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
               </form>
             ) : (
               <div className="board-rank">
-                <b>{board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()}` : board ? `${board.count.toLocaleString()} played` : boardErr ? 'The leaderboard didn’t answer' : 'Loading…'}</b>
-                {boardErr && !board && <button className="link" onClick={() => setBoardTry((n) => n + 1)}>Try again</button>}
+                <b>{board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()}` : board ? `${board.count.toLocaleString()} played` : boardErr === 'limited' ? 'Too many scores from this connection today' : boardErr ? 'The leaderboard didn’t answer' : 'Loading…'}</b>
+                {boardErr === 'failed' && !board && <button className="link" onClick={() => setBoardTry((n) => n + 1)}>Try again</button>}
                 {board?.tied ? <span className="muted"> (tied with {board.tied.toLocaleString()})</span> : null}
                 <button className="link" onClick={() => setEditing(true)}>as {store.settings.nickname}</button>
               </div>

@@ -917,3 +917,6 @@
 .dn-clock { color: #fff; border-color: transparent; background: linear-gradient(120deg, var(--tc) 0%, color-mix(in srgb, var(--tc) 45%, #0b0f0d) 55%, #0b0f0d 100%); box-shadow: 0 12px 30px rgba(0, 0, 0, .2); }
 .dn-clock .dn-otc span { color: rgba(255, 255, 255, .78); }
 .dn-clock .eyebrow { color: var(--accent); }
+
+/* a game paused with Save & exit: resume it from anywhere in the career */
+.cr-paused { max-width: 1100px; margin: 0 auto 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--r-md); background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border: 1px solid var(--accent); }

@@ -48,7 +48,8 @@ export function stripeClient(key: string, f: typeof fetch) {
     if (form) headers['content-type'] = 'application/x-www-form-urlencoded';
     if (idem) headers['idempotency-key'] = idem;
     const qs = method === 'GET' && form ? `?${encodeForm(form)}` : '';
-    const r = await f(`https://api.stripe.com${path}${qs}`, { method, headers, body: method === 'POST' && form ? encodeForm(form) : undefined });
+    // 10 seconds at most: a hung call fails (and a webhook is retried by Stripe) instead of holding the Worker
+    const r = await f(`https://api.stripe.com${path}${qs}`, { method, headers, body: method === 'POST' && form ? encodeForm(form) : undefined, signal: AbortSignal.timeout(10_000) });
     const data = await r.json().catch(() => ({})) as T & { error?: { message?: string } };
     if (!r.ok) throw new StripeError(r.status, data?.error?.message ?? `Stripe ${r.status}`);
     return data;

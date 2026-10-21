@@ -90,11 +90,13 @@ export function loadStore(): Store {
   }
 }
 
-export function saveStore(s: Store) {
+/** False when the browser refused it (storage full or off): the game plays on, and App says progress isn't saving. */
+export function saveStore(s: Store): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
+    return true;
   } catch {
-    /* storage off or full: keep playing */
+    return false;
   }
 }
 

@@ -91,5 +91,7 @@ export interface LiveGame {
   /** risks that paid off in the moments you played (career/risk.ts), for XP and attribute boosts */
   risks?: RiskWin[];
   /** a moment in progress: where it started and the calls so far (GameScreen replays them after a refresh) */
-  seg?: { start: State; picks: Pick[] };
+  seg?: { start: State; picks: Pick[]; taken?: boolean };   // taken false: the prompt is up, not yet taken over
+  /** you took over at least one drive (or played every snap): a game you only simmed to the end earns sim XP */
+  played?: boolean;
 }

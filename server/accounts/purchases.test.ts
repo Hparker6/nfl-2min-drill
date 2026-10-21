@@ -280,12 +280,14 @@ describe('refunds and disputes', () => {
   it('a warning that isn’t actionable, or about a purchase already refunded or disputed, refunds nothing', async () => {
     const a = await bought();
     a.stripe.objects.set('issfr_1', warning({ actionable: false }));
-    expect((await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_1', T0)).body.outcome).toMatch(/^ignored: fraud warning not actionable/);
+    expect((await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_1', T0)).body.outcome).toMatch(/^fraud warning: marked; not actionable/);
     expect([a.status(), await a.owns()]).toEqual(['paid', ['coach_edition']]);
+    // still marked: a retry after a refund that went through (the warning is no longer actionable) keeps the buyer closed
+    expect(a.env.DB.raw.prepare('SELECT fraud FROM purchases').get()).toEqual({ fraud: 1 });
     a.stripe.objects.set('dp_1', { id: 'dp_1', payment_intent: 'pi_test_1', charge: 'ch_1', status: 'needs_response' });
     await webhook(a.env, a.stripe.fetch, 'charge.dispute.created', 'dp_1', T0 + MIN);
     a.stripe.objects.set('issfr_2', warning({ id: 'issfr_2' }));
-    expect((await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_2', T0 + 2 * MIN)).body.outcome).toBe('ignored: fraud warning on a disputed purchase');
+    expect((await webhook(a.env, a.stripe.fetch, 'radar.early_fraud_warning.created', 'issfr_2', T0 + 2 * MIN)).body.outcome).toBe('fraud warning: marked; disputed purchase');
     expect(a.stripe.calls.filter((c) => c.method === 'POST' && c.url.endsWith('/v1/refunds'))).toHaveLength(0);
   });
 
@@ -293,8 +295,9 @@ describe('refunds and disputes', () => {
     const a = await bought();
     a.stripe.objects.set('issfr_1', warning());
     const refusing = (async (input: RequestInfo | URL, init?: RequestInit) => (init?.method === 'POST' && String(input).endsWith('/v1/refunds') ? Response.json({ error: { message: 'Charge has already been refunded.' } }, { status: 400 }) : a.stripe.fetch(input, init))) as typeof fetch;
-    expect((await webhook(a.env, refusing, 'radar.early_fraud_warning.created', 'issfr_1', T0)).body.outcome).toBe('fraud warning: refund refused (400)');
+    expect((await webhook(a.env, refusing, 'radar.early_fraud_warning.created', 'issfr_1', T0)).body.outcome).toBe('fraud warning: marked; refund refused (400)');
     expect([a.status(), await a.owns()]).toEqual(['paid', ['coach_edition']]);
+    expect(a.env.DB.raw.prepare('SELECT fraud FROM purchases').get()).toEqual({ fraud: 1 });
     const down = (async (input: RequestInfo | URL, init?: RequestInit) => (init?.method === 'POST' && String(input).endsWith('/v1/refunds') ? Response.json({}, { status: 503 }) : a.stripe.fetch(input, init))) as typeof fetch;
     expect((await webhook(a.env, down, 'radar.early_fraud_warning.created', 'issfr_1', T0 + MIN, { id: 'evt_later' })).status).toBe(503);
     expect(a.env.DB.raw.prepare('SELECT COUNT(*) AS n FROM webhook_events WHERE event_id = ?').get('evt_later')).toEqual({ n: 0 });

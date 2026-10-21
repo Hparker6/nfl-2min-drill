@@ -27,7 +27,7 @@ interface Props {
   c: Career;
   app: AppSettings;
   save: (live: LiveGame) => void;
-  onFinal: (how: 'moments' | 'full') => void;
+  onFinal: (how: 'moments' | 'full' | 'sim') => void;
   onLeave: () => void;
 }
 
@@ -43,7 +43,7 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
   const teams = useMemo(() => liveTeams(c, g), []);   // eslint-disable-line react-hooks/exhaustive-deps
   const [, setTick] = useState(0);
   const rerender = () => setTick((t) => t + 1);
-  const [view, setView] = useState<View>(() => (L.seg ? 'play' : L.s.stage === 'over' ? 'final' : 'watch'));
+  const [view, setView] = useState<View>(() => (L.seg ? (L.seg.taken === false ? 'prompt' : 'play') : L.s.stage === 'over' ? 'final' : 'watch'));
   const [fast, setFast] = useState(c.settings.speed === 'fast');
   const skipRef = useRef(false);        // "keep simming" this drive
   const ffRef = useRef<'moment' | 'end' | null>(null);   // skip ahead: to the next moment, or the end
@@ -58,7 +58,7 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
     if (liveRef.current.mode === m) return;
     liveRef.current.mode = m;
     // every snap means now: a drive of yours the sim is running comes to you at its next snap
-    if (m === 'full') { skipRef.current = false; if (ffRef.current === 'moment') { ffRef.current = null; setFf(null); } }
+    if (m === 'full') { skipRef.current = false; ffRef.current = null; setFf(null); }
     persist(); rerender();
   };
   /** From inside a drive you took over: give it back to the sim. */
@@ -82,7 +82,8 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
         if (tossFor0(s) && ffRef.current !== 'end') { ffRef.current = null; setFf(null); persist(); setView('toss'); return; }
         if (atMoment(s)) {
           ffRef.current = null; setFf(null);
-          liveRef.current.seg = { start: clone(s), picks: [] };
+          liveRef.current.seg = { start: clone(s), picks: [], taken: L.mode === 'full' };
+          if (L.mode === 'full') liveRef.current.played = true;
           persist();
           setView(L.mode === 'full' ? 'play' : 'prompt');
           return;
@@ -99,7 +100,7 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
     return () => { cancelled = true; };
   }, [view, fast]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const takeOver = () => { setView('play'); };
+  const takeOver = () => { if (liveRef.current.seg) liveRef.current.seg.taken = true; liveRef.current.played = true; persist(); setView('play'); };
   /** Your call at the toss, or your choice after it: one step of the game with your decision. */
   const tossStep = (ch: Choice) => {
     const ev: Ev[] = [];
@@ -109,7 +110,7 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
     if (liveRef.current.s.stage === 'toss') rerender(); else setView('watch');
   };
   const keepSimming = () => { skipRef.current = true; liveRef.current.seg = undefined; persist(); setView('watch'); };
-  const skipAhead = (to: 'moment' | 'end') => { ffRef.current = to; setFf(to); if (view === 'prompt' && to === 'end') { liveRef.current.seg = undefined; setView('watch'); } };
+  const skipAhead = (to: 'moment' | 'end') => { ffRef.current = to; setFf(to); if (view === 'prompt' && to === 'end') { liveRef.current.seg = undefined; persist(); setView('watch'); } };
 
   const sc = useMemo(() => (view === 'play' ? momentScenario(c, liveRef.current) : null), [view]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -126,7 +127,11 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
     return out.reverse().slice(0, 40);
   }, [L.ev.length]);   // eslint-disable-line react-hooks/exhaustive-deps
   const line = useMemo(() => { try { return liveBox(c, L).box.players[c.you.pid] ?? {}; } catch { return {}; } }, [L.ev.length]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const flash = view === 'watch' ? scoreFlash(L.ev) : null;
+  // a score's flash plays its whole 2.2 s, whatever comes next (the try, the kickoff, a fast sim)
+  const held = useRef<{ key: number; text: string; team: 0 | 1; until: number } | null>(null);
+  const f = view === 'watch' ? scoreFlash(L.ev) : null;
+  if (f && f.key !== held.current?.key) held.current = { ...f, until: Date.now() + 2200 };
+  const flash = view === 'watch' && held.current && Date.now() < held.current.until ? held.current : null;
 
   if (view === 'play' && sc) {
     return (
@@ -177,7 +182,8 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
             <div className="cg-final">
               <div className="eyebrow">Final{s.q && s.q >= 5 ? ' · overtime' : ''}</div>
               <h2>{s.score[0] > s.score[1] ? 'Win' : s.score[0] < s.score[1] ? 'Loss' : 'Tie'}: {teams[0].name} {s.score[0]}, {teams[1].name} {s.score[1]}</h2>
-              <button className="btn primary big" onClick={() => onFinal(L.mode)}>Postgame</button>
+              {/* a game you never took a snap of (straight to Sim to the end) counts as simmed, like the Sim button */}
+              <button className="btn primary big" onClick={() => onFinal(L.played || L.scores?.length ? L.mode : 'sim')}>Postgame</button>
             </div>
           )}
           {view === 'watch' && (
@@ -211,7 +217,8 @@ function MomentPrompt({ s, teams, onTake, onSim, onEnd }: { s: State; teams: [Te
   const score = l > 0 ? `up ${l}` : l < 0 ? `down ${-l}` : 'tied';
   const spot = Math.round(s.yl) === 50 ? 'midfield' : s.yl < 50 ? `your own ${Math.round(s.yl)}` : `the ${teams[1].id} ${100 - Math.round(s.yl)}`;
   useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Enter') { e.preventDefault(); onTake(); } };
+    // Enter takes over, unless focus is on one of the other buttons (then Enter is that button)
+    const k = (e: KeyboardEvent) => { if (e.key === 'Enter' && !(e.target as HTMLElement)?.closest?.('button, a, input, select, textarea')) { e.preventDefault(); onTake(); } };
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onTake]);

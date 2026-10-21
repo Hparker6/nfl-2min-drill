@@ -11,7 +11,7 @@ import { CONF_NAME, DIV_NAME, FINAL_NAME, LEAGUE_NAME, teamById, teamInfo } from
 import { tradeTargets, signWith } from '../../career/offseason';
 import { race } from '../../career/awards';
 import { gameWeather, leaders, REG_WEEKS, WEEK_NAME, statValue, alive } from '../../career/season';
-import { picture, seeds, standings } from '../../career/standings';
+import { divisionOrder, picture, seeds, standings } from '../../career/standings';
 import type { CTeam, Game, StandingRow } from '../../career/types';
 import { WEATHER } from '../../engine/sim';
 import { POS_LABEL } from '../../engine/data';
@@ -94,7 +94,7 @@ function Home({ c, commit, pic, onPlay, onBye, go }: { c: Career; commit: Commit
   const me = youPlayer(c);
   const g = yourGameThisWeek(c);
   const team = teamById(c.league, me.team!);
-  const div = c.league.teams.filter((t) => t.conf === team.conf && t.div === team.div).sort((a, b) => (pic[b.id]?.pct ?? 0) - (pic[a.id]?.pct ?? 0));
+  const div = useMemo(() => divisionOrder(c.league.teams, c.season.games, team.conf, team.div, c.seed).map((id) => teamById(c.league, id)), [c.season.games, team.id]);   // eslint-disable-line react-hooks/exhaustive-deps
   const mvp = useMemo(() => race(c.league, c.season, c.history.length ? 'mvp' : 'oroy'), [c.season.games]);
   const eliminated = c.season.week > REG_WEEKS && !g && !alive(c.season, team.id);   // a top seed's wild-card bye is not elimination
   const targets = c.you.wantsTrade && c.season.week <= 9 ? tradeTargets(c) : [];

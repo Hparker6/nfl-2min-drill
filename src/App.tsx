@@ -30,12 +30,13 @@ export default function App() {
   // first visit: no modal in the way. The Daily brief carries a short welcome instead.
   const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | 'account' | 'support' | null>(null);
   // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
-  const [accountFrom, setAccountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
-  useEffect(() => { if (accountFrom) setModal('account'); }, [accountFrom]);
+  // read always (a sign-in link can open on a browser that hasn't yet learned accounts are on); open once they show
+  const [accountFrom, setAccountFrom] = useState(() => takeAccountHash());
+  const [drawn, redraw] = useState(0);
+  useEffect(() => { if (accountFrom && accountsShown()) setModal('account'); }, [accountFrom, drawn]);
   // any "get the Coach's Edition" button opens the account panel (EditionLock sends this)
   useEffect(() => { const open = () => setModal('account'); window.addEventListener('4c:account', open); return () => window.removeEventListener('4c:account', open); }, []);
   // what the account owns, asked at start and whenever the tab comes back: a refund made elsewhere shows up here
-  const [, redraw] = useState(0);
   useEffect(() => {
     const ask = () => { if (document.visibilityState === 'visible') fetchMe().then(() => redraw((n) => n + 1)); };
     ask();
@@ -47,11 +48,12 @@ export default function App() {
   // a change runs exactly once, right away: React may run a state updater twice, and the changes here carry side
   // effects (badges announced, analytics, the save itself), so they are applied to the latest store outside of one
   const storeRef = useRef(store);
+  const [unsaved, setUnsaved] = useState(false);
   const update = useCallback((fn: (s: Store) => void) => {
     const next = structuredClone(storeRef.current);
     fn(next);
     storeRef.current = next;
-    saveStore(next);
+    setUnsaved(!saveStore(next));
     setStore(next);
   }, []);
 
@@ -132,6 +134,7 @@ export default function App() {
         </div>
       </header>
       <main className="shell">
+        {unsaved && <p className="notice" role="alert">This browser isn't saving your progress (storage is full or blocked). Your games still play, but streaks and results may not be kept.</p>}
         {mode !== 'career' && <h1 className="sr-only">The 4th Call: a free 2-minute drill play-calling game</h1>}   {/* career screens carry their own H1 */}
         {mode === 'daily' && <Daily store={store} update={update} toast={toast} go={go} onboarded={onboarded} openHelp={() => setModal('help')} />}
         {mode === 'survivor' && <Survivor store={store} update={update} toast={toast} />}
