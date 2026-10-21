@@ -13,6 +13,7 @@ export type Me =
 
 export const COACH_EDITION = 'coach_edition';
 const OWNS_KEY = 'the4thcall:account:owns';
+const PAY_KEY = 'the4thcall:account:payments';
 
 async function post(path: string, body: unknown = {}): Promise<{ status: number; data: Record<string, unknown> }> {
   const r = await fetch(path, { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
@@ -23,13 +24,14 @@ async function post(path: string, body: unknown = {}): Promise<{ status: number;
 export async function fetchMe(): Promise<Me> {
   try {
     const r = await fetch('/v1/me', { credentials: 'same-origin' });
-    if (r.status === 404) return { state: 'off' };
+    if (r.status === 404) { rememberPayments('off'); return { state: 'off' }; }
     if (!r.ok || !(r.headers.get('content-type') ?? '').includes('json')) return { state: 'unreachable' };
     const d = await r.json();
     if (!d || typeof d !== 'object') return { state: 'unreachable' };
     const payments: Payments = d.payments === 'test' || d.payments === 'live' ? d.payments : 'off';
     const owns = Array.isArray(d.owns) ? d.owns.filter((x: unknown) => typeof x === 'string') : [];
     const me: Me = d.signedIn === true ? { state: 'signed-in', email: typeof d.email === 'string' ? d.email : '', owns, payments } : { state: 'signed-out', payments };
+    rememberPayments(payments);
     rememberOwns(me.state === 'signed-in' ? me.owns : []);
     return me;
   } catch { return { state: 'unreachable' }; }
@@ -39,6 +41,13 @@ export async function fetchMe(): Promise<Me> {
 function rememberOwns(owns: string[]) {
   try { localStorage.setItem(OWNS_KEY, JSON.stringify(owns)); } catch { /* storage off */ }
   forgetEditionState();   // a refund or a purchase elsewhere shows on the next screen, not the next page load
+}
+/** Whether this site's server sells the edition, and in which mode (the production gate shows it only for 'live'). */
+function rememberPayments(p: Payments) {
+  try { if (localStorage.getItem(PAY_KEY) !== p) { localStorage.setItem(PAY_KEY, p); forgetEditionState(); } } catch { /* storage off */ }
+}
+export function lastKnownPayments(): Payments {
+  try { const v = localStorage.getItem(PAY_KEY); return v === 'test' || v === 'live' ? v : 'off'; } catch { return 'off'; }
 }
 export function lastKnownOwns(): string[] {
   try { const v = JSON.parse(localStorage.getItem(OWNS_KEY) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; }

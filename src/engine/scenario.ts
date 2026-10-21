@@ -271,7 +271,8 @@ export function genScenario(seedStr: string, mode: Mode, opts: { side?: 'off' | 
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
-    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.nr = true; s.dc = dcFor(seedStr); s.mo = 0; }
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.dc = dcFor(seedStr); s.mo = 0; }
+    if (nrOn(seedStr)) s.nr = true;
     if (fair && checkSpot(s, { daily: true }).length) continue;   // never keep a spot that breaks the rules
     const wp = quickWp(s, hash(seedStr, tries));
     if (fair ? wp >= FAIR_WP[0] && wp <= FAIR_WP[1] : wp >= 0.08 && wp <= 0.88) { best = { s, wp, p }; break; }
@@ -293,7 +294,8 @@ function repairDaily(p0: SpotParams, teams: [TeamInfo, TeamInfo], seedStr: strin
     if (aiMix(seedStr)) s.mix = true;
     if (defAmp(seedStr)) s.dx = DEF_AMP;
     if (covOn(seedStr)) s.cov = true;
-    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.nr = true; s.dc = dcFor(seedStr); s.mo = 0; }
+    if (otOn(seedStr)) { s.otPlay = true; s.toss = true; s.twoPlay = true; s.dc = dcFor(seedStr); s.mo = 0; }
+    if (nrOn(seedStr)) s.nr = true;
     if (checkSpot(s, { daily: true }).length) continue;
     const wp = quickWp(s, hash(seedStr, 'repair', step));
     if (wp >= FAIR_WP[0] && wp <= FAIR_WP[1]) return { s, wp, p };
@@ -362,6 +364,19 @@ export function dcFor(seedStr: string): DcStyle {
 function otOn(seedStr: string): boolean {
   const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
   return !m || m[1] >= OT_FROM;
+}
+
+/**
+ * The finer rules (types.ts `nr`: an untimed down after a defensive foul at 0:00, no try after a walk-off touchdown,
+ * kicks scored past the goal line, the two-minute warning in a kneel-out) from the NR_FROM daily on, and in Survivor,
+ * Practice and Career. Earlier dailies play as they did, so their saved games replay. The date must be later than the
+ * deploy that ships this to the live site (it was set while the change waited on another branch): if that deploy
+ * comes later, move the date past it.
+ */
+export const NR_FROM = '2026-11-15';
+function nrOn(seedStr: string): boolean {
+  const m = seedStr.match(/^daily:(\d{4}-\d{2}-\d{2}):/);
+  return !m || m[1] >= NR_FROM;
 }
 
 export function dailyScenarios(date: string): Scenario[] {

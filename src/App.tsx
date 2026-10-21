@@ -32,10 +32,12 @@ export default function App() {
   // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
   const [accountFrom, setAccountFrom] = useState(() => (accountsShown() ? takeAccountHash() : null));
   useEffect(() => { if (accountFrom) setModal('account'); }, [accountFrom]);
+  // any "get the Coach's Edition" button opens the account panel (EditionLock sends this)
+  useEffect(() => { const open = () => setModal('account'); window.addEventListener('4c:account', open); return () => window.removeEventListener('4c:account', open); }, []);
   // what the account owns, asked at start and whenever the tab comes back: a refund made elsewhere shows up here
+  const [, redraw] = useState(0);
   useEffect(() => {
-    if (!accountsShown()) return;
-    const ask = () => { if (document.visibilityState === 'visible') fetchMe(); };
+    const ask = () => { if (document.visibilityState === 'visible') fetchMe().then(() => redraw((n) => n + 1)); };
     ask();
     document.addEventListener('visibilitychange', ask);
     return () => document.removeEventListener('visibilitychange', ask);

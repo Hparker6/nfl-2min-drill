@@ -9,7 +9,11 @@ declare global {
   interface Window { turnstile?: { render(el: HTMLElement, o: Record<string, unknown>): string; reset(id?: string): void; remove(id: string): void } }
 }
 
-export const TURNSTILE_SITE_KEY = ((import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) ?? '').trim();
+/** The live site's widget key (public by design: it is in every page). Empty until the widget exists in Cloudflare. */
+const LIVE_SITE_KEY = '';
+const onLiveSite = typeof location !== 'undefined' && location.hostname === 'nfl-2min-drill.com';
+// a build variable wins (staging builds with Cloudflare's test key); otherwise the live key, on the live site only
+export const TURNSTILE_SITE_KEY = (((import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) ?? '').trim() || (onLiveSite ? LIVE_SITE_KEY : '')).trim();
 export const turnstileOn = () => /^[A-Za-z0-9_-]{10,}$/.test(TURNSTILE_SITE_KEY);
 
 let loading: Promise<void> | null = null;

@@ -132,15 +132,25 @@ purchase, auto-unlock, and a refund that revoked it automatically all work. What
    player names; Career is already a fictional league).
 
 **Claude's (can start on 6–9 before the EIN; 10–11 need the live keys)**
-6. [ ] **Give the bug-sweep engine rules their own start date** after the merge day. They ride on the overtime flag
+6. [x] **Done 2026-10-21:** `NR_FROM = '2026-11-15'` (`src/engine/scenario.ts`). **If the merge to `main` happens on or
+   after that date, move it past the merge day first** (tested in `rules.test.ts`). Was: give the bug-sweep engine rules their own start date after the merge day. They ride on the overtime flag
    (`otOn`, `OT_FROM = 2026-10-21`), and production `main` doesn't have them, so merging as is would change
    dailies people already played on the live site (saved games would replay differently). Keep the legacy digest.
-7. [ ] **Production purchase screens:** the edition gate (`src/game/edition.ts`) is staging-only by design; switch it to
+7. [x] **Done 2026-10-21:** on the live site the edition shows only once `/v1/me` answers `payments: "live"` (remembered
+   in `the4thcall:account:payments`), so merging changes nothing visible until live payments are on; checked with a
+   production build (server off: nothing new shows; live: the star, Help & refunds, "Buy … $4.99" without test-mode
+   wording). Locked features get a "Get the Coach's Edition" button. The live Turnstile site key goes in
+   `LIVE_SITE_KEY` (`src/ui/Turnstile.tsx`, public, used on `nfl-2min-drill.com` only): **set it before
+   `TURNSTILE_SECRET` goes on production, or sign-in there will fail the bot check.** Was:
+   **Production purchase screens:** the edition gate (`src/game/edition.ts`) is staging-only by design; switch it to
    account-based ownership in production. The Buy button only shows when `payments === 'test'` (`Account.tsx`), and
    the panel says "Preview… test mode": show the live button and drop the preview wording when payments are live.
    The ad slot already hides for owners once the gate reads ownership.
-8. [ ] **Production database:** create the production D1, apply migrations 0001–0004 remotely.
-9. [ ] **Production config** (one reviewed commit): top-level D1 binding, `ACCOUNTS`, `SITE_ORIGIN=https://nfl-2min-drill.com`,
+8. [~] **Production database:** created 2026-10-21: `the-fourth-call-prod`, id `5fbc0458-441f-45df-9045-a61e6ecc5e1c`,
+   region WNAM, empty. Migrations 0001–0004 still to apply (`npx wrangler d1 migrations apply DB --remote`), which
+   needs the top-level binding from item 9 first.
+9. [ ] **Needs the owner's explicit OK in the session** (Claude Code's permission check blocked it on 2026-10-21 as a
+   production change): **Production config** (one reviewed commit): top-level D1 binding, `ACCOUNTS`, `SITE_ORIGIN=https://nfl-2min-drill.com`,
    `MAIL_MODE=resend`, `MAIL_FROM=The 4th Call <login@nfl-2min-drill.com>`, `PAYMENTS`, the real Turnstile site key in the
    build, and `LIVE_PAYMENTS_ALLOWED` flipped. Production secrets via `npx wrangler secret put` (no `--env`):
    `AUTH_PEPPER` (new random value), `RESEND_API_KEY`, `STRIPE_SECRET_KEY` (live), `STRIPE_PRICE_ID`,

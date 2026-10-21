@@ -32,7 +32,7 @@ export function AccountModal({ onClose, from, onSupport }: { onClose: () => void
 
   return (
     <Modal title="Account" onClose={onClose}>
-      <p className="acct-dev">Preview: accounts and purchases are in development and not live. Payments run in Stripe’s test mode only.</p>
+      {me?.state !== 'off' && me && 'payments' in me && me.payments !== 'live' && <p className="acct-dev">Preview: accounts and purchases are in development and not live. Payments run in Stripe’s test mode only.</p>}
       {msg && <p className="acct-msg" role="status">{msg}</p>}
       {from?.token && me?.state === 'signed-out' && <FinishSignIn token={from.token} onDone={(e) => { setMsg(e); refresh(); }} />}
       {from?.purchase && me?.state === 'signed-in' && <ConfirmPurchase sessionId={from.purchase} onOwned={refresh} />}
@@ -133,7 +133,7 @@ function SignedIn({ me, busy, setBusy, setMsg, refresh, onClose }: {
       <p>Signed in as <b>{me.email}</b>.</p>
       <p>{EDITION_NAME}: {owns ? <b className="acct-ok">owned</b> : 'not owned'}</p>
       {!owns && me.payments !== 'off' && <ul className="ed-points">{EDITION_POINTS.map((p) => <li key={p}>{p}</li>)}</ul>}
-      {!owns && me.payments === 'test' && <button className="btn primary" disabled={busy} onClick={buy}>Buy the {EDITION_NAME}: {EDITION_PRICE} (test mode)</button>}
+      {!owns && me.payments !== 'off' && <button className="btn primary" disabled={busy} onClick={buy}>Buy the {EDITION_NAME}: {EDITION_PRICE}{me.payments === 'test' ? ' (test mode)' : ''}</button>}
       {!owns && me.payments !== 'off' && <p className="muted small">One-time purchase for this account, no subscription. Delivered instantly; one refund per account within 14 days on request. <a href="/terms/">Terms</a>.</p>}
       {!owns && me.payments === 'off' && <p className="muted small">Purchases aren’t open.</p>}
       <p className="muted small">Bought it on another device? Signing in with the same email restores it here.</p>

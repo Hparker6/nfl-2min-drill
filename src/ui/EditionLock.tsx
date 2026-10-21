@@ -1,6 +1,7 @@
 import { EDITION_NAME, EDITION_PRICE } from '../game/edition';
+import { lastKnownPayments } from '../game/account';
 
-/** What a locked part of the Coach's Edition says. There is nothing to buy yet, so it says so. */
+/** What a locked part of the Coach's Edition says: what it holds, the price, and the way to buy it (once it's on sale). */
 export function EditionLock({ title, blurb, points }: { title: string; blurb: string; points?: string[] }) {
   return (
     <section className="ed-lock">
@@ -8,7 +9,9 @@ export function EditionLock({ title, blurb, points }: { title: string; blurb: st
       <h3>{title}</h3>
       <p className="muted">{blurb}</p>
       {points && <ul className="ed-points">{points.map((p) => <li key={p}>{p}</li>)}</ul>}
-      <p className="ed-price"><b>{EDITION_PRICE}</b> once, no subscription · <span className="muted">not on sale yet</span></p>
+      {lastKnownPayments() === 'off'
+        ? <p className="ed-price"><b>{EDITION_PRICE}</b> once, no subscription · <span className="muted">not on sale yet</span></p>
+        : <p className="ed-price"><b>{EDITION_PRICE}</b> once, no subscription <button className="btn primary small" onClick={() => window.dispatchEvent(new Event('4c:account'))}>Get the {EDITION_NAME}</button></p>}
     </section>
   );
 }

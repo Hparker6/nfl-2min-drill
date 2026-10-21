@@ -128,3 +128,15 @@ describe('overtime: the second possession scores but stays behind', () => {
     expect(win.stage).toBe('over');
   });
 });
+
+describe('when the finer rules start', () => {
+  it('dailies before NR_FROM play by the old rules; from it on, and in Survivor and Practice, by the new ones', async () => {
+    const { NR_FROM, dailyScenarios, survivorScenario } = await import('./scenario');
+    const day = (d: string, n: number) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+    expect(dailyScenarios(day(NR_FROM, -1))[0].start.nr).toBeUndefined();
+    expect(dailyScenarios('2026-10-22')[0].start.nr).toBeUndefined();   // live on the site before this shipped
+    expect(dailyScenarios(NR_FROM)[0].start.nr).toBe(true);
+    expect(survivorScenario(1, 0).start.nr).toBe(true);
+    expect(NR_FROM > '2026-10-31').toBe(true);
+  });
+});
