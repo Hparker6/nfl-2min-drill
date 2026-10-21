@@ -19,6 +19,9 @@ import { PlayButtons, type Commit } from './Career';
 import { LegacyTab } from './Legacy';
 import { editionShown } from '../../game/edition';
 
+/** A rating's tier, for its color: elite, good, ok, low. */
+const tier = (v: number) => (v >= 90 ? 'elite' : v >= 82 ? 'good' : v >= 74 ? 'ok' : 'low');
+
 type Tab = 'home' | 'schedule' | 'standings' | 'leaders' | 'team' | 'player' | 'playoffs' | 'legacy';
 
 interface Props {
@@ -260,48 +263,70 @@ export const TeamTag = ({ t }: { t: CTeam }) => <span className="cr-tag" style={
 
 function PlayerTab({ c, commit }: { c: Career; commit: Commit }) {
   const me = youPlayer(c);
+  const team = teamById(c.league, me.team!);
   const line = c.season.stats[c.you.pid] ?? {};
   const lv = levelOf(c.you.xp);
+  const x0 = xpForLevel(lv), x1 = xpForLevel(lv + 1);
+  const ATTR_NAME: Record<string, string> = { accuracy: 'Accuracy', arm: 'Arm strength', decision: 'Decision-making', mobility: 'Mobility' };
+  const ATTR_TIP: Record<string, string> = { accuracy: 'Completions', arm: 'Deep throws', decision: 'Fewer interceptions', mobility: 'Scrambles, escaping the rush' };
   return (
-    <div className="cr-grid">
-      <section className="cr-card">
-        <h3>Attributes <span className="muted small">{c.you.sp} skill point{c.you.sp === 1 ? '' : 's'} to spend · 1 point per {XP_PER_SP} XP</span></h3>
-        <div className="cr-attrs">
-          {(['accuracy', 'arm', 'decision', 'mobility'] as const).map((a) => {
-            const v = me.attrs[a] ?? 60, cost = attrCost(v);
-            return (
-              <div key={a} className="cr-attr">
-                <span className="k">{a === 'decision' ? 'Decision-making' : a === 'arm' ? 'Arm strength' : a[0].toUpperCase() + a.slice(1)}</span>
-                <i><b style={{ width: `${v}%` }} /></i>
-                <em>{v}</em>
-                <button className="btn" disabled={c.you.sp < cost || v >= 99} onClick={() => commit((x) => { upgrade(x, a); })} aria-label={`Raise ${a} for ${cost} points`}>+1<small>{cost} pt{cost > 1 ? 's' : ''}</small></button>
-              </div>
-            );
-          })}
+    <div className="cr-stack">
+      <section className="pl-hero" style={{ ...tv(team), ['--hem' as string]: chipInk('#0b0f0d', team.color2) }}>
+        <div className="pl-jersey" aria-hidden><span>{c.you.name.split(' ').slice(-1)[0].toUpperCase()}</span><b>{me.number}</b></div>
+        <div className="pl-id">
+          <div className="eyebrow">Quarterback · {ARCH[c.you.arch].name}</div>
+          <h2>{c.you.name}</h2>
+          <p>{team.city} <em>{team.name}</em> · age {me.age}{c.you.contract ? ` · ${c.you.contract.years} yr${c.you.contract.years === 1 ? '' : 's'} left, $${c.you.contract.salary}m a year` : ''}{c.you.drafted ? ` · drafted ${ordinal(c.you.drafted.pick)}, ${c.you.drafted.year}` : ''}</p>
+          <div className="pl-lv">
+            <span>Level <b>{lv}</b></span>
+            <span className="cr-xp" aria-label={`${c.you.xp - x0} of ${x1 - x0} XP to the next level`}><i style={{ width: `${((c.you.xp - x0) / (x1 - x0)) * 100}%` }} /></span>
+            <span className="pl-to">{x1 - c.you.xp} XP to level {lv + 1}</span>
+            {c.you.sp > 0 && <span className="pl-sp">{c.you.sp} skill point{c.you.sp === 1 ? '' : 's'} to spend</span>}
+          </div>
         </div>
-        <p className="muted small">Accuracy: completions. Arm: deep throws. Decision-making: fewer interceptions. Mobility: scrambles and escaping the rush. Overall is their average.</p>
+        <div className="pl-ovr"><b>{me.rating}</b><small>Overall</small></div>
       </section>
+
+      <div className="pl-grid">
+        <section className="cr-card">
+          <h3>Attributes <span className="muted small">1 skill point per {XP_PER_SP} XP · overall is their average</span></h3>
+          <div className="pl-attrs">
+            {(['accuracy', 'arm', 'decision', 'mobility'] as const).map((a) => {
+              const v = me.attrs[a] ?? 60, cost = attrCost(v);
+              return (
+                <div key={a} className="pl-attr">
+                  <div className="pl-attr-k"><b>{ATTR_NAME[a]}</b><small>{ATTR_TIP[a]}</small></div>
+                  <div className="pl-attr-bar"><i style={{ width: `${v}%` }} className={`t-${tier(v)}`} /></div>
+                  <strong>{v}</strong>
+                  <button className="btn small" disabled={c.you.sp < cost || v >= 99} onClick={() => commit((x) => { upgrade(x, a); })} aria-label={`Raise ${ATTR_NAME[a]} for ${cost} point${cost > 1 ? 's' : ''}`}>+1 · {cost} pt{cost > 1 ? 's' : ''}</button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+        <section className="cr-card">
+          <h3>{c.season.year} season</h3>
+          <StatLine l={line} />
+          {!c.you.wantsTrade && c.season.week <= 9 && <button className="btn ghost small" onClick={() => { if (confirm('Ask for a trade? Teams that want you will show on the home screen until the deadline after week 9.')) commit((x) => { x.you.wantsTrade = true; }); }}>Request a trade</button>}
+        </section>
+      </div>
+
       <section className="cr-card">
-        <h3>Abilities <span className="muted small">Level {lv}</span></h3>
-        <ul className="cr-abil">
+        <h3>Abilities <span className="muted small">unlock with levels, buy with skill points</span></h3>
+        <ul className="pl-abil">
           {(Object.keys(ABILITIES) as Ability[]).map((k) => {
             const A = ABILITIES[k], have = c.you.abilities.includes(k), locked = lv < A.level;
             return (
-              <li key={k} className={have ? 'have' : locked ? 'locked' : ''}>
-                <div><b>{A.name}</b><span>{A.blurb}</span></div>
-                {have ? <em>Unlocked</em> : locked ? <em>Level {A.level}</em>
-                  : <button className="btn" disabled={c.you.sp < A.cost} onClick={() => commit((x) => { buyAbility(x, k); })}>{A.cost} pts</button>}
+              <li key={k} className={have ? 'have' : locked ? 'locked' : 'open'}>
+                <div className="pl-abil-top"><b>{A.name}</b>{have ? <em className="ok">Unlocked</em> : locked ? <em>Level {A.level}</em> : <em className="buy">{A.cost} pts</em>}</div>
+                <p>{A.blurb}</p>
+                {!have && !locked && <button className="btn primary small" disabled={c.you.sp < A.cost} onClick={() => commit((x) => { buyAbility(x, k); })}>{c.you.sp < A.cost ? `Needs ${A.cost} points` : `Unlock for ${A.cost} points`}</button>}
               </li>
             );
           })}
         </ul>
       </section>
-      <section className="cr-card">
-        <h3>{c.season.year} season</h3>
-        <StatLine l={line} />
-        {c.you.contract && <p className="muted small">Contract: {c.you.contract.years} year{c.you.contract.years === 1 ? '' : 's'} left, ${c.you.contract.salary}m a year.{c.you.drafted ? ` Drafted ${ordinal(c.you.drafted.pick)} overall, ${c.you.drafted.year}.` : ''}</p>}
-        {!c.you.wantsTrade && c.season.week <= 9 && <button className="btn ghost small" onClick={() => { if (confirm('Ask for a trade? Teams that want you will show on the home screen until the deadline after week 9.')) commit((x) => { x.you.wantsTrade = true; }); }}>Request a trade</button>}
-      </section>
+
       {c.history.length > 0 && (
         <section className="cr-card cr-wide">
           <h3>Career</h3>
@@ -500,7 +525,7 @@ function Leaders({ c }: { c: Career }) {
               </div>
               <ol className="ld-list" start={2}>
                 {rows.slice(1, 5).map((r, i) => { const q = c.league.players[r.id]; return (
-                  <li key={r.id} className={r.id === c.you.pid ? 'you' : ''}><span className="ld-rk">{i + 2}</span><span className="ld-n">{q.name}<small>{q.team ?? ''}</small></span><b>{fmt(statValue(r.line, k), k)}</b></li>
+                  <li key={r.id} className={r.id === c.you.pid ? 'you' : ''}><span className="ld-rk">{i + 2}</span><span className="ld-name">{q.name}<small>{q.team ?? ''}</small></span><b>{fmt(statValue(r.line, k), k)}</b></li>
                 ); })}
               </ol>
               {youAt >= 5 && <p className="ld-you">You: <b>{ordinal(youAt + 1)}</b> · {fmt(statValue(rows[youAt].line, k), k)}</p>}
@@ -530,7 +555,6 @@ const UNITS: [string, string[]][] = [
   ['Defense', ['EDGE1', 'DL1', 'DL2', 'EDGE2', 'LB1', 'LB2', 'LB3', 'CB1', 'CB2', 'S1', 'S2']],
   ['Special teams', ['K', 'P']],
 ];
-const tier = (v: number) => (v >= 90 ? 'elite' : v >= 82 ? 'good' : v >= 74 ? 'ok' : 'low');
 
 /** A team page: the identity up top, its season, its depth chart by unit, and where it ranks. */
 function TeamTab({ c }: { c: Career }) {
@@ -556,7 +580,7 @@ function TeamTab({ c }: { c: Career }) {
   };
   return (
     <div className="cr-stack">
-      <section className="cr-card tm-hero" style={tv(t)}>
+      <section className="cr-card tm-hero" style={{ ...tv(t), ['--hem' as string]: chipInk('#0b0f0d', t.color2) }}>
         <span className="cr-chip big">{t.id}</span>
         <div className="tm-id">
           <div className="eyebrow">{CONF_NAME[t.conf]} {DIV_NAME[t.div]}{r ? ` · ${rec(r)}` : ''}{r?.seed ? ` · ${ordinal(r.seed)} seed` : ''}</div>

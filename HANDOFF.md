@@ -199,3 +199,10 @@ Four review passes (server, UI, engine, career/renderers) plus two fuzz harnesse
 - **First-game tour** (`src/ui/Tour.tsx`): up to six spotlight notes at a brand-new player's first Daily call (steps
   whose part isn't on screen skip themselves), "Skip tour", Escape, remembered in `store.seenTour`.
 - Phone header: the Coach's Edition button is a star there, and the mode tabs' column shrinks instead of overlapping.
+- 2026-10-22 follow-ups: Leaders tab fixed (its `.ld-n` class collided with the ladder's: renamed `.ld-name`); the
+  Player tab is a player card (jersey, overall, level/XP, skill points), attributes with their effect, abilities as
+  cards with an unlock button; the Team page and draft night's team-on-the-clock card use the dark team band (the old
+  fade left white text on white). The NFL's 5:00 out-of-bounds rule (with `nr`, from NR_FROM for dailies). `App.update`
+  applies each change once. Local Safari sign-in (plain dev cookie on localhost only). Clutch ratings built once per
+  game. Career stays a fictional league for launch (owner's call, option 3); real teams can come later.
+
