@@ -1,5 +1,13 @@
 # Monetization: what is in place and how to turn it on
 
+> **Updated 2026-10-22 (branch coachs-edition):** the CSP now allows Google's ad domains (`public/_headers`, the Worker's
+> page headers); the game page carries the AdSense account meta tag instead of the script; `src/ui/AdSlot.tsx` loads the
+> script itself, 1.5 s after the page draws, only where an ad shows, never for Coach's Edition owners; placements are the
+> footer (not while a game is up) and the end-of-game screen; `public/ads.txt` is in place. The publisher ID and the
+> slot ID live in `src/game/site.ts` (`ADSENSE_CLIENT`, `ADSENSE_SLOT`, both public): **ads show once `ADSENSE_SLOT`
+> holds the display unit's slot ID** and the site is approved. Keep Auto ads off: they can't be kept away from the play
+> controls or from owners. Sections below describe the earlier state.
+
 Nothing here is live until it is deployed, and no ads show until every step under "Turning ads on" is done.
 
 ## What the site runs on

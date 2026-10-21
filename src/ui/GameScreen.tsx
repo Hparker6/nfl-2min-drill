@@ -19,7 +19,7 @@ import { MiniPlay } from './MiniPlay';
 import { Scoreboard } from './Scoreboard';
 import { SpotReview } from './Review';
 import { tellsOf, type Preview } from './field';
-import { gameOnScreen } from './AdSlot';
+import { AdSlot, gameOnScreen } from './AdSlot';
 import { audio } from '../game/audio';
 import { cueFor, finalCue, type ImpactKind } from '../game/fx';
 import { Impact } from './Impact';
@@ -605,8 +605,11 @@ export function GameScreen(p: Props) {
   } else if (phase === 'result' && last) {
     side = <ResultCard last={last} s={view} teams={T} onNext={next} onReplay={replay} replaying={replaying} over={session.over} overLabel={p.segment ? p.segment.endLabel ?? 'Continue' : undefined} />;
   } else if (phase === 'over' && result) {
-    side = <SpotReview result={result} session={session} trail={trail} onContinue={p.onContinue} continueLabel={p.continueLabel}
-      lastPlay={feed.find((l) => l.text && !/expires|runs out/.test(l.text))?.text} />;
+    side = <>
+      <SpotReview result={result} session={session} trail={trail} onContinue={p.onContinue} continueLabel={p.continueLabel}
+        lastPlay={feed.find((l) => l.text && !/expires|runs out/.test(l.text))?.text} />
+      {!p.segment && <AdSlot where="end" />}
+    </>;
   } else {
     side = (
       <section className="status">

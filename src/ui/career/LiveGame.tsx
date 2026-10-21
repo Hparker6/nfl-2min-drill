@@ -19,7 +19,7 @@ import { DriveChart, DriveList, LastPlay, YourLine, scoreFlash } from './Tracker
 import type { LiveGame } from '../../career/types';
 import { WEEK_NAME } from '../../career/season';
 import { GameScreen } from '../GameScreen';
-import { gameOnScreen } from '../AdSlot';
+import { AdSlot, gameOnScreen } from '../AdSlot';
 import { Scoreboard, periodName } from '../Scoreboard';
 import { CoinToss } from '../CoinToss';
 
@@ -186,6 +186,7 @@ export function LiveGameView({ c, app, save, onFinal, onLeave }: Props) {
               <button className="btn primary big" onClick={() => onFinal(L.played || L.scores?.length ? L.mode : 'sim')}>Postgame</button>
             </div>
           )}
+          {view === 'final' && <AdSlot where="end" />}
           {view === 'watch' && (
             <div className="cg-now">
               <LastPlay ev={L.ev} teams={teams} s={s} cur={cur} ff={ff} />

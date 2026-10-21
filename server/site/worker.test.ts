@@ -8,7 +8,8 @@ vi.mock('cloudflare:workers', () => ({ DurableObject: class {} }));
 // @ts-expect-error: a plain JavaScript module
 const W = await import('./worker.js');
 const worker = W.default as { fetch: (r: Request, env: unknown) => Promise<Response> };
-const { cleanName, callerOf } = W as { cleanName: (s: unknown) => string; callerOf: (ip: string) => string };
+// @ts-expect-error: a plain JavaScript module
+const { cleanName, callerOf } = (await import('./board.js')) as { cleanName: (s: unknown) => string; callerOf: (ip: string) => string };
 
 const SITE = 'https://nfl-2min-drill.com';
 const today = () => new Date().toISOString().slice(0, 10);

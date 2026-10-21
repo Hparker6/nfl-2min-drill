@@ -1362,3 +1362,5 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .tour-row { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
 .tour-row .link { font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } .tour-pop { animation: none; } }
+/* the end-of-game ad: below the summary and its buttons, with room between, never touching them */
+.ad-slot.ad-end:has(ins[data-ad-status="filled"]) { margin: 28px auto 8px; padding-top: 14px; border-top: 1px solid var(--line); }
