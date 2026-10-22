@@ -9,8 +9,8 @@ declare global {
   interface Window { turnstile?: { render(el: HTMLElement, o: Record<string, unknown>): string; reset(id?: string): void; remove(id: string): void } }
 }
 
-/** The live site's widget key (public by design: it is in every page). Empty until the widget exists in Cloudflare. */
-const LIVE_SITE_KEY = '';
+/** The live site's widget key (public by design: it is in every page). Its secret is the Worker secret TURNSTILE_SECRET. */
+const LIVE_SITE_KEY = '0x4AAAAAAFgA2XyACJNdPRSD';
 const onLiveSite = typeof location !== 'undefined' && location.hostname === 'nfl-2min-drill.com';
 // a build variable wins (staging builds with Cloudflare's test key); otherwise the live key, on the live site only
 export const TURNSTILE_SITE_KEY = (((import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) ?? '').trim() || (onLiveSite ? LIVE_SITE_KEY : '')).trim();

@@ -88,7 +88,7 @@ async function routeAccounts(req: Request, cfg: Config, url: URL, opts: RouteOpt
       }
       const body = await readJson(req, 4096);
       if (!body) return fail(400, 'Something in the request isn’t right.');
-      if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('signin.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
+      if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch, { action: 'signin', hostnames: siteHosts(cfg) }))) { audit('signin.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
       if ((opts.random ?? Math.random)() < 0.02) await sweep(cfg.db, now).catch((e) => console.error(`sweep failed: ${String((e as Error)?.message).slice(0, 200)}`));
       const r = await startEmail(deps, body?.email, addr);
       audit('signin.requested', { ok: r.ok, error: r.ok ? null : r.error });
@@ -128,7 +128,7 @@ async function routeAccounts(req: Request, cfg: Config, url: URL, opts: RouteOpt
     if (p === '/v1/support') {
       const body = await readJson(req, 12288);
       if (!body) return fail(400, 'Something in the form isn’t right (too long, or not sent as the game sends it).');
-      if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch))) { audit('support.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
+      if (cfg.turnstile && !(await verifyTurnstile(cfg.turnstile, body?.turnstile, req.headers.get('cf-connecting-ip'), opts.fetch ?? fetch, { action: 'support', hostnames: siteHosts(cfg) }))) { audit('support.bot_check_failed', {}); return fail(403, 'The bot check did not pass. Reload and try again.'); }
       const s = await readSession(cfg.db, readCookie(req, SESSION_COOKIE), now);   // optional: a locked-out player can still write
       const r = await submitSupport({ db: cfg.db, pepper: cfg.pepper, mail: cfg.mail, supportTo: cfg.supportTo, now, fetch: opts.fetch ?? fetch, notifier: opts.notifier }, body, addr, s?.userId ?? null);
       if (r.ok) return json({ ok: true, ref: r.ref });
@@ -148,6 +148,9 @@ function mailerFor(cfg: Config, f: typeof fetch): Mailer {
   if (cfg.mail.kind === 'resend') return resendMailer(cfg.mail, f);
   return offMailer;
 }
+
+/** The hostnames our pages are served from (a Turnstile token must have been made on one of them). */
+const siteHosts = (cfg: Config) => cfg.origins.map((o) => new URL(o).hostname);
 
 async function withSession(cfg: Config, req: Request, now: number, fn: (s: NonNullable<Awaited<ReturnType<typeof readSession>>>) => Promise<Response>): Promise<Response> {
   const s = await readSession(cfg.db, readCookie(req, SESSION_COOKIE), now);

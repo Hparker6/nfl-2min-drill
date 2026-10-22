@@ -165,7 +165,7 @@ Stages 1 (local sandbox) and 2 (staging) are done: on staging, sign-in email fro
 purchase, auto-unlock, and a refund that revoked it automatically all work. What remains, in order:
 
 **The owner's (blocked on an EIN: do the Stripe part at home)**
-1. [x] **Stripe live activated** (checked 2026-10-21 from the owner's screenshots: Settings → Business → Account status
+1. [x] **Stripe live activated**, public details set (business name The 4th Call, website nfl-2min-drill.com, terms URL) (checked 2026-10-21 from the owner's screenshots: Settings → Business → Account status
    shows Payments and Payouts **Active**, no open tasks; Cartes Bancaires paused, irrelevant for US cards). In the live dashboard:
    - [x] Product created, one-time **$4.99 USD**: product `prod_VU8xNuhz38A6EG`, **live price `price_1UTAffAUirSh8V8lT4Pxw1m5`**
      (not a secret; production's `STRIPE_PRICE_ID`). To do: rename it from "coachs-edition" to
@@ -177,8 +177,10 @@ purchase, auto-unlock, and a refund that revoked it automatically all work. What
    - [ ] Customer receipts on for successful payments and refunds (Settings → Emails).
    - [ ] Optional: switch off "buy now, pay later" methods (Settings → Payment methods). The code already allows cards only.
    - The live **secret key** and **webhook secret** never go in a chat: paste them at `npx wrangler secret put …` prompts.
-2. [ ] **Turnstile widget** for `nfl-2min-drill.com` (Cloudflare dashboard → Turnstile → Add widget, mode Managed). Send
-   Claude the **site key** (public); keep the secret for `npx wrangler secret put TURNSTILE_SECRET`.
+2. [x] **Turnstile widget** for `nfl-2min-drill.com` created (2026-10-21). Its site key `0x4AAAAAAFgA2XyACJNdPRSD`
+   (public) is `LIVE_SITE_KEY` in `src/ui/Turnstile.tsx`, used on nfl-2min-drill.com only. The owner holds the secret:
+   it goes on production with `npx wrangler secret put TURNSTILE_SECRET` **at the production step (item 9), not before**.
+   With a real secret the server also checks each token's action (`signin`/`support`) and hostname (`turnstile.ts`).
 3. [ ] **Delete the old Resend key** `re_BHVK…` (Resend → API Keys). The newer key is the one staging uses.
 4. [ ] **Finish the staging walkthrough** (LAUNCH_TODO.md stage 2b): send a Help & refunds request while signed in
    (it should reach your inbox with "refunds before: 1"), then try Account → Delete my account.
