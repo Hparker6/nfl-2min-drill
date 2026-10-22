@@ -2,16 +2,26 @@
 
 ## START HERE (updated 2026-10-22, end of the work-PC session)
 
-**Three branches matter:**
+**Two branches now (updated 2026-10-21, after the ads went live):**
 
 | Branch | What it is | Status |
 |---|---|---|
-| `main` | The live site (nfl-2min-drill.com). Pushing it deploys. | Unchanged since `8bc5726` (kickoff cam). |
-| `live-ads` | `main` + the leaderboard integrity fix + ads. **Ready to go live.** | Pushed. Waiting on the owner (Claude Code's permission check blocks pushes to `main`). |
-| `coachs-edition` | Everything else: accounts, the $4.99 Coach's Edition, Stripe, the Coach's Playbook, career and game polish. Deployed to staging only. | Pushed. Waits on Stripe live (the owner needs an EIN first). |
+| `main` | The live site (nfl-2min-drill.com). Pushing it deploys. | **Ads and the leaderboard integrity fix are live** (PR #1, merge `0954a52`; checked on the live site: `ads.txt`, the CSP's ad hosts, unit `4281334746`). Accounts and payments still off there (`/v1/me` answers 404). |
+| `coachs-edition` | Everything else: accounts, the $4.99 Coach's Edition, Stripe, the Coach's Playbook, career and game polish. Deployed to staging only. | `main` merged back in (conflicts resolved toward this branch, as planned; every live ads/leaderboard change checked as kept). Waits on the production config approval (section 5, item 9). |
 
-**To put ads and the leaderboard fix live (the owner):** from the repo folder, `git push origin live-ads:main`, or open
-https://github.com/Hparker6/nfl-2min-drill/pull/new/live-ads, create the pull request and merge it. Then:
+`live-ads` and `hotfix-leaderboard` were merged and deleted.
+
+**Databases (D1):** staging's `the-fourth-call-database` is bound to the staging Worker. Production's
+`the-fourth-call-prod` (`5fbc0458-…`) exists in Cloudflare but is **not bound to the live Worker yet**; binding it (and
+applying the migrations) is the production config step, item 9, on the owner's explicit approval. The leaderboard's own
+storage (Durable Objects with built-in SQLite) is separate and already live.
+
+**Cloudflare preview builds** of non-`main` branches fail at `npx wrangler preview` (Worker Previews; likely because of
+the Durable Objects). The build itself passes, and production deploys use `npx wrangler deploy`. To quiet the red check:
+Settings → Build → set the non-production deploy command to `npx wrangler versions upload`, or turn off non-production
+builds. Also check the analytics build variable is named exactly `VITE_GA_ID`.
+
+**Done 2026-10-21 (was: to put ads and the leaderboard fix live):** merged through PR #1. Still applies:
 - AdSense → Sites: the site showed **"Getting ready"** (Google's review) and ads.txt **"Not found"** on 2026-10-22,
   because ads.txt wasn't live yet. Once `live-ads` is live, `https://nfl-2min-drill.com/ads.txt` must show
   `google.com, pub-2581780385461126, DIRECT, f08c47fec0942fa0`; Google re-checks within about a day. No ads fill until
