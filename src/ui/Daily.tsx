@@ -9,6 +9,7 @@ import { BAND_LABELS, bandOf, fetchBoard, leaderboardOn, submitScore, type Board
 import { streak, type Store, type SpotResult } from '../game/storage';
 import { track } from '../game/analytics';
 import { GameScreen } from './GameScreen';
+import { EditionPromo } from './EditionLock';
 import percentiles from '../data/percentiles.json';
 import { rivalsFor, versusRivals } from '../game/rivals';
 import { ANON, challengeText, challengeUrl, clearChallenge, loadChallenge, type Challenge } from '../game/challenge';
@@ -93,13 +94,14 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
       label={`Daily #${dayNumber(today)}`}
       autoStart={!!day.cur}
       onStart={() => update((s) => { (s.days[today] ??= { spots: [] }).cur = { idx: 0, picks: [] }; s.seenHelp = true; })}
-      briefExtra={(kind || dare || challenge) ? (
+      briefExtra={
         <>
           {kind && <p className="brief-kind">{kind.tagline}</p>}
           {dare && <p className="dare"><b>{dare.name}</b> scored <b>{dare.score}</b> on today's game{dare.win ? ' and won it' : ''}. Beat it.</p>}
           {!dare && challenge && <p className="dare stale">{challenge.name}'s challenge was for Daily #{dayNumber(challenge.date)}, which is over. Play today's and send yours.</p>}
+          <EditionPromo where="brief" />
         </>
-      ) : undefined}
+      }
       welcome={!store.seenHelp && !day.cur ? (
         <div className="welcome">
           <p className="welcome-lead"><b>You call the plays at the end of a close game.</b> Pick each play, run the clock, win it. Every call is graded against every other option you had.</p>
@@ -291,6 +293,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
         </div>
         <span className="muted small">Next daily in <Countdown /></span>
       </div>
+      <EditionPromo where="after" />
     </section>
   );
 }

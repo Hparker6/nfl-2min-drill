@@ -192,7 +192,7 @@ function NewCareer({ onCreate, onLoad, onSlots, slot }: { onCreate: (o: { name: 
   return (
     <div className="cr-page nc">
       <header className="nc-hero">
-        <div className="eyebrow">Career mode · beta</div>
+        <div className="eyebrow">Career mode</div>
         <h1>Become the <em>franchise</em> quarterback</h1>
         <p>One bowl game in front of the scouts. Draft night. Then a 17-game season, the playoffs and the Gridiron Bowl, calling your own plays when it's on the line.</p>
       </header>

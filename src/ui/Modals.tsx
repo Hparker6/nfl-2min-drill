@@ -77,6 +77,7 @@ export function About({ onClose }: { onClose: () => void }) {
       <h3>About the grades</h3>
       <p>Plays are resolved by a simplified football simulation written for this game. Win chances and grades are that simulation's estimates: useful for comparing your options, but not official evaluations, real coaching grades or real-world probabilities.</p>
       <h3>Your data</h3>
+      <p>The full details are in the <a href="/privacy/">privacy policy</a>. In short:</p>
       <ul>
         <li>Your progress, streaks, stats, careers and settings are stored in this browser (localStorage), not on a server. Clearing your browser data, or <i>Settings → Erase my data</i>, removes them.</li>
         <li>The daily leaderboard: when you post a score, our server receives the nickname you chose, your score, your call grades, whether you won and a random code this browser made up (so a second post replaces the first). To limit posts, your IP address is counted for that day as a one-way hash; the address itself isn’t kept.</li>

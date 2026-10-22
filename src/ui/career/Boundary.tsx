@@ -15,9 +15,9 @@ export class CareerBoundary extends Component<{ children: ReactNode; slot: numbe
     return (
       <div className="cr-page">
         <section className="cr-card">
-          <div className="eyebrow">Career mode · Beta</div>
+          <div className="eyebrow">Career mode</div>
           <h2>This career couldn't load</h2>
-          <p className="muted">Career mode is in beta, and an update may have changed something your save relies on. Try reloading first. If it still won't open, start a new career.</p>
+          <p className="muted">An update may have changed something your save relies on. Try reloading first. If it still won't open, start a new career.</p>
           <div className="row">
             <button className="btn primary" onClick={() => location.reload()}>Reload</button>
             <button className="btn" onClick={() => { if (confirm('Delete this career and start a new one?')) { saveCareer(null, ownsEdition() ? activeSlot() : 1); location.reload(); } }}>Start a new career</button>
