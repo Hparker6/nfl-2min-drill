@@ -1,6 +1,7 @@
 /** Career screens between games: draft night, the postgame, the season's end, and the offseason. */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { tv } from './tv';
+import { AdSlot } from '../AdSlot';
 import { passerRating, type Box, type Line } from '../../career/box';
 import { ARCH, COLLEGES, levelOf, youPlayer, type Career } from '../../career/career';
 import { FINAL_NAME, teamById, teamInfo } from '../../career/league';
@@ -122,6 +123,7 @@ export function Postgame({ c, gameId, onContinue }: { c: Career; gameId: string;
       )}
 
       <TeamStats box={box} teams={teams} />
+      <AdSlot where="end" />
 
       {box.scoring.length > 0 && (
         <section className="cr-card">
