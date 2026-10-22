@@ -105,8 +105,9 @@ Each item here is an owner decision or an external approval, not a code task, ex
       LLC is the seller; terms of sale; refund and dispute policy; the privacy policy covering accounts and Stripe.
 - [ ] **Tax / merchant of record:** standard Stripe (you handle tax) or Stripe's managed option. Decide before the
       first live sale.
-- [ ] **Stripe live mode:** activate the account (business details, bank), recreate the product and price in live
-      mode, create a live restricted key and a live webhook endpoint for the production URL.
+- [~] **Stripe live mode:** account activated (Payments and Payouts active, 2026-10-21); live product and price
+      created (`price_1UTAffAUirSh8V8lT4Pxw1m5`, one-time $4.99 USD). Still to do: a live restricted key and a live
+      webhook endpoint for the production URL.
 - [ ] **Resend:** a sending address on the final domain (a dedicated one such as `signin@` is fine), domain verified,
       a production API key separate from staging's.
 - [ ] **Production config** (code change on the branch, reviewed): add the D1 binding, `ACCOUNTS`, `SITE_ORIGIN`

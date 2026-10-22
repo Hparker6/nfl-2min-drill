@@ -165,8 +165,13 @@ Stages 1 (local sandbox) and 2 (staging) are done: on staging, sign-in email fro
 purchase, auto-unlock, and a refund that revoked it automatically all work. What remains, in order:
 
 **The owner's (blocked on an EIN: do the Stripe part at home)**
-1. [ ] **Get the EIN**, then **activate Stripe live** (business details, bank account, identity). In the live dashboard:
-   - [ ] Product "The 4th Call: Coach's Edition", **one-time, $4.99 USD**. Send Claude its **price ID** (`price_…`, not a secret).
+1. [x] **Stripe live activated** (checked 2026-10-21 from the owner's screenshots: Settings → Business → Account status
+   shows Payments and Payouts **Active**, no open tasks; Cartes Bancaires paused, irrelevant for US cards). In the live dashboard:
+   - [x] Product created, one-time **$4.99 USD**: product `prod_VU8xNuhz38A6EG`, **live price `price_1UTAffAUirSh8V8lT4Pxw1m5`**
+     (not a secret; production's `STRIPE_PRICE_ID`). To do: rename it from "coachs-edition" to
+     **The 4th Call: Coach's Edition** (buyers see the name at checkout and on receipts); tax code and category not needed
+     until Stripe Tax is on.
+   - [ ] Automatic payouts (Balances → Set up automatic payouts): not set up yet.
    - [ ] Statement descriptor **`THE 4TH CALL`** (Settings → Business → Public details), so buyers recognize the charge.
    - [ ] Radar rule **"Request 3D Secure if 3DS is recommended by Radar"** on.
    - [ ] Customer receipts on for successful payments and refunds (Settings → Emails).
