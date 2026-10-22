@@ -1393,3 +1393,40 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .pc-pb { position: absolute; left: 8px; bottom: 6px; font: 700 10px var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); border-radius: 999px; padding: 2px 7px; }
 .pc-pb.inline { position: static; margin-left: 6px; font-style: normal; vertical-align: middle; }
 .pb-badge { font-style: normal; margin-left: 5px; color: var(--accent); font-size: 12px; }
+
+/* the Coach's Edition card: on the Daily brief and after a game (never for owners) */
+.ed-promo { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: var(--r-md); background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 12%, var(--panel)), var(--panel) 75%); text-align: left; }
+.ed-promo-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ed-promo-head b { font: 800 16px var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--ink); }
+.ed-promo-star { color: var(--accent); }
+.ed-promo-price { margin-left: auto; font: 700 14px var(--display); color: var(--accent); letter-spacing: .03em; }
+.ed-promo p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.45; }
+.ed-promo .btn { justify-self: start; padding: 6px 12px; font-size: 13px; }
+.ed-promo-brief { margin-top: 14px; }
+.ed-promo-after { margin: 6px auto 0; max-width: 560px; width: 100%; box-sizing: border-box; }
+
+/* the footer: one slim row of links, the long "what is this" folded away (still in the page for search engines) */
+.foot { gap: 4px; padding-top: 18px; padding-bottom: 18px; }
+.foot-links { gap: 4px 16px; }
+.foot-links a, .foot-links button { font-size: 12.5px; color: var(--muted); }
+.foot-about { margin: 2px auto 0; gap: 0; }
+.foot-about > summary { list-style: none; cursor: pointer; justify-self: center; color: var(--muted); font: 600 12px var(--body); padding: 2px 6px; border-radius: 6px; }
+.foot-about > summary::-webkit-details-marker { display: none; }
+.foot-about > summary::after { content: ' ▾'; font-size: 10px; }
+.foot-about[open] > summary::after { content: ' ▴'; }
+.foot-about > summary:hover { color: var(--ink); }
+.foot-about[open] { gap: 4px; margin-bottom: 6px; }
+.foot-about[open] > summary { margin-bottom: 6px; }
+.foot-fine { font-size: 11px; opacity: .8; }
+
+/* phones: two rows in the header, so all four modes show (the Coach's Edition star took Career's room) and the name
+   comes back: logo, name and icons on top, the mode tabs across the full width below */
+@media (max-width: 640px) {
+  :root { --top-h: 96px; }
+  .top-in { height: auto; min-height: 52px; grid-template-columns: auto 1fr; grid-template-areas: "brand right" "modes modes"; row-gap: 8px; padding: 8px 10px 10px; }
+  .brand { grid-area: brand; }
+  .brand-name { display: inline; font-size: 19px; }
+  .top-r { grid-area: right; }
+  .modes { grid-area: modes; justify-self: stretch; justify-content: space-between; overflow-x: visible; }
+  .modes button { flex: 1 1 0; padding: 7px 2px; font-size: 13px; letter-spacing: .04em; }
+}
