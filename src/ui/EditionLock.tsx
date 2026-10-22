@@ -1,6 +1,7 @@
 import { EDITION_NAME, EDITION_PRICE, editionShown, ownsEdition } from '../game/edition';
 import { track } from '../game/analytics';
 import { lastKnownPayments } from '../game/account';
+import { Icon } from './Icon';
 
 /** What a locked part of the Coach's Edition says: what it holds, the price, and the way to buy it (once it's on sale). */
 export function EditionLock({ title, blurb, points }: { title: string; blurb: string; points?: string[] }) {
@@ -27,7 +28,7 @@ export function EditionPromo({ where }: { where: 'brief' | 'after' }) {
   return (
     <aside className={`ed-promo ed-promo-${where}`} aria-label={EDITION_NAME}>
       <div className="ed-promo-head">
-        <span className="ed-promo-star" aria-hidden>★</span>
+        <span className="ed-promo-star"><Icon name="star" /></span>
         <b>{EDITION_NAME}</b>
         <span className="ed-promo-price">{EDITION_PRICE} once</span>
       </div>

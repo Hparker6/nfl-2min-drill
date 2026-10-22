@@ -13,6 +13,7 @@ import { EditionPromo } from './EditionLock';
 import percentiles from '../data/percentiles.json';
 import { rivalsFor, versusRivals } from '../game/rivals';
 import { ANON, challengeText, challengeUrl, clearChallenge, loadChallenge, type Challenge } from '../game/challenge';
+import { Icon } from './Icon';
 
 interface Props {
   store: Store;
@@ -271,11 +272,11 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
                 </div>
                 <p className="muted small">Today's average: {board.average} · yours: {rt.performance}</p>
                 <ol className="best">
-                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked, ★ Coach's Playbook</em></span>
+                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked, <Icon name="star" /> Coach's Playbook</em></span>
                   {bestRows.map((b, i) => (
                     <li key={i} className={b.ai ? 'ai' : ''}>
                       <span>{b.ai ? '·' : b.rank}</span>
-                      <span>{b.name}{b.pb && <i className="pb-badge" title="Played with the Coach's Playbook">★</i>}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
+                      <span>{b.name}{b.pb && <i className="pb-badge"><Icon name="star" title="Played with the Coach's Playbook" /></i>}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
                       <b>{b.score}</b>
                     </li>
                   ))}

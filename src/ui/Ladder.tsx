@@ -13,6 +13,7 @@ import { utcDate } from '../engine/scenario';
 import type { Store } from '../game/storage';
 import { EDITION_POINTS, EditionLock } from './EditionLock';
 import { GameScreen } from './GameScreen';
+import { Icon } from './Icon';
 
 interface Props {
   store: Store;
@@ -23,7 +24,7 @@ interface Props {
 const FREE_RUNGS = 1;
 
 export const StarRow = ({ n, label }: { n: number; label?: string }) => (
-  <span className="ld-stars" aria-label={label ?? `${n} of 3 stars`}>{[1, 2, 3].map((k) => <i key={k} className={k <= n ? 'on' : ''} aria-hidden>★</i>)}</span>
+  <span className="ld-stars" aria-label={label ?? `${n} of 3 stars`}>{[1, 2, 3].map((k) => <i key={k} className={k <= n ? 'on' : ''} aria-hidden><Icon name="star" /></i>)}</span>
 );
 
 /** The spot in a few words: the score, the clock, the ball. */
@@ -73,7 +74,7 @@ export function Ladder({ store, update }: Props) {
     <div className="page ld">
       <div className="meta">
         <div className="meta-l"><h2 className="meta-title">Gridiron Challenge</h2><span className="meta-sub">Eight late-game spots, harder as you climb. Win for a star; call it well for three.</span></div>
-        <div className="ld-total" aria-label={`${total} of ${MAX_STARS} stars`}><b>{total}</b><span>/ {MAX_STARS} ★</span></div>
+        <div className="ld-total" aria-label={`${total} of ${MAX_STARS} stars`}><b>{total}</b><span>/ {MAX_STARS} <Icon name="star" /></span></div>
       </div>
 
       {last && <LastResult r={LADDER[last.i]} {...last} onAgain={() => play(last.i)} onNext={last.i + 1 < LADDER.length && (last.stars > 0 || unlocked(prog, last.i + 1)) ? () => play(last.i + 1) : undefined} canNext={owned || last.i + 1 < FREE_RUNGS} />}

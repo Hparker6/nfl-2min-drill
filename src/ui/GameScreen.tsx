@@ -25,6 +25,7 @@ import { audio } from '../game/audio';
 import { cueFor, finalCue, HAPTIC, type ImpactKind } from '../game/fx';
 import { Impact } from './Impact';
 import { CoinToss } from './CoinToss';
+import { Icon } from './Icon';
 
 interface Props {
   sc: Scenario;
@@ -595,7 +596,6 @@ export function GameScreen(p: Props) {
       <section className="brief">
         {p.welcome}
         {boot.lost && <p className="notice">Your saved progress on this spot couldn't be restored after an update, so it starts over.</p>}
-        <div className="eyebrow">{p.label}</div>
         <h2 className="brief-head">{headline(s0)}</h2>
         <p className="brief-sit">{situation(s0, T)}{s0.weather && s0.weather !== 'clear' ? <> <b className={`wx-word wx-${s0.weather}`}>{WEATHER[s0.weather].blurb}</b></> : null}</p>
         {s0.dc && <p className="brief-dc"><span className="k">Scouting report</span>Their defensive coordinator {DC_TEXT[s0.dc.style]}. Watch for it, and don't run the same play three times in a row: he adjusts.</p>}
@@ -641,7 +641,7 @@ export function GameScreen(p: Props) {
     );
   }
 
-  const chip = replaying ? ['replay', '↺ Replay'] : phase === 'snapping' || phase === 'auto' ? ['live', 'Live'] : phase === 'result' ? ['result', 'Result'] : phase === 'over' ? ['result', 'Final']
+  const chip = replaying ? ['replay', 'Replay'] : phase === 'snapping' || phase === 'auto' ? ['live', 'Live'] : phase === 'result' ? ['result', 'Result'] : phase === 'over' ? ['result', 'Final']
     : phase === 'deciding' ? (sel ? ['sel', `Selected: ${sel.label}`] : ['ready', dec?.step === 'play' ? 'Pick a play' : 'Your call']) : ['ready', 'Pre-game'];
 
   // the tour opens on the first real call, once the panel is drawn
@@ -749,7 +749,7 @@ function ResultCard({ last, s, teams, onNext, onReplay, replaying, over, overLab
         </div>
       )}
       <div className="res-actions">
-        {canReplay && <button className="btn ghost replay" onClick={onReplay} disabled={replaying}>↺ Replay<kbd>R</kbd></button>}
+        {canReplay && <button className="btn ghost replay" onClick={onReplay} disabled={replaying}><Icon name="replay" /> Replay<kbd>R</kbd></button>}
         <button className={`btn next${auto ? ' auto' : ''}`} onClick={onNext} disabled={(!g && !last.failed) || replaying}>
           {auto > 0 && <i className="next-fill" key={`${auto}:${last.label}`} style={{ animationDuration: `${auto}ms` }} aria-hidden />}
           <span>{over ? overLabel ?? 'See the final' : 'Next play'}</span><kbd>Enter</kbd>

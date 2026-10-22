@@ -9,6 +9,7 @@ import { GRADE_INFO, type Grade } from '../game/grade';
 import type { Look, LookFam, PassMods, Rcv, RouteId, State, TeamInfo } from '../engine/types';
 import { MiniPlay } from './MiniPlay';
 import type { ScoutNote } from '../game/scout';
+import { Icon } from './Icon';
 
 /** What the play-caller changed about the selected call: the side, the receiver, the routes, the quarterback's action. */
 export interface Edits {
@@ -335,7 +336,7 @@ export function CallPanel(p: Props) {
             return (
               <button key={o.key} className={`dbtn${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} disabled={needClock} onClick={() => onSnap(o)}>
                 <span className="dbtn-txt">
-                  <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline">★ Playbook</em>}</span>
+                  <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline"><Icon name="star" /> Playbook</em>}</span>
                   {o.sub && <span className="dbtn-sub">{o.sub}</span>}
                 </span>
                 {wp != null && <span className="opt-wp">{(wp * 100).toFixed(1)}%</span>}
@@ -370,7 +371,7 @@ export function CallPanel(p: Props) {
           <MiniPlay play={o.choice.play} side={sel ? edits.side : undefined} routes={sel ? edits.routes : undefined} target={sel ? edits.target : undefined} mods={sel ? edits.mods : undefined} />
           {f && <span className="pc-form">{FORMATION_NAME[f] ?? f}</span>}
           <span className="pc-tag">{wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}</span>
-          {o.premium && <span className="pc-pb" title="From the Coach's Playbook">★ Playbook</span>}
+          {o.premium && <span className="pc-pb" title="From the Coach's Playbook"><Icon name="star" /> Playbook</span>}
         </span>
         <span className="pc-name"><kbd>{i + 1}</kbd>{o.label}</span>
         <span className="pc-sub">{o.sub}</span>
@@ -408,7 +409,7 @@ export function CallPanel(p: Props) {
           return (
             <button key={o.key} className={`sbtn${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={() => onSelect(o)} aria-pressed={sel}>
               <MiniPlay play={o.key} />
-              <span><span className="sbtn-name"><kbd>{list.length + j + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline">★</em>}</span><span className="sbtn-sub">{o.sub}</span></span>
+              <span><span className="sbtn-name"><kbd>{list.length + j + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline"><Icon name="star" title="Coach's Playbook" /></em>}</span><span className="sbtn-sub">{o.sub}</span></span>
               {wp != null && <span className="opt-wp">{(wp * 100).toFixed(1)}%</span>}
             </button>
           );
@@ -432,7 +433,7 @@ export function CallPanel(p: Props) {
     <section className="cp" aria-label="Call the play">
       <Prev prev={prev} />
       <header className="cp-head">
-        <div className="cp-flags"><span className="off-flag">Your call</span><WeatherChip s={s} /></div>
+        <div className="cp-flags"><WeatherChip s={s} /></div>
         <Title text={dec.title} />
         {s.shownLook && !simple && (
           <div className="read" title={`Your pre-snap read is right about ${Math.round((read?.p ?? 0.7) * 100)}% of the time${read?.crowd ? ' (a road crowd on third down makes it harder)' : ''}`}>
