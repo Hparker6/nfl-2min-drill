@@ -1257,3 +1257,5 @@ svg.field { -webkit-touch-callout: none; -webkit-user-select: none; user-select:
 .field-wrap.look-gold .f-line, .field-wrap.look-gold .f-hash { stroke: #f2d36b; }
 .field-wrap.look-gold .f-num, .field-wrap.look-gold .f-arrow { fill: #f2d36b; opacity: .62; }
 .field-wrap.look-gold .f-border { stroke: #f2d36b; }
+/* the end-of-game ad: below the summary and its buttons, with room between, never touching them */
+.ad-slot.ad-end:has(ins[data-ad-status="filled"]) { margin: 32px auto 32px; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }

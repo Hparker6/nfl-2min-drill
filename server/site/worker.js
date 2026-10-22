@@ -15,19 +15,14 @@
 import { DurableObject } from 'cloudflare:workers';
 import PCT from '../../src/data/percentiles.json';
 import { rivalsFor } from '../../src/game/rivals.ts';
+// names, callers and the possible-score check live in their own module (a Worker module exports only handlers and classes)
+import { callerOf, cleanName, possible } from './board.js';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; frame-ancestors 'none'" },
 });
 
-// names are public on the board: letters, digits and a little punctuation, 20 characters, no obvious abuse
-const BLOCK = /\b(fuck\w*|shit\w*|cunt\w*|nigg\w*|fag\w*|bitch\w*|whore\w*|slut\w*|rape\w*|rapist|nazi\w*|hitler|porn\w*|dick|dicks|cock|cocks|pussy|asshole\w*|retard\w*)\b/i;
-function cleanName(s) {
-  const n = String(s ?? '').normalize('NFKC').replace(/[^\p{L}\p{N} _.'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 20);
-  if (!n) return 'Anonymous';
-  return BLOCK.test(n) ? 'Coach' : n;
-}
 
 
 /** One day's scores. */
@@ -98,6 +93,11 @@ async function api(request, env, url) {
   const board = env.DAY_BOARD.get(env.DAY_BOARD.idFromName(day));
   if (request.method === 'GET' && !m[2]) return json(await board.summary(day, url.searchParams.get('token')));
   if (request.method === 'POST' && m[2]) {
+    // from our own pages only, as JSON: another site can't post for its visitors (a JSON post from elsewhere needs a
+    // CORS preflight, which this Worker never answers)
+    const origin = request.headers.get('origin');
+    if (!(request.headers.get('content-type') ?? '').toLowerCase().startsWith('application/json')) return json({ error: 'bad request' }, 415);
+    if (origin !== url.origin && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin ?? '')) return json({ error: 'forbidden' }, 403);
     // only today and yesterday (UTC) take scores, so old days stay fixed
     const now = Date.now(), dayMs = Date.parse(day + 'T00:00:00Z');
     if (!(now - dayMs < 2 * 864e5 && now - dayMs > -864e5)) return json({ error: 'day closed' }, 400);
@@ -106,15 +106,17 @@ async function api(request, env, url) {
     if (raw.length > 2048) return json({ error: 'too large' }, 413);
     let body;
     try { body = JSON.parse(raw); } catch { return json({ error: 'bad json' }, 400); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ error: 'bad json' }, 400);
     const token = String(body.token || '').slice(0, 64);
     const score = Number(body.score);
-    if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100) return json({ error: 'bad score' }, 400);
+    if (!/^[a-f0-9]{8,64}$/.test(token) || !Number.isFinite(score) || score < 0 || score > 100 || !possible(Math.round(score), !!body.win)) return json({ error: 'bad score' }, 400);
     // the address only counts posts, and only as a salted hash: no IP is stored
-    const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+    const ip = callerOf(request.headers.get('cf-connecting-ip') || 'unknown');
     const addr = [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(day + ':' + ip)))].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('');
     const sum = await board.submit(day, { token, name: cleanName(body.name), score: Math.round(score), grades: String(body.grades || '').replace(/[^gyor]/g, '').slice(0, 64), win: !!body.win }, addr);
     if (!sum) return json({ error: 'too many scores from this address today' }, 429);
-    await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum);
+    try { await env.ALL_DAYS.get(env.ALL_DAYS.idFromName('all')).set(day, sum); }
+    catch (e) { console.error(JSON.stringify({ audit: 'stats.update_failed', day, error: String(e?.message ?? e).slice(0, 120) })); }
     return json(sum);
   }
   return json({ error: 'method' }, 405);
@@ -137,7 +139,7 @@ const fmtDay = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { w
 const PAGE_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'public, max-age=60',
-  'content-security-policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; connect-src 'self' https://cloudflareinsights.com; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+  'content-security-policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.google.com https://*.googleadservices.com https://*.doubleclick.net https://*.adtrafficquality.google https://fundingchoicesmessages.google.com; frame-src https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google; connect-src 'self' https://cloudflareinsights.com https://*.googlesyndication.com https://adservice.google.com https://www.google.com/recaptcha/ https://*.doubleclick.net https://*.adtrafficquality.google https://fundingchoicesmessages.google.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
   'strict-transport-security': 'max-age=31536000; includeSubDomains',
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
@@ -164,9 +166,8 @@ function page({ path, title, description, h1, body, jsonld, eyebrow }) {
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/pages.css" />
 ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>` : ''}
-<!-- Google AdSense site verification: loads the AdSense script only; no ad units are placed -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2581780385461126"
-     crossorigin="anonymous"></script>
+<!-- Google AdSense: the account tag; /ads.js fills this page's ad slots (and skips them for Coach's Edition owners) -->
+<meta name="google-adsense-account" content="ca-pub-2581780385461126" />
 </head><body>
 <header class="top"><div class="top-in">
 <a class="brand" href="/" aria-label="The 4th Call home"><span class="mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="18" height="18"><g transform="rotate(-35 32 32)"><ellipse cx="32" cy="32" rx="21" ry="13" fill="currentColor"/></g></svg></span><span>The <em>4th</em> Call</span></a>
@@ -175,6 +176,7 @@ ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(
 <main>${eyebrow ? `<p class="eyebrow">${eyebrow}</p>` : ''}<h1>${h1}</h1>${body}</main>
 <footer><div class="in"><span class="brandline">The <em>4th</em> Call</span><nav aria-label="More"><a href="/">Play</a><a href="/how-to-play/">How to play</a><a href="/leaderboard/">Leaderboard</a><a href="/stats/">Stats</a></nav>
 An independent fan game, not affiliated with or endorsed by the NFL, its teams or the NFLPA. Rosters and statistics from nflverse (CC-BY 4.0). Scores are reported by each player's browser.</div></footer>
+<script src="/ads.js" defer></script>
 </body></html>`;
 }
 
@@ -194,6 +196,8 @@ const untilNext = () => {
   const h = Math.floor(ms / 36e5), m = Math.floor((ms % 36e5) / 6e4);
   return `${h}h ${String(m).padStart(2, '0')}m`;
 };
+/** One display ad on a page (filled by /ads.js; nothing at all for a Coach's Edition owner or an ad blocker). */
+const AD_SLOT = '<aside class="ad-slot" aria-label="Advertisement"><span class="ad-k">Advertisement</span><ins class="adsbygoogle ad-page" style="display:block" data-ad-client="ca-pub-2581780385461126" data-ad-slot="4281334746" data-ad-format="auto" data-full-width-responsive="true"></ins></aside>';
 const shortDay = (d) => new Date(d + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 
 /** Players and AI rivals in one table: players ranked 1, 2, 3…; rivals sit at their score, badged and unranked. */
@@ -231,6 +235,7 @@ async function leaderboardPage(env) {
 <h2>Today's board</h2>
 ${boardTable(t.best, today)}
 <p class="note">${t.count ? '' : 'No scores yet today: be the first on the board. Play the Daily, then post your name. '}Rows marked <span class="badge" style="margin:0">AI</span> are the day's AI rivals: computer play-callers whose scores come from the game's simulated play-callers, a different group each day. They are not players, are not ranked, and don't count in the numbers above.</p>
+${AD_SLOT}
 ${t.count ? `<h2>How today's scores spread out</h2>${bandBars(t.bands)}` : ''}
 <h2>Yesterday's best</h2>
 ${yest}
@@ -265,6 +270,7 @@ async function statsPage(env) {
 ${bestEver ? `<p>The best score so far is <b>${bestEver.score}</b>, by <b>${esc(bestEver.name)}</b> on Daily #${dayNumber(bestEver.day)} (${esc(fmtDay(bestEver.day))}).</p>` : ''}
 <h2>Day by day</h2>
 ${table}
+${AD_SLOT}
 <h2>Scores to beat</h2>
 <p>Simulated play-callers set the bar: across ${SIM.length} simulated games, the top 10% scored <b>${simAt(0.9)}</b> or better and the average was <b>${simAt(0.5)}</b>. Your end-of-game screen shows how you compare.</p>
 <h2>About the numbers</h2>
