@@ -20,12 +20,25 @@
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DayBoard", "AllDays"] }
   ],
-  // Accounts and purchases are OFF at the top level (production): no database binding, so /v1/auth, /v1/me, /v1/checkout
-  // and /v1/stripe answer 404. The dev environment below turns them on, on this machine only:
+  // PRODUCTION accounts and payments (approved by the owner 2026-10-21): the live D1 database, and the live settings.
+  // They only take effect once this branch is merged to main and the production secrets are set
+  // (npx wrangler secret put AUTH_PEPPER | RESEND_API_KEY | STRIPE_SECRET_KEY | STRIPE_PRICE_ID | STRIPE_WEBHOOK_SECRET |
+  // TURNSTILE_SECRET | SUPPORT_TO, no --env). Any one missing keeps that part off (server/accounts/config.ts).
+  // Tables first: npx wrangler d1 migrations apply DB --remote
+  "d1_databases": [
+    { "binding": "DB", "database_name": "the-fourth-call-prod", "database_id": "5fbc0458-441f-45df-9045-a61e6ecc5e1c", "migrations_dir": "server/db/migrations" }
+  ],
+  "vars": {
+    "ACCOUNTS": "on",
+    "SITE_ORIGIN": "https://nfl-2min-drill.com",
+    "MAIL_MODE": "resend",
+    "MAIL_FROM": "The 4th Call <login@nfl-2min-drill.com>",
+    "PAYMENTS": "on"
+  },
+  // The dev environment below runs all of it on this machine only:
   //   npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev
   //   then, in another terminal: DEV_API=http://localhost:8787 npm run dev, and open http://localhost:5173/?edition=account
-  // with secrets in .dev.vars (see .dev.vars.example). The staging environment is further down; production gets the same
-  // only after review. Setup for both: server/accounts/SETUP.md.
+  // with secrets in .dev.vars (see .dev.vars.example). The staging environment is further down. Setup: server/accounts/SETUP.md.
   "env": {
     "dev": {
       "durable_objects": {

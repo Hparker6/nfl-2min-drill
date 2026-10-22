@@ -215,7 +215,10 @@ purchase, auto-unlock, and a refund that revoked it automatically all work. What
 8. [~] **Production database:** created 2026-10-21: `the-fourth-call-prod`, id `5fbc0458-441f-45df-9045-a61e6ecc5e1c`,
    region WNAM, empty. Migrations 0001–0004 still to apply (`npx wrangler d1 migrations apply DB --remote`), which
    needs the top-level binding from item 9 first.
-9. [ ] **Needs the owner's explicit OK in the session** (Claude Code's permission check blocked it on 2026-10-21 as a
+9. [x] **Done 2026-10-21 with the owner's explicit approval** ("approved: make the production config change and flip
+   live payments"): top-level D1 binding to `the-fourth-call-prod`, the live vars, `LIVE_PAYMENTS_ALLOWED = true`.
+   Still to do by the owner: `npx wrangler d1 migrations apply DB --remote`, then the production secrets. Was:
+   **Needs the owner's explicit OK in the session** (Claude Code's permission check blocked it on 2026-10-21 as a
    production change). **To unblock:** the owner says in the chat "approved: make the production config change and flip
    live payments" (or allows it at Claude Code's permission prompt, or makes the two edits by hand: the top-level
    `d1_databases` + `vars` block in `wrangler.jsonc` described below, and `LIVE_PAYMENTS_ALLOWED = true` in

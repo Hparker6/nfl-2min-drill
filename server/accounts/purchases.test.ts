@@ -75,11 +75,13 @@ describe('switches', () => {
     expect(paymentsConfig(PAY)).toMatchObject({ live: false, priceId: 'price_coach499' });
   });
 
-  it('live Stripe keys are refused while live payments are not allowed in code', () => {
-    expect(LIVE_PAYMENTS_ALLOWED).toBe(false);
-    expect(paymentsConfig({ ...PAY, STRIPE_SECRET_KEY: 'sk_live_abc' })).toBeNull();
-    expect(paymentsConfig({ ...PAY, STRIPE_SECRET_KEY: 'rk_live_abc' })).toBeNull();
-    expect(accountsConfig(testEnv({ ...PAY, STRIPE_SECRET_KEY: 'sk_live_abc' }))?.payments).toBeNull();
+  it('live Stripe keys work now that live payments are allowed in code, and are marked live', () => {
+    expect(LIVE_PAYMENTS_ALLOWED).toBe(true);
+    expect(paymentsConfig({ ...PAY, STRIPE_SECRET_KEY: 'sk_live_abc' })).toMatchObject({ live: true });
+    expect(paymentsConfig({ ...PAY, STRIPE_SECRET_KEY: 'rk_live_abc' })).toMatchObject({ live: true });
+    expect(accountsConfig(testEnv({ ...PAY, STRIPE_SECRET_KEY: 'rk_live_abc' }))?.payments).toMatchObject({ live: true });
+    // and a live key still needs every other piece
+    expect(paymentsConfig({ ...PAY, STRIPE_SECRET_KEY: 'sk_live_abc', STRIPE_WEBHOOK_SECRET: '' })).toBeNull();
   });
 
   it('with payments off: checkout is closed, the webhook does not exist, /v1/me says off', async () => {

@@ -1,18 +1,18 @@
 /**
- * What the Worker's environment turns on. Everything is off unless configured, and the production config
- * (wrangler.jsonc, top level) configures none of it: no database binding, so no accounts and no payments.
+ * What the Worker's environment turns on. Everything is off unless configured: a missing binding, setting or secret
+ * keeps that part off. Production (wrangler.jsonc, top level) is configured since the owner's approval on 2026-10-21.
  *
  * Accounts need: a D1 binding (DB), ACCOUNTS = "on", SITE_ORIGIN, and an AUTH_PEPPER secret of 32+ characters.
  * Sign-in email needs MAIL_MODE: "console" prints it to the log and works on localhost only; "resend" sends it
  * through Resend and needs the RESEND_API_KEY secret and a MAIL_FROM sender. Anything missing or malformed leaves
  * email off, and asking for a sign-in then answers 503: nothing is written down, nothing is sent.
- * Payments need all that, plus PAYMENTS = "on" and the Stripe secrets. Live Stripe keys are refused outright while
- * LIVE_PAYMENTS_ALLOWED below is false: turning on live payments takes a reviewed code change, not just a setting.
+ * Payments need all that, plus PAYMENTS = "on" and the Stripe secrets. Live Stripe keys work only while
+ * LIVE_PAYMENTS_ALLOWED below is true: turning live payments on or off is a reviewed code change, not just a setting.
  */
 import type { D1Database } from './d1';
 
-/** Live payments stay off until the legal and operational launch review says otherwise. */
-export const LIVE_PAYMENTS_ALLOWED = false;
+/** Live payments: turned on with the owner's explicit approval, 2026-10-21. Set to false to refuse live keys again. */
+export const LIVE_PAYMENTS_ALLOWED = true;
 
 export interface AccountsEnv {
   DB?: D1Database;
