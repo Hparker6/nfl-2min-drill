@@ -27,6 +27,7 @@ import type { SpotResult } from './storage';
 import type { GameFacts } from './badges';
 import type { Ev } from '../engine/types';
 import { tagsOf } from './share';
+import { CALL } from '../engine/data';
 
 export const DECISION_SCALE = 40;   // points of total win chance given up that cut Decisions to 1/e (37)
 export const W_DECISIONS = 0.55;
@@ -77,6 +78,7 @@ export function spotResult(session: Session, date: string): SpotResult {
     tags: tagsOf(session.records),
     baseWp: sc.baseWp,
     facts: factsOf(session),
+    ...(session.records.some((x) => CALL[x.key]?.premium || x.key === 'surprise' || x.key === 'squib') ? { pb: true } : {}),
   };
 }
 

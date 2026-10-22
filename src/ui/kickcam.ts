@@ -14,7 +14,7 @@
  */
 import { hash, rng } from '../engine/rng';
 import type { TeamInfo } from '../engine/types';
-import { inkOn, shade } from './stadium';
+import { DRESSING, inkOn, shade } from './stadium';
 
 export type Flight = 'through' | 'doinkIn' | 'left' | 'right' | 'short' | 'doinkOut';
 
@@ -91,6 +91,12 @@ const project = (x: number, z: number, h = 0): [number, number] => { const s = s
 const SKIN = ['#f1c9a5', '#e0ac85', '#c68c5f', '#a5673f', '#7c4a2a', '#5a3620'];
 const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
 const ease = (f: number) => (f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2);
+/** A bold line and a small one, as text nodes: names never become markup. */
+function caption(host: HTMLElement, title: string, sub: string) {
+  const b = document.createElement('b'), s = document.createElement('span');
+  b.textContent = title; s.textContent = sub;
+  host.replaceChildren(b, s);
+}
 
 interface Scene {
   svg: SVGSVGElement; cam: SVGElement; gp: SVGElement; people: SVGElement; r: () => number;
@@ -111,6 +117,7 @@ const KO_APPROACH: Approach = { x0: -3.4, z0: -9, dur: 1.25, strides: 6 };
 export class KickCam {
   private host: HTMLElement;
   private alive = true;
+  private runId = 0;
   constructor(host: HTMLElement) { this.host = host; }
   stop() { this.alive = false; this.host.innerHTML = ''; this.host.classList.remove('on'); }
 
@@ -177,7 +184,7 @@ export class KickCam {
       for (let x = -40; x <= 40; x += 16) {
         const [sx] = project(x, zw, 0.8);
         const t = this.el('text', { x: sx, y: (yTop + yBot) / 2, class: 'kc-wallt', fill: inkOn(E.color), 'font-size': ((yBot - yTop) * 0.62).toFixed(2) }, cam);
-        t.textContent = E.name.toUpperCase();
+        t.textContent = DRESSING;
       }
     }
     // the net, raised behind the uprights for the kick
@@ -337,7 +344,7 @@ export class KickCam {
   private graphics(title: string, sub: string) {
     const lower = document.createElement('div');
     lower.className = 'kc-lower';
-    lower.innerHTML = `<b>${title}</b><span>${sub}</span>`;
+    caption(lower, title, sub);
     this.host.appendChild(lower);
     const verdict = document.createElement('div');
     verdict.className = 'kc-verdict';
@@ -348,6 +355,7 @@ export class KickCam {
 
   /** Runs frame(t) from 0 to total seconds at the given speed (0: the final frame at once), then fades the cam out. */
   private async run(total: number, speed: number, frame: (t: number) => void, atEnd: () => void) {
+    const mine = ++this.runId;   // a stop() followed by a new play(): the old run's tail must not touch the new scene
     const dur = speed > 0 ? total / speed : 0;
     if (!dur) { frame(total); atEnd(); await sleep(900); }
     else {
@@ -362,9 +370,11 @@ export class KickCam {
         requestAnimationFrame(step);
       });
     }
+    if (!this.alive || mine !== this.runId) return;   // stopped: no outcome, and nothing of a newer scene is touched
     atEnd();
     this.host.classList.add('out');
     await sleep(speed > 0 ? 260 : 0);
+    if (mine !== this.runId) return;
     this.host.classList.remove('on', 'out', 'kc-live', 'kc-cheer');
     this.host.innerHTML = '';
   }
@@ -404,7 +414,7 @@ export class KickCam {
       const f = path.flight;
       const sub = f === 'left' ? 'Wide left' : f === 'right' ? 'Wide right' : f === 'short' ? 'Short' : f === 'doinkOut' ? 'Off the upright' : f === 'doinkIn' ? 'Off the upright and in!' : k.xp ? 'Extra point' : `${k.dist} yards`;
       verdict.className = `kc-verdict show ${k.good ? 'good' : 'bad'}`;
-      verdict.innerHTML = `<b>${k.good ? 'It’s good!' : 'No good'}</b><span>${sub}</span>`;
+      caption(verdict, k.good ? 'It’s good!' : 'No good', sub);
       if (f === 'doinkIn' || f === 'doinkOut') host.querySelector(path.cross < 0 ? '.kc-up-l' : '.kc-up-r')?.classList.add('kc-clank');
       if (k.good) host.classList.add('kc-cheer');
       onOutcome?.();
@@ -474,7 +484,7 @@ export class KickCam {
     const land = () => {
       if (caught) return;
       caught = true;
-      if (k.touchback) { verdict.className = 'kc-verdict show neutral'; verdict.innerHTML = `<b>Touchback</b><span>Out to the ${k.spot}</span>`; }
+      if (k.touchback) { verdict.className = 'kc-verdict show neutral'; caption(verdict, 'Touchback', `Out to the ${k.spot}`); }
       onCatch?.();
     };
     const frame = (t: number) => {

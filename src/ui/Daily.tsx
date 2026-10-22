@@ -32,12 +32,19 @@ export function simulatedPercentile(performance: number): number | null {
 }
 
 export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) {
-  const [today] = useState(utcDate);
-  const sc = useMemo(() => dailyScenarios(today)[0], [today]);
-  const day = store.days[today] ?? { spots: [] };
-  const result = day.spots[0];
+  const [today, setToday] = useState(utcDate);
   // the finished game stays on screen for its review until you move on to the score
   const [reviewing, setReviewing] = useState(false);
+  const sc = useMemo(() => dailyScenarios(today)[0], [today]);
+  // midnight UTC while the tab is open: move to the new Daily, unless a game is mid-play (it finishes as yesterday's)
+  useEffect(() => {
+    const check = () => { const d = utcDate(); if (d !== today && !store.days[today]?.cur) { setToday(d); setReviewing(false); } };
+    const id = setInterval(check, 30_000);
+    document.addEventListener('visibilitychange', check);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', check); };
+  }, [today, store.days]);
+  const day = store.days[today] ?? { spots: [] };
+  const result = day.spots[0];
   const kind = sc.kind ? DAILY_KINDS[sc.kind] : null;
   // a friend's challenge link: their score to beat, only while it is for today's Daily
   const [challenge] = useState(loadChallenge);
@@ -78,6 +85,7 @@ export function Daily({ store, update, toast, go, onboarded, openHelp }: Props) 
     <GameScreen
       key={sc.id}
       sc={sc}
+      tour={!store.seenTour && store.history.length === 0 ? { onDone: () => update((s) => { s.seenTour = true; }) } : undefined}
       saved={day.cur?.picks ?? []}
       settings={store.settings}
       hints={false}
@@ -119,6 +127,8 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
   const vsAi = result.aiLost - result.lost;
   const pct = simulatedPercentile(rt.performance);
   const [board, setBoard] = useState<Board | null>(null);
+  const [boardErr, setBoardErr] = useState<false | 'failed' | 'limited'>(false);
+  const [boardTry, setBoardTry] = useState(0);
   const [name, setName] = useState(store.settings.nickname ?? '');
   const [editing, setEditing] = useState(!store.settings.nickname);
   const on = leaderboardOn();
@@ -129,9 +139,10 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
     let live = true;
     const nick = store.settings.nickname;
     if (nick) track('leaderboard_submit', { performance: rt.performance, win: result.win });
-    (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win) : fetchBoard(date)).then((b) => { if (live && b) setBoard(b); });
+    setBoardErr(false);
+    (nick ? submitScore(date, nick, rt.performance, result.grades.join(''), result.win, !!result.pb) : fetchBoard(date)).then((b) => { if (!live) return; if (b === 'failed' || b === 'limited') setBoardErr(b); else if (b) setBoard(b); });
     return () => { live = false; };
-  }, [on, date, rt.performance, store.settings.nickname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [on, date, rt.performance, store.settings.nickname, boardTry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveName = () => {
     const n = name.trim().slice(0, 20);
@@ -181,7 +192,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
   const vs = versusRivals(rt.performance, rivals);
   const aiBands = BAND_LABELS.map((_, i) => rivals.filter((x) => bandOf(x.score) === i).length);
   const maxBand = Math.max(1, ...(board?.bands ?? []).map((n, i) => n + aiBands[i]), ...aiBands);
-  const bestRows = [...(board?.best ?? []).map((b, i) => ({ name: b.name, score: b.score, rank: i + 1, ai: false, style: '' })), ...rivals.map((x) => ({ name: x.name, score: x.score, rank: 0, ai: true, style: x.style }))]
+  const bestRows = [...(board?.best ?? []).map((b, i) => ({ name: b.name, score: b.score, rank: i + 1, ai: false, style: '', pb: !!b.pb })), ...rivals.map((x) => ({ name: x.name, score: x.score, rank: 0, ai: true, style: x.style, pb: false }))]
     .sort((a, b) => b.score - a.score || (a.ai ? 1 : 0) - (b.ai ? 1 : 0)).slice(0, 10);
 
   return (
@@ -240,7 +251,8 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
               </form>
             ) : (
               <div className="board-rank">
-                <b>{board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()}` : board ? `${board.count.toLocaleString()} played` : 'Loading…'}</b>
+                <b>{board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()}` : board ? `${board.count.toLocaleString()} played` : boardErr === 'limited' ? 'Too many scores from this connection today' : boardErr ? 'The leaderboard didn’t answer' : 'Loading…'}</b>
+                {boardErr === 'failed' && !board && <button className="link" onClick={() => setBoardTry((n) => n + 1)}>Try again</button>}
                 {board?.tied ? <span className="muted"> (tied with {board.tied.toLocaleString()})</span> : null}
                 <button className="link" onClick={() => setEditing(true)}>as {store.settings.nickname}</button>
               </div>
@@ -257,11 +269,11 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
                 </div>
                 <p className="muted small">Today's average: {board.average} · yours: {rt.performance}</p>
                 <ol className="best">
-                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked</em></span>
+                  <span className="k">Today's best <em className="muted">· players ranked, AI rivals marked, ★ Coach's Playbook</em></span>
                   {bestRows.map((b, i) => (
                     <li key={i} className={b.ai ? 'ai' : ''}>
                       <span>{b.ai ? '·' : b.rank}</span>
-                      <span>{b.name}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
+                      <span>{b.name}{b.pb && <i className="pb-badge" title="Played with the Coach's Playbook">★</i>}{b.ai && <><i className="ai-badge">AI</i><small>{b.style}</small></>}</span>
                       <b>{b.score}</b>
                     </li>
                   ))}

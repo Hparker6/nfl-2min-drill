@@ -4,9 +4,9 @@
  *
  *   VITE_FEEDBACK_URL   the footer's Feedback link (a form, an issue tracker, or a mailto: address)
  *   VITE_SUPPORT_URL    the footer's Support the developer link (a tip or membership page you own)
- *   VITE_ADS            "adsense" turns the ad slots on; anything else (or nothing) keeps them hidden
- *   VITE_ADSENSE_CLIENT the publisher ID, ca-pub-…, exactly as AdSense shows it
- *   VITE_ADSENSE_SLOT   the ad unit's slot ID, from AdSense → Ads → By ad unit
+ *   VITE_ADS            "off" turns the ad slots off (they are on once a slot ID is set below or here)
+ *   VITE_ADSENSE_CLIENT the publisher ID, ca-pub-…, exactly as AdSense shows it (default: ADSENSE_CLIENT below)
+ *   VITE_ADSENSE_SLOT   the ad unit's slot ID, from AdSense → Ads → By ad unit (default: ADSENSE_SLOT below)
  */
 const env = (k: string) => ((import.meta.env[k] as string | undefined) ?? '').trim();
 const url = (k: string) => { const v = env(k); return /^(https:\/\/|mailto:)/.test(v) ? v : ''; };
@@ -20,6 +20,6 @@ export const ADSENSE_CLIENT = 'ca-pub-2581780385461126';
 export const ADSENSE_SLOT = '4281334746';   // initial_ad_unit (display, responsive)
 const client = env('VITE_ADSENSE_CLIENT') || ADSENSE_CLIENT;
 const slot = env('VITE_ADSENSE_SLOT') || ADSENSE_SLOT;
-/** The ad unit, or null: a real-looking publisher ID and a numeric slot ID, and ads not turned off (VITE_ADS=off). */
+/** The ad unit, or null: a real-looking publisher ID and a numeric slot ID, and ads not turned off. */
 export const AD_UNIT = env('VITE_ADS') !== 'off' && /^ca-pub-\d{10,20}$/.test(client) && /^\d{6,20}$/.test(slot)
   ? { client, slot } : null;

@@ -4,6 +4,8 @@
  */
 import { kickoffState, playOut, step } from '../engine/game';
 import { riskWins } from './risk';
+import { GAME_STATS, noteGame } from './legacy';
+import { editionShown } from '../game/edition';
 import { evaluate } from '../engine/evaluate';
 import { clip, hash, rng } from '../engine/rng';
 import { SLOTS, type Attr } from '../engine/roster';
@@ -72,12 +74,22 @@ export function liveRatings(c: Career, g: Game, teams: [TeamInfo, TeamInfo], clu
 /** The fourth quarter or overtime of a one-score game: when Clutch kicks in. */
 export const clutchTime = (s: State) => (s.q ?? 4) >= 4 && Math.abs(leadOf(s, 0)) <= 8;
 
+/** Both rating sets of one game (normal and clutch), built once: rebuilding the teams on every snap was slow. */
+const ratingsCache = new WeakMap<LiveGame, { key: string; r: [[Ratings, Ratings], [Ratings, Ratings]] }>();
+
 /** Swap in the clutch ratings when the game gets there (and back out of them if it gets away). */
 export function applyClutch(c: Career, live: LiveGame, s: State) {
   if (!c.you.abilities.includes('clutch')) return;
-  const g = gameOf(c, live.gameId);
-  const teams = liveTeams(c, g);
-  s.rat = liveRatings(c, g, teams, clutchTime(s));
+  // the same game and the same abilities and difficulty: the same ratings (a new ability or setting rebuilds them)
+  const key = `${live.gameId}|${c.you.abilities.join(',')}|${c.settings.diff}`;
+  let hit = ratingsCache.get(live);
+  if (!hit || hit.key !== key) {
+    const g = gameOf(c, live.gameId);
+    const teams = liveTeams(c, g);
+    hit = { key, r: [liveRatings(c, g, teams, false), liveRatings(c, g, teams, true)] };
+    ratingsCache.set(live, hit);
+  }
+  s.rat = hit.r[clutchTime(s) ? 1 : 0];
 }
 
 export const gameOf = (c: Career, id: string): Game => (id === 'college' ? COLLEGE_GAME : c.season.games.find((x) => x.id === id)!);
@@ -198,6 +210,12 @@ export function finishLive(c: Career, how: 'sim' | 'moments' | 'full'): { box: B
   }
   recordGame(c.season, g, box, teams, how, c.league);
   c.boxes[g.id] = box;
+  // career highs are always kept; the news line about them comes with the Coach's Edition (free Career reads as before)
+  const highs = noteGame(c, line, g, teams[1].id);
+  if (editionShown()) for (const k of highs) {
+    const label = GAME_STATS.find((x) => x[0] === k)![1].toLowerCase();
+    c.news.unshift({ week: c.season.week, year: c.season.year, text: `Career high: ${line[k]} ${label} against the ${teams[1].name}.`, tone: 'good' });
+  }
   awardXp(c, g.id, line, win, how, scores, g.kind, risks);
   const opp = teams[1];
   const big = line.ptd && line.ptd >= 3 ? `, ${line.ptd} touchdown passes` : '';

@@ -121,6 +121,7 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
   if (dropId !== 'quick' && dropId !== 'screen' && dropId !== 'hail' && r() < 0.03) {
     res.kind = 'scramble';
     const y = clip(Math.round(4 + PM.scramble + gauss(r) * 4), -3, yt);
+    if (s.yl + y <= 0) { res.safety = true; res.yards = -s.yl; res.dur = 5; return res; }   // run down in his own end zone
     res.yards = y;
     res.td = y >= yt;
     res.oob = !res.td && r() < 0.4;
@@ -177,12 +178,21 @@ function resolvePass(s: State, c: Call, look: Look, r: Rng, tgt: Rcv, route: Rou
     let yac = Math.round(-Math.log(1 - r() * 0.999) * RT.yac * L.yac * PM.yacMul * Wx.yac * (mods.oob ? 0.55 : 1));
     if (r() < 0.018 * PM.bigYac) yac += 12 + Math.round(r() * 30);
     if (route === 'screen' && famOf(look) === 'blitz') yac += 2;
+    // hook and ladder: the lateral breaks free about three times in five, is on the ground about one time in eleven
+    let pitchLost = false;
+    if (c.ladder) {
+      const lr = r();
+      if (lr < 0.09) { pitchLost = true; yac = Math.min(yac, 1); }
+      else if (lr < 0.71) yac += 4 + Math.round(-Math.log(1 - r() * 0.999) * 9);
+      else yac = Math.min(yac, 2);
+    }
     let y = catchY + yac;
     if (s.yl + y <= 0) y = 1 - s.yl;
     y = Math.min(y, yt);
     res.yards = y;
-    res.td = y >= yt;
-    if (!res.td && r() < 0.006 * Wx.fumble) { res.fumble = true; res.turnover = true; }
+    res.td = !pitchLost && y >= yt;
+    if (pitchLost) { res.fumble = true; res.turnover = true; }
+    else if (!res.td && r() < 0.006 * Wx.fumble) { res.fumble = true; res.turnover = true; }
     // working the sideline: he gets out most of the time, for fewer yards
     res.oob = !res.td && !res.turnover && r() < (mods.oob ? 0.85 : RT.oob);
     res.dur = drop.release + fl + Math.max(yac, 0) / 6 + 0.8;
@@ -246,7 +256,7 @@ export function resolvePunt(s: State, st: StChoice, r: Rng): PlayResult {
   res.dur = 7;
   res.turnover = true;
   if (st === 'rush') {
-    if (r() < 0.03) { res.blocked = true; res.yards = -8; return res; }
+    if (r() < 0.03) { res.blocked = true; res.yards = -8; if (s.nr && s.yl <= 8) res.defTd = true; return res; }   // fallen on in the end zone
     if (r() < 0.025) { res.penalty = 'rough'; res.turnover = false; res.yards = Math.min(15, Math.floor(ytg(s) / 2)); return res; }
   }
   const gross = Math.round(45 + wx(s).punt + gauss(r) * 7);
@@ -254,6 +264,7 @@ export function resolvePunt(s: State, st: StChoice, r: Rng): PlayResult {
   if (s.yl + gross >= 100) { res.touchback = true; res.yards = 80 - s.yl; return res; }
   const ret = st === 'return' ? Math.max(0, Math.round(8 + gauss(r) * 6)) : Math.max(0, Math.round(3 + gauss(r) * 3));
   if (st === 'return' && r() < 0.005) { res.defTd = true; }
+  if (s.nr && ret >= s.yl + gross) res.defTd = true;   // the return reaches the end zone (a short punt, a long return)
   res.yards = gross;
   res.retYds = ret;
   return res;
@@ -412,12 +423,25 @@ function otCheck(s: State) {
     if (s.otp >= 3 && unequal) return end();
   }
   if (s.stage === 'pat') return;   // the try is still to come: judge the score after it
+  // the second possession ended with a score that leaves it behind (a field goal down seven, a missed try): over
+  if (s.stage === 'kick' && s.otp === 2 && s.kicker === s.otOwn && unequal) return end();
   s.otS = [s.score[0], s.score[1]];
   if ((s.stage === 'pre' || s.stage === 'call') && s.off !== s.otOwn) {
     if (s.otp === 2 && unequal) return end();
     s.otp++;
     s.otOwn = s.off;
   }
+}
+
+/**
+ * A touchdown on the last play of regulation that decides the game ends it on the spot: no try (the NFL skips a try
+ * that can't change the outcome). Down three or more with no time left, the try is moot too. Overtime has its own rule
+ * (otCheck).
+ */
+function walkOff(s: State, scorer: Team) {
+  if (!s.nr || s.t > 0 || (s.q != null && s.q !== 4)) return;
+  const l = leadOf(s, scorer);
+  if (l > 0 || l < -2) { s.stage = 'kick'; s.kicker = scorer; endCheck(s); }
 }
 
 function changePoss(s: State, yl: number) {
@@ -441,7 +465,8 @@ export function applySnap(s: State, res: PlayResult): boolean {
   s.pendPlay = null;
 
   if (res.penalty === 'hold') {
-    const back = s.yl <= 20 ? Math.ceil(s.yl / 2) : 10;
+    // inside the 20: half the distance to the goal, rounded down (a penalty can never put the ball in the end zone)
+    const back = s.yl <= 20 ? Math.floor(s.yl / 2) : 10;
     s.yl -= back;
     s.dist += back;
     s.running = false;
@@ -455,7 +480,8 @@ export function applySnap(s: State, res: PlayResult): boolean {
     s.dist = Math.min(10, 100 - s.yl);
     s.running = false;
     s.stage = 'pre';
-    endCheck(s);
+    // a defensive foul on the last play of a period: it is extended by one untimed down (the clock stays at 0:00)
+    if (!(s.nr && s.t <= 0)) endCheck(s);
     return true;
   }
   if (res.safety) {
@@ -481,6 +507,7 @@ export function applySnap(s: State, res: PlayResult): boolean {
       s.off = d;
       s.stage = 'pat';
       s.running = false;
+      walkOff(s, d);
       return false;
     }
     let newYl: number;
@@ -494,6 +521,7 @@ export function applySnap(s: State, res: PlayResult): boolean {
     s.score[o] += 6;
     s.stage = 'pat';
     s.running = false;
+    walkOff(s, o);
     return true;
   }
   const inc = (res.kind === 'pass' && !res.complete) || res.kind === 'spike';
@@ -508,8 +536,9 @@ export function applySnap(s: State, res: PlayResult): boolean {
     if (!inc) s.dist -= res.yards;
   }
   if (s.down > 4) { changePoss(s, 100 - s.yl); return false; }
-  // out of bounds stops the clock only late in a half (the fourth quarter's rule for a late-game spot)
-  const late = s.t <= 120 && endOfHalf(s);
+  // out of bounds stops the clock only late in a half: the last 2:00 of the first half, and (the NFL's rule, with the
+  // finer rules) the last 5:00 of the fourth quarter. Older games use 2:00 for both.
+  const late = s.t <= (s.nr && (s.q == null || s.q === 4) ? 300 : 120) && endOfHalf(s);
   s.running = !(inc || warn || (res.oob && late));
   if (res.oob && !late) s.adj = -7;
   s.stage = 'pre';
@@ -683,10 +712,16 @@ function kickStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
     s.safetyKick = false;
     yl = clip(Math.round(40 + gauss(r) * 6), 20, 60);
     dur = 6;
-  } else if ((ch?.kick ?? aiKick(s)) === 'onside') {
+  } else if ((ch?.kick ?? aiKick(s)) === 'onside' || ch?.kick === 'surprise') {
     kind = 'onside';
     dur = 3;
-    if (r() < 0.12) { recover = k; yl = 47; } else yl = 53;
+    // a surprise onside (the Coach's Playbook) catches them in their return set: one in five
+    if (r() < (ch?.kick === 'surprise' ? 0.2 : 0.12)) { recover = k; yl = 47; } else yl = 53;
+  } else if (ch?.kick === 'squib') {
+    // a low bouncer (the Coach's Playbook): an up-man mishandles it one time in five, otherwise a short field, no return
+    kind = 'kickoff';
+    dur = 5;
+    if (r() < 0.2) { recover = k; yl = 58; } else yl = clip(Math.round(31 + gauss(r) * 4), 22, 40);
   } else {
     kind = 'kickoff';
     if (r() < 0.58) { touchback = true; yl = 35; dur = 0; } else {
@@ -703,6 +738,7 @@ function kickStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
   if (td) {
     s.score[rcv] += 6;
     s.stage = 'pat';
+    walkOff(s, rcv);
   } else {
     s.yl = yl;
     s.down = 1;
@@ -710,7 +746,7 @@ function kickStage(s: State, r: Rng, ch: Choice | null | undefined, ev?: Ev[]) {
     s.stage = 'pre';
     endCheck(s);
   }
-  ev?.push({ type: 'kick', kind, kicker: k, recover, touchback, td, yl, t: s.t });
+  ev?.push({ type: 'kick', kind, kicker: k, recover, touchback, td, yl, t: s.t, ...(ch?.kick === 'squib' ? { squib: true } : ch?.kick === 'surprise' ? { surprise: true } : {}) });
   if (!warned && s.warned) ev?.push({ type: 'warning', t: s.t });
 }
 
@@ -754,7 +790,8 @@ export function value0(s: State): number {
 /** Can the offense kneel out the clock from here? */
 export function canKneel(s: State): boolean {
   if (leadOf(s, s.off) <= 0) return false;
-  let tos = s.to[other(s.off)];
+  // the two-minute warning still to come stops the clock once, like one more timeout for the defense
+  let tos = s.to[other(s.off)] + (s.nr && !s.warned && s.t > 120 ? 1 : 0);
   let burn = 0;
   const n = 4 - s.down + 1;
   for (let k = 0; k < n; k++) {

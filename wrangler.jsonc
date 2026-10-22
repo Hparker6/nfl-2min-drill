@@ -19,5 +19,74 @@
   },
   "migrations": [
     { "tag": "v1", "new_sqlite_classes": ["DayBoard", "AllDays"] }
-  ]
+  ],
+  // PRODUCTION accounts and payments (approved by the owner 2026-10-21): the live D1 database, and the live settings.
+  // They only take effect once this branch is merged to main and the production secrets are set
+  // (npx wrangler secret put AUTH_PEPPER | RESEND_API_KEY | STRIPE_SECRET_KEY | STRIPE_PRICE_ID | STRIPE_WEBHOOK_SECRET |
+  // TURNSTILE_SECRET | SUPPORT_TO, no --env). Any one missing keeps that part off (server/accounts/config.ts).
+  // Tables first: npx wrangler d1 migrations apply DB --remote
+  "d1_databases": [
+    { "binding": "DB", "database_name": "the-fourth-call-prod", "database_id": "5fbc0458-441f-45df-9045-a61e6ecc5e1c", "migrations_dir": "server/db/migrations" }
+  ],
+  "vars": {
+    "ACCOUNTS": "on",
+    "SITE_ORIGIN": "https://nfl-2min-drill.com",
+    "MAIL_MODE": "resend",
+    "MAIL_FROM": "The 4th Call <login@nfl-2min-drill.com>",
+    "PAYMENTS": "on"
+  },
+  // The dev environment below runs all of it on this machine only:
+  //   npm run build && npx wrangler d1 migrations apply DB --local --env dev && npx wrangler dev --env dev
+  //   then, in another terminal: DEV_API=http://localhost:8787 npm run dev, and open http://localhost:5173/?edition=account
+  // with secrets in .dev.vars (see .dev.vars.example). The staging environment is further down. Setup: server/accounts/SETUP.md.
+  "env": {
+    "dev": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "DAY_BOARD", "class_name": "DayBoard" },
+          { "name": "ALL_DAYS", "class_name": "AllDays" }
+        ]
+      },
+      // local only: wrangler dev simulates this database on disk (.wrangler/), nothing is created in Cloudflare
+      "d1_databases": [
+        { "binding": "DB", "database_name": "the4thcall-dev", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "server/db/migrations" }
+      ],
+      "vars": {
+        "ACCOUNTS": "on",
+        // the Vite dev server, which proxies /v1 here (DEV_API=http://localhost:8787 npm run dev)
+        "SITE_ORIGIN": "http://localhost:5173",
+        "DEV_ORIGINS": "http://localhost:8787,http://127.0.0.1:8787",
+        "MAIL_MODE": "console",
+        // test-mode Stripe only (live keys are refused in code); set to on with test secrets in .dev.vars to try checkout
+        "PAYMENTS": "off"
+      }
+    },
+    // STAGING: a separate Worker (nfl-2min-drill-staging, on workers.dev) with a real D1 database (the-fourth-call-database,
+    // staging only). Accounts ON and payments ON, in Stripe test mode (the Stripe secrets are test keys; live keys are refused in code).
+    // Secrets: wrangler secret put AUTH_PEPPER|RESEND_API_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|STRIPE_PRICE_ID --env staging
+    // Order: npx wrangler d1 migrations apply DB --env staging --remote, THEN npm run build && npx wrangler deploy --env staging
+    // (tables first, so the Worker never runs against an empty database). Full steps: server/accounts/SETUP.md.
+    "staging": {
+      "durable_objects": {
+        "bindings": [
+          { "name": "DAY_BOARD", "class_name": "DayBoard" },
+          { "name": "ALL_DAYS", "class_name": "AllDays" }
+        ]
+      },
+      "d1_databases": [
+        { "binding": "DB", "database_name": "the-fourth-call-database", "database_id": "42a1a193-5c81-495a-bf0b-730eae04098f", "migrations_dir": "server/db/migrations" }
+      ],
+      "vars": {
+        "ACCOUNTS": "on",
+        // the staging Worker's exact address (the first deploy printed it). Sign-in links are built from it: a wrong host
+        // would send them somewhere else. Empty, accounts stay off.
+        "SITE_ORIGIN": "https://nfl-2min-drill-staging.houston-parker.workers.dev",
+        // sign-in emails through Resend: the key is a secret (wrangler secret put RESEND_API_KEY --env staging); the
+        // sender must be an address on a domain verified in Resend
+        "MAIL_MODE": "resend",
+        "MAIL_FROM": "The 4th Call <login@nfl-2min-drill.com>",
+        "PAYMENTS": "on"
+      }
+    }
+  }
 }

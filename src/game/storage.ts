@@ -2,6 +2,7 @@ import type { FieldLook, GameFacts } from './badges';
 /** Local persistence: settings, daily progress (resumable mid-spot), survivor runs, history and streaks. */
 import type { GradeKey } from './grade';
 import type { Pick } from './session';
+import type { LadderProgress } from './ladder';
 
 export interface Settings {
   theme: 'auto' | 'light' | 'dark';
@@ -12,11 +13,15 @@ export interface Settings {
   sound?: boolean;       // sound effects (on unless set to false)
   music?: boolean;       // the light background music (on unless set to false)
   fieldLook?: FieldLook; // the field's look (badges unlock more)
+  autoNext?: boolean;    // after a play's result and grade, go on by itself (on unless set to false)
+  haptics?: boolean;     // phones: a buzz on the big moments (on unless set to false)
+  simple?: boolean;      // the rookie playbook: a few plays and defenses, the extras hidden (new players start with it)
+  simpleChosen?: boolean;// the player set it themselves (then it never switches on its own)
 }
 
 export interface SpotResult {
   id: string;
-  mode: 'daily' | 'survivor' | 'practice' | 'career';
+  mode: 'daily' | 'survivor' | 'practice' | 'career' | 'ladder';
   date: string;
   teams: [string, string];
   win: boolean;
@@ -28,6 +33,7 @@ export interface SpotResult {
   aiLost: number;        // what the AI coach would have given up on the same decisions
   tags: string[];        // what kind of calls were made (for the coach profile)
   baseWp?: number;       // how often the simulated coach wins from the starting spot (absent on old saves)
+  pb?: boolean;          // a Coach's Playbook play or kick was called (shown with a star on the Daily leaderboard)
   facts?: GameFacts;     // what badges read: the spot you took over, fourth downs, takeaways… (absent on old saves)
 }
 
@@ -50,14 +56,16 @@ export interface Store {
   surv: { best: number; runs: number; run?: SurvivorRun };
   history: SpotResult[];
   seenHelp: boolean;
+  seenTour?: boolean;   // the first-game tour was shown (finished or skipped)
   badges?: Record<string, string>;   // badge id → the date it was earned
+  ladder?: LadderProgress;           // the Gridiron Challenge (Coach's Edition): best stars per rung
 }
 
 const KEY = 'the4thcall:v1';
 
 export const defaultStore = (): Store => ({
   v: 1,
-  settings: { theme: 'auto', speed: 'normal', hints: true },
+  settings: { theme: 'auto', speed: 'normal', hints: true, simple: true },
   days: {},
   surv: { best: 0, runs: 0 },
   history: [],
@@ -75,7 +83,8 @@ export function loadStore(): Store {
     return {
       ...d,
       ...s,
-      settings: { ...d.settings, ...(s.settings || {}) },
+      // the rookie playbook is for new players: a save with games in it keeps the full one unless it chose otherwise
+      settings: { ...d.settings, simple: Array.isArray(s.history) && s.history.length > 0 ? undefined : true, ...(s.settings || {}) },
       days: s.days && typeof s.days === 'object' ? s.days : {},
       surv: { ...d.surv, ...(s.surv || {}) },
       history: Array.isArray(s.history) ? s.history : [],
@@ -87,11 +96,13 @@ export function loadStore(): Store {
   }
 }
 
-export function saveStore(s: Store) {
+/** False when the browser refused it (storage full or off): the game plays on, and App says progress isn't saving. */
+export function saveStore(s: Store): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(s));
+    return true;
   } catch {
-    /* storage off or full: keep playing */
+    return false;
   }
 }
 

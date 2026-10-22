@@ -58,10 +58,19 @@ export function leaveOnce(send: () => void) {
 
 export function initAnalytics() {
   if (!GA_ID || typeof document === 'undefined' || window.gtag || !analyticsAllowed(location.hostname)) return;
-  const s = document.createElement('script');
-  s.async = true;
-  s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
-  document.head.appendChild(s);
+  // the tag (177 KB) waits for the first tap or key, or 3.5 s, whichever comes first, so it never competes with the
+  // first screen; everything sent before then waits in the queue below and goes out when it loads
+  let loaded = false;
+  const load = () => {
+    if (loaded) return;
+    loaded = true;
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(GA_ID)}`;
+    document.head.appendChild(s);
+  };
+  for (const ev of ['pointerdown', 'keydown'] as const) window.addEventListener(ev, load, { once: true, passive: true });
+  setTimeout(load, 3500);
   window.dataLayer = window.dataLayer || [];
   window.gtag = function gtag() {
     // eslint-disable-next-line prefer-rest-params
@@ -92,7 +101,7 @@ export type EventName =
   | 'screen_view' | 'modal_open' | 'brief_shown' | 'game_start' | 'phase' | 'decision_shown' | 'call_made' | 'result_shown'
   | 'replay' | 'next_play' | 'grade_failed' | 'spot_complete' | 'play_again' | 'daily_complete' | 'survivor_new_run' | 'survivor_end'
   | 'practice_setup' | 'leaderboard_submit' | 'share' | 'leave' | 'app_error' | 'welcome_link' | 'career_start' | 'career_game'
-  | 'challenge_open' | 'challenge_result';
+  | 'challenge_open' | 'challenge_result' | 'tour_done';
 
 export function track(name: EventName, params: Record<string, string | number | boolean | undefined | null> = {}) {
   try {

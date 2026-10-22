@@ -28,6 +28,7 @@ export interface Opt {
   group: Group;
   choice: Choice;
   risk?: number;
+  premium?: boolean;   // from the Coach's Playbook (the Coach's Edition)
 }
 
 export interface Decision {
@@ -198,6 +199,10 @@ export class Session {
       const options: Opt[] = [
         { key: 'deep', label: 'Kick it deep', sub: 'Touchback puts them at the 35', group: 'kick', choice: { kick: 'deep' } },
         { key: 'onside', label: 'Onside kick', sub: 'About 1 in 8 recovered', group: 'kick', choice: { kick: 'onside' } },
+        ...(s.pb ? [
+          { key: 'surprise', label: 'Surprise onside', sub: 'Catch them in their return set: 1 in 5 recovered', group: 'kick' as const, choice: { kick: 'surprise' as const }, premium: true },
+          { key: 'squib', label: 'Squib kick', sub: 'A low bouncer: 1 in 5 recovered, otherwise a short field', group: 'kick' as const, choice: { kick: 'squib' as const }, premium: true },
+        ] : []),
       ];
       return { step: 'kick', title: 'Kickoff', options, aiKey: aiKick(s), state: clone(s) };
     }
@@ -228,7 +233,9 @@ export class Session {
     for (const c of CALLS) {
       if (c.id === 'hail' && (s.tryTwo || !(s.t <= 30 && yt >= 30))) continue;
       if (c.id === 'sneak' && s.dist > 3) continue;
-      options.push({ key: c.id, label: c.name, sub: c.sub, group: c.fam, choice: { play: c.id }, risk: c.risk });
+      if (c.premium && !s.pb) continue;                       // the Coach's Playbook: owners only
+      if (c.fourthOnly && (s.down !== 4 || s.tryTwo)) continue;
+      options.push({ key: c.id, label: c.name, sub: c.sub, group: c.fourthOnly ? 'special' : c.fam, choice: { play: c.id }, risk: c.risk, ...(c.premium ? { premium: true } : {}) });
     }
     const fd = fgDist(s);
     if (s.tryTwo) {

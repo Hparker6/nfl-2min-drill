@@ -1,0 +1,28 @@
+# Local secrets and overrides for `wrangler dev --env dev`. Copy to .dev.vars (git-ignored) and fill in. Never commit
+# real values, and never put any of these in a VITE_ variable: those are built into the public JavaScript.
+# Staging and production take the same names as Worker secrets instead: wrangler secret put NAME --env <env>.
+# The full list, and what happens when one is missing: server/accounts/SETUP.md.
+
+# 32+ random characters; keys every token and code hash. Generate one with:
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+AUTH_PEPPER=
+
+# Sign-in email. Locally the dev environment prints links and codes to this terminal (MAIL_MODE=console), so nothing
+# is needed here. To try real delivery through Resend instead, uncomment all three:
+# MAIL_MODE=resend
+# MAIL_FROM=The 4th Call <sign-in@mail.your-domain>
+# RESEND_API_KEY=
+
+# Support form: where requests are emailed (an address you read). Requests are stored in D1 either way.
+SUPPORT_TO=
+# Cloudflare Turnstile secret (with VITE_TURNSTILE_SITE_KEY in the build). Test secret: 1x0000000000000000000000000000000AA
+TURNSTILE_SECRET=
+
+# Stripe TEST mode only (server/accounts/SETUP.md, section 5). Live keys (sk_live_/rk_live_) are refused in code.
+# PAYMENTS=on
+# A restricted key is better than the full secret key: Checkout Sessions (write), Charges and Disputes (read).
+STRIPE_SECRET_KEY=
+# From `stripe listen --forward-to localhost:8787/v1/stripe/webhook` (whsec_...)
+STRIPE_WEBHOOK_SECRET=
+# The test-mode Price for the Coach's Edition: one-time, 4.99 USD (price_...)
+STRIPE_PRICE_ID=

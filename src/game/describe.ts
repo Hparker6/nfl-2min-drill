@@ -163,9 +163,16 @@ export function tell(ev: Ev, teams: [TeamInfo, TeamInfo]): Told {
     }
     case 'kick': {
       const T = teams[ev.recover];
+      if (ev.squib) {
+        const got = ev.recover === ev.kicker;
+        return got
+          ? { text: `Squib kick bounces off an up-man… and ${teams[ev.kicker].city} falls on it!`, banner: 'Squib recovered', tone: tone(ev.kicker, true) }
+          : { text: `Squib kick, fielded on the bounce. ${T.city} starts at the ${ballOn(ev.yl, ev.recover, teams)}.`, tone: 'neutral' };
+      }
       if (ev.kind === 'onside') {
         const got = ev.recover === ev.kicker;
-        return { text: `Onside kick… recovered by ${teams[ev.kicker].city}${got ? '!' : '? No, ' + T.city + ' falls on it.'}`, banner: got ? 'Onside recovered' : undefined, tone: tone(ev.kicker, got) };
+        const what = ev.surprise ? 'Surprise onside kick' : 'Onside kick';
+        return { text: `${what}… recovered by ${teams[ev.kicker].city}${got ? '!' : '? No, ' + T.city + ' falls on it.'}`, banner: got ? 'Onside recovered' : undefined, tone: tone(ev.kicker, got) };
       }
       if (ev.td) return { text: `Kickoff returned all the way for a touchdown by ${T.city}!`, banner: 'Touchdown', tone: tone(ev.recover, true) };
       const spot = ballOn(ev.yl, ev.recover, teams);

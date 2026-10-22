@@ -11,7 +11,8 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
   const today = utcDate();
   const [stats, setStats] = useState<Stats | null | 'off'>(leaderboardOn() ? null : 'off');
   const [day, setDay] = useState(today);
-  useEffect(() => { if (leaderboardOn()) fetchStats().then((s) => setStats(s ?? { days: {} })); }, []);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { if (leaderboardOn()) fetchStats().then((s) => { if (s === 'failed') setFailed(true); else setStats(s ?? { days: {} }); }); }, []);
 
   const days = useMemo(() => (stats && stats !== 'off' ? Object.keys(stats.days).sort() : []), [stats]);
   const mine = useMemo(() => {
@@ -32,7 +33,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
       </div>
     );
   }
-  if (!stats) return <div className="page"><div className="meta"><div className="meta-l"><h1 className="meta-title">Everyone's daily stats</h1></div></div><section className="summary"><span className="muted">Loading…</span></section></div>;
+  if (!stats) return <div className="page"><div className="meta"><div className="meta-l"><h1 className="meta-title">Everyone's daily stats</h1></div></div><section className="summary"><span className="muted">{failed ? 'The leaderboard didn’t answer. Reload to try again.' : 'Loading…'}</span></section></div>;
 
   const S = stats.days;
   const td = S[today] ?? { count: 0, average: 0, best: [], bands: Array(10).fill(0) };
@@ -41,6 +42,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
   const recent = days.slice(-14);
   const sel = S[day];
   const i = days.indexOf(day);
+  const at = i < 0 ? days.length : i;   // a day with no scores (today, early) sits after the last one that has any
   const maxBand = sel ? Math.max(1, ...sel.bands) : 1;
   const yourBand = yours ? Math.min(9, Math.floor(rateSpots([yours]).performance / 10)) : -1;
 
@@ -70,7 +72,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
         <div className="dayhead">
           <h2>{fmtDay(day)} <span className="muted">· Daily #{dayNumber(day)}</span></h2>
           <div className="row">
-            <button className="icon" disabled={i <= 0} onClick={() => setDay(days[i - 1])} aria-label="Previous day">‹</button>
+            <button className="icon" disabled={at <= 0} onClick={() => setDay(days[at - 1])} aria-label="Previous day">‹</button>
             <button className="icon" disabled={i < 0 || i >= days.length - 1} onClick={() => setDay(days[i + 1])} aria-label="Next day">›</button>
           </div>
         </div>
@@ -95,7 +97,7 @@ export function Everyone({ store, go }: { store: Store; go: (m: 'daily') => void
             {sel.best.length > 0 && (
               <>
                 <div className="k">Top ten</div>
-                <ol className="best">{sel.best.map((b, k) => <li key={k}><span>{k + 1}</span><span>{b.name}</span><b>{b.score}</b></li>)}</ol>
+                <ol className="best">{sel.best.map((b, k) => <li key={k}><span>{k + 1}</span><span>{b.name}{b.pb && <i className="pb-badge" title="Played with the Coach's Playbook">★</i>}</span><b>{b.score}</b></li>)}</ol>
               </>
             )}
           </>

@@ -631,9 +631,10 @@ export class FieldRenderer {
         if (ev.touchback) { onOutcome?.('kick'); field = this.runTimeline(tl, fake, map, 'kick', 0, undefined, tl.end); }
         else field = this.runTimeline(tl, fake, map, 'kick', speed, onOutcome, catchEv.t);
       });
-      this.finish = () => { this.kickCam?.stop(); };
+      const camStop = () => { this.kickCam?.stop(); };
+      this.finish = camStop;
       await cam;
-      this.finish = null;
+      if (this.finish === camStop) this.finish = null;   // the return's timeline may have installed its own by now
       if (!field) { onOutcome?.('kick'); field = this.runTimeline(tl, fake, map, 'kick', 0, undefined, tl.end); }   // cut off before the catch
       return field;
     }

@@ -1,5 +1,6 @@
 /** Career screens between games: draft night, the postgame, the season's end, and the offseason. */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { tv } from './tv';
 import { AdSlot } from '../AdSlot';
 import { passerRating, type Box, type Line } from '../../career/box';
 import { ARCH, COLLEGES, levelOf, youPlayer, type Career } from '../../career/career';
@@ -20,7 +21,7 @@ import { StatLine, TeamTag } from './Hub';
 import type { Commit } from './Career';
 
 /** A number that counts up to its value when it first shows (instant under reduced motion). */
-function useCountUp(target: number, ms = 1100): number {
+export function useCountUp(target: number, ms = 1100): number {
   const [v, setV] = useState(() => (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches ? target : 0));
   useEffect(() => {
     if (v === target) return;
@@ -37,7 +38,8 @@ function useCountUp(target: number, ms = 1100): number {
   return v;
 }
 
-const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+/** The game clock as it read (2:59.6 shows 3:00, never 2:60). */
+const mmss = (sec: number) => { const s = Math.max(0, Math.ceil(sec - 1e-6)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 
 /**
  * After a game, laid out like a sports app's game page: the actions at the top (no scrolling to move on), the
@@ -75,12 +77,12 @@ export function Postgame({ c, gameId, onContinue }: { c: Career; gameId: string;
         <button className="btn primary" onClick={() => onContinue()} autoFocus>{college ? 'On to draft night' : 'Continue'}</button>
       </div>
 
-      <section className="cr-card pg-score">
+      <section className="cr-card pg-score" style={{ ['--ta' as string]: teams[0].color, ['--tb' as string]: teams[1].color }}>
         {([0, 1] as const).map((s) => {
           const t = teams[s], r = st?.[t.id];
           const lead = box.final[s] > box.final[1 - s];
           return (
-            <div key={s} className={`pg-team${s ? ' right' : ''}${lead || tie ? '' : ' dim'}`} style={{ ['--tc' as string]: t.color, ['--tc2' as string]: t.color2 }}>
+            <div key={s} className={`pg-team${s ? ' right' : ''}${lead || tie ? '' : ' dim'}`} style={tv(t)}>
               <span className="cr-chip big">{t.id}</span>
               <span className="pg-tn"><b>{t.name}</b><small>{t.city}{r ? ` · ${r.w}-${r.l}${r.t ? `-${r.t}` : ''}` : ''}</small></span>
               <span className="pg-pts">{box.final[s]}</span>
@@ -258,7 +260,7 @@ export function SeasonDone({ c, onOffseason }: { c: Career; onOffseason: () => v
   );
 }
 
-export function Offseason({ c, commit, onNext }: { c: Career; commit: Commit; onNext: () => void }) {
+export function Offseason({ c, commit, onNext, retire }: { c: Career; commit: Commit; onNext: () => void; retire?: ReactNode }) {
   const me = youPlayer(c);
   const aw = c.season.awards ?? [];
   const off = offers(c);
@@ -304,6 +306,7 @@ export function Offseason({ c, commit, onNext }: { c: Career; commit: Commit; on
           <button className="btn ghost small" onClick={() => commit((x) => { x.you.wantsTrade = true; })}>Request a trade</button>
         </section>
       )}
+      {retire}
       <button className="btn primary big" disabled={free} onClick={onNext}>{free ? 'Sign somewhere to continue' : `Start the ${c.season.year + 1} season`}</button>
       <p className="muted small">Level {levelOf(c.you.xp)} · {c.you.sp} skill point{c.you.sp === 1 ? '' : 's'} to spend (on the Player tab once the season starts).</p>
     </div>

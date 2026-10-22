@@ -74,7 +74,7 @@ export function Survivor({ store, update, toast }: Props) {
         autoStart={reviewing == null && !!run.cur}
         startLabel="Play it"
         onStart={() => update((s) => { if (s.surv.run) s.surv.run.cur = []; })}
-        onPicks={(p) => update((s) => { if (s.surv.run && !s.surv.run.over) s.surv.run.cur = p; })}
+        onPicks={(p) => update((s) => { if (s.surv.run && !s.surv.run.over && s.surv.run.results.length === idx) s.surv.run.cur = p; })}
         onDone={(r) => done(idx, r)}
         onContinue={() => setReviewing(null)}
         continueLabel={run.over ? 'See the run' : 'Next game'}

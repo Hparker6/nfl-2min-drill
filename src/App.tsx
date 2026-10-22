@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BadgeToast } from './ui/Badges';
 import { loadStore, saveStore, type Store } from './game/storage';
 import { Daily } from './ui/Daily';
 import { Survivor } from './ui/Survivor';
 import { Practice } from './ui/Practice';
+import { accountsShown, EDITION_NAME, EDITION_PRICE, editionShown } from './game/edition';
+import { fetchMe } from './game/account';
+import { AccountModal, takeAccountHash } from './ui/Account';
+import { SupportModal } from './ui/Support';
 import { Everyone } from './ui/Everyone';
 import { About, Help, SettingsModal, Stats } from './ui/Modals';
 import { UpdateBar } from './ui/UpdateBar';
@@ -12,32 +16,63 @@ import { FEEDBACK_URL, SUPPORT_URL } from './game/site';
 import { lazy, Suspense } from 'react';
 // career mode is its own chunk: the Daily loads as fast as it did
 const CareerMode = lazy(() => import('./ui/career/Career').then((m) => ({ default: m.CareerMode })));
+// the Gridiron Challenge (Coach's Edition) too: hidden in production until it can be bought
+const Ladder = lazy(() => import('./ui/Ladder').then((m) => ({ default: m.Ladder })));
 import { setContext, setPlayerProperties, track } from './game/analytics';
 import { audio } from './game/audio';
 
-type Mode = 'daily' | 'survivor' | 'practice' | 'everyone' | 'career';
-const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : location.hash.startsWith('#career') ? 'career' : 'daily');
+type Mode = 'daily' | 'survivor' | 'practice' | 'everyone' | 'career' | 'ladder';
+const modeFromHash = (): Mode => (location.hash === '#survivor' ? 'survivor' : location.hash === '#practice' ? 'practice' : location.hash === '#everyone' ? 'everyone' : location.hash.startsWith('#career') ? 'career' : location.hash === '#ladder' && editionShown() ? 'ladder' : 'daily');
 
 export default function App() {
   const [store, setStore] = useState<Store>(loadStore);
   const [mode, setMode] = useState<Mode>(modeFromHash);
   // first visit: no modal in the way. The Daily brief carries a short welcome instead.
-  const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | null>(null);
+  const [modal, setModal] = useState<'help' | 'stats' | 'settings' | 'about' | 'account' | 'support' | null>(null);
+  // arriving from a sign-in email or back from Stripe opens the account panel (development builds only)
+  // read always (a sign-in link can open on a browser that hasn't yet learned accounts are on); open once they show
+  const [accountFrom, setAccountFrom] = useState(() => takeAccountHash());
+  const [drawn, redraw] = useState(0);
+  useEffect(() => { if (accountFrom && accountsShown()) setModal('account'); }, [accountFrom, drawn]);
+  // any "get the Coach's Edition" button opens the account panel (EditionLock sends this)
+  useEffect(() => { const open = () => setModal('account'); window.addEventListener('4c:account', open); return () => window.removeEventListener('4c:account', open); }, []);
+  // what the account owns, asked at start and whenever the tab comes back: a refund made elsewhere shows up here
+  useEffect(() => {
+    const ask = () => { if (document.visibilityState === 'visible') fetchMe().then(() => redraw((n) => n + 1)); };
+    ask();
+    document.addEventListener('visibilitychange', ask);
+    return () => document.removeEventListener('visibilitychange', ask);
+  }, []);
   const [toastMsg, setToast] = useState<string | null>(null);
 
+  // a change runs exactly once, right away: React may run a state updater twice, and the changes here carry side
+  // effects (badges announced, analytics, the save itself), so they are applied to the latest store outside of one
+  const storeRef = useRef(store);
+  const [unsaved, setUnsaved] = useState(false);
+  const graduated = useRef(false);
   const update = useCallback((fn: (s: Store) => void) => {
-    setStore((prev) => {
-      const next = structuredClone(prev);
-      fn(next);
-      saveStore(next);
-      return next;
-    });
+    const next = structuredClone(storeRef.current);
+    fn(next);
+    // three games in: the full playbook opens on its own (unless the player chose a playbook themselves)
+    if (next.settings.simple && !next.settings.simpleChosen && next.history.length >= 3) { next.settings.simple = false; graduated.current = true; }
+    storeRef.current = next;
+    setUnsaved(!saveStore(next));
+    setStore(next);
   }, []);
 
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useCallback((m: string) => {
     setToast(m);
-    setTimeout(() => setToast(null), 2600);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
   }, []);
+  // the rookie playbook's "Show the full playbook" link (CallPanel sends this), and the note when it opens by itself
+  useEffect(() => {
+    const full = () => { update((s) => { s.settings.simple = false; s.settings.simpleChosen = true; }); toast('Full playbook: 27 plays and 19 defenses. Settings brings the rookie one back.'); };
+    window.addEventListener('4c:fullplaybook', full);
+    return () => window.removeEventListener('4c:fullplaybook', full);
+  }, [update, toast]);
+  useEffect(() => { if (graduated.current) { graduated.current = false; toast('Three games in: the full playbook is open (27 plays, 19 defenses).'); } });
 
   // the funnel: which screen, and who (new or returning)
   useEffect(() => { setContext({ mode }); track('screen_view', { mode }); }, [mode]);
@@ -73,7 +108,7 @@ export default function App() {
     window.scrollTo({ top: 0 });
   };
 
-  const closeModal = useCallback(() => setModal(null), []);
+  const closeModal = useCallback(() => { setModal(null); setAccountFrom(null); }, []);   // a sign-in or purchase hash is used once
   const onboarded = useCallback(() => update((s) => { s.seenHelp = true; }), [update]);
 
   return (
@@ -86,12 +121,13 @@ export default function App() {
           </div>
           <nav className="modes" aria-label="Game modes">
             {(['daily', 'survivor', 'practice', 'career'] as Mode[]).map((m) => (
-              <button key={m} className={`${mode === m ? 'on' : ''}${m === 'career' ? ' new' : ''}`} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
+              <button key={m} className={`${mode === m || (m === 'practice' && mode === 'ladder') ? 'on' : ''}${m === 'career' ? ' new' : ''}`} aria-current={mode === m ? 'page' : undefined} onClick={() => go(m)}>
                 {m === 'daily' ? 'Daily' : m === 'survivor' ? 'Survivor' : m === 'practice' ? 'Practice' : <>Career<sup className="beta">Beta</sup></>}
               </button>
             ))}
           </nav>
           <div className="top-r">
+            {accountsShown() && <button className="top-edition" onClick={() => setModal('account')} title={`${EDITION_NAME}: ${EDITION_PRICE}, once`} aria-label={EDITION_NAME}><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path d="M12 2.8l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 16.8l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor" /></svg><span className="te-txt">{EDITION_NAME}</span></button>}
             <button className="icon" onClick={toggleSound} aria-pressed={anySound} aria-label={anySound ? 'Mute sound and music' : 'Turn sound and music on'} title={anySound ? 'Mute' : 'Sound on'}>
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />{anySound ? <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />}</svg>
             </button>
@@ -102,16 +138,18 @@ export default function App() {
               <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M5 20V11M12 20V4M19 20v-7" stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="round" /></svg>
             </button>
             <button className="icon" onClick={() => setModal('settings')} aria-label="Settings" title="Settings">
-              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="2" fill="none" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden><path d="M10.73 4.71 L11.02 2.45 L12.98 2.45 L13.27 4.71 L16.26 5.95 L18.06 4.56 L19.44 5.94 L18.05 7.74 L19.29 10.73 L21.55 11.02 L21.55 12.98 L19.29 13.27 L18.05 16.26 L19.44 18.06 L18.06 19.44 L16.26 18.05 L13.27 19.29 L12.98 21.55 L11.02 21.55 L10.73 19.29 L7.74 18.05 L5.94 19.44 L4.56 18.06 L5.95 16.26 L4.71 13.27 L2.45 12.98 L2.45 11.02 L4.71 10.73 L5.95 7.74 L4.56 5.94 L5.94 4.56 L7.74 5.95Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" fill="none" /><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" fill="none" /></svg>
             </button>
           </div>
         </div>
       </header>
       <main className="shell">
+        {unsaved && <p className="notice" role="alert">This browser isn't saving your progress (storage is full or blocked). Your games still play, but streaks and results may not be kept.</p>}
         {mode !== 'career' && <h1 className="sr-only">The 4th Call: a free 2-minute drill play-calling game</h1>}   {/* career screens carry their own H1 */}
         {mode === 'daily' && <Daily store={store} update={update} toast={toast} go={go} onboarded={onboarded} openHelp={() => setModal('help')} />}
         {mode === 'survivor' && <Survivor store={store} update={update} toast={toast} />}
         {mode === 'practice' && <Practice store={store} update={update} />}
+        {mode === 'ladder' && <Suspense fallback={<div className="cr-busy" />}><Ladder store={store} update={update} /></Suspense>}
         {mode === 'everyone' && <Everyone store={store} go={go} />}
         {mode === 'career' && <Suspense fallback={<div className="cr-busy" />}><CareerMode app={store.settings} /></Suspense>}
       </main>
@@ -124,6 +162,8 @@ export default function App() {
           <a href="/leaderboard/">Leaderboard</a>
           <a href="/stats/">Stats</a>
           <button onClick={() => setModal('about')}>About &amp; privacy</button>
+          <a href="/terms/">Terms</a>
+          {accountsShown() && <button onClick={() => setModal('support')}>Help &amp; refunds</button>}
           {FEEDBACK_URL && <a href={FEEDBACK_URL} target="_blank" rel="noopener">Feedback</a>}
           {SUPPORT_URL && <a href={SUPPORT_URL} target="_blank" rel="noopener">Support the developer</a>}
         </nav>
@@ -147,7 +187,9 @@ export default function App() {
       {modal === 'help' && <Help onClose={closeModal} />}
       {modal === 'stats' && <Stats store={store} onClose={closeModal} />}
       <BadgeToast />
-      {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} />}
+      {modal === 'settings' && <SettingsModal store={store} update={update} onClose={closeModal} onAccount={accountsShown() ? () => setModal('account') : undefined} />}
+      {modal === 'account' && <AccountModal onClose={closeModal} from={accountFrom} onSupport={() => setModal('support')} />}
+      {modal === 'support' && <SupportModal onClose={closeModal} page={mode} />}
       {modal === 'about' && <About onClose={closeModal} />}
       {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
       <UpdateBar />

@@ -15,6 +15,7 @@ export interface Drive {
   result: string;         // Touchdown, Field goal, Punt, Interception…
   done: boolean;
   score?: boolean;
+  snaps: number[];        // the drive's snaps, as indexes into the game's events (the drive chart draws them)
 }
 
 /** A yard line (the offense's) in your team's coordinates. */
@@ -26,7 +27,8 @@ export function drives(ev: Ev[]): Drive[] {
   let q = 1;
   let lastT = 0;
   const close = (result: string, score = false) => { if (cur && !cur.done) { cur.result = result; cur.done = true; cur.score = score; } };
-  for (const e of ev) {
+  for (let i = 0; i < ev.length; i++) {
+    const e = ev[i];
     if (e.type === 'period') {
       q = e.q;
       if (e.q === 3 || e.q >= 5) close(e.q === 3 ? 'End of half' : 'End of regulation');
@@ -39,11 +41,12 @@ export function drives(ev: Ev[]): Drive[] {
     const r = e.res;
     if (!cur || cur.done || cur.team !== e.off) {
       close('Turnover');
-      cur = { team: e.off, q, start: toYou(e.off, e.yl0), end: toYou(e.off, e.yl0), plays: 0, yards: 0, secs: 0, result: '', done: false };
+      cur = { team: e.off, q, start: toYou(e.off, e.yl0), end: toYou(e.off, e.yl0), plays: 0, yards: 0, secs: 0, result: '', done: false, snaps: [] };
       out.push(cur);
       lastT = e.t0;
     }
     const d: Drive = cur;
+    d.snaps.push(i);
     if (r.kind !== 'fg' && r.kind !== 'punt') d.plays++;
     d.secs += Math.max(0, lastT - e.t);
     lastT = e.t;
@@ -62,4 +65,5 @@ export function drives(ev: Ev[]): Drive[] {
   return out;
 }
 
-export const fmtSecs = (s: number) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+/** A length of time, m:ss (rounded as a whole, so 59.6 s is 1:00, never 0:60). */
+export const fmtSecs = (secs: number) => { const s = Math.max(0, Math.round(secs)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };

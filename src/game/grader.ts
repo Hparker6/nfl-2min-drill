@@ -17,7 +17,8 @@ const REFINE_TOP = 4;
 
 interface Job { id: number; s: State; choices: Choice[]; n: number; seed: number; from: number; paired?: boolean }
 interface Result { stats: OptStat[]; pairs?: PairStat }
-interface Pending { resolve: (r: Result) => void; job: Job; w: Worker }
+interface Pending { resolve: (r: Result) => void; reject: (e: Error) => void; job: Job; w: Worker; timer: ReturnType<typeof setTimeout> }
+const JOB_TIMEOUT_MS = 90_000;   // a grade this slow is stuck, not slow
 const onMain = (j: Job): Result => (j.paired ? evaluatePaired(j.s, j.choices, j.n, j.seed, j.from) : { stats: evaluate(j.s, j.choices, j.n, j.seed, j.from) });
 
 export class Pool {
@@ -31,9 +32,12 @@ export class Pool {
     try {
       for (let i = 0; i < size; i++) {
         const w = new Worker(new URL('../engine/worker.ts', import.meta.url), { type: 'module' });
-        w.onmessage = (e: MessageEvent<{ id: number; stats: OptStat[]; pairs?: PairStat }>) => {
+        w.onmessage = (e: MessageEvent<{ id: number; stats?: OptStat[]; pairs?: PairStat; error?: string }>) => {
           const p = this.pending.get(e.data.id);
-          if (p) { this.pending.delete(e.data.id); p.resolve({ stats: e.data.stats, pairs: e.data.pairs }); }
+          if (!p) return;
+          this.pending.delete(e.data.id); clearTimeout(p.timer);
+          if (e.data.error || !e.data.stats) p.reject(new Error(e.data.error ?? 'evaluation failed'));
+          else p.resolve({ stats: e.data.stats, pairs: e.data.pairs });
         };
         // a worker that fails (load error, crash) must not leave a grade waiting forever: its jobs finish here
         w.onerror = (e) => { e.preventDefault?.(); this.retire(w); };
@@ -47,8 +51,9 @@ export class Pool {
   private call(w: Worker, s: State, choices: Choice[], n: number, seed: number, from: number, paired = false): Promise<Result> {
     const id = ++this.seq;
     const job: Job = { id, s, choices, n, seed, from, paired };
-    return new Promise((resolve) => {
-      this.pending.set(id, { resolve, job, w });
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { if (this.pending.delete(id)) reject(new Error('grade timed out')); }, JOB_TIMEOUT_MS);
+      this.pending.set(id, { resolve, reject, job, w, timer });
       try { w.postMessage(job); } catch { this.retire(w); }
     });
   }
@@ -59,8 +64,8 @@ export class Pool {
     try { w.terminate(); } catch { /* already gone */ }
     for (const [id, p] of [...this.pending]) {
       if (p.w !== w) continue;
-      this.pending.delete(id);
-      setTimeout(() => p.resolve(onMain(p.job)), 0);
+      this.pending.delete(id); clearTimeout(p.timer);
+      setTimeout(() => { try { p.resolve(onMain(p.job)); } catch (e) { p.reject(e instanceof Error ? e : new Error('evaluation failed')); } }, 0);
     }
   }
 

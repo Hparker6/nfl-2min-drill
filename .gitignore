@@ -31,3 +31,11 @@ data-cache
 
 # wrangler dev state (local leaderboard data)
 .wrangler
+
+# legal working papers stay out of this public repository
+docs/legal/
+
+# wrangler local secrets (.dev.vars.example is the template and is committed)
+.dev.vars
+.dev.vars.*
+!.dev.vars.example

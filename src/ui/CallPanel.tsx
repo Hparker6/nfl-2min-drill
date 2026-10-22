@@ -21,6 +21,7 @@ export const NO_EDITS: Edits = { target: null, routes: {}, side: 1, mods: {} };
 
 interface Props {
   dec: Decision;                            // the call on the board: play / look / st / pat / kick, or a clock-only step
+  simple?: boolean;                         // the rookie playbook: the starter plays, no tabs, no tells or scouting
   scout?: ScoutNote[];                      // what their defense has shown, the scouting report, their adjustment
   read?: { p: number; crowd: boolean };     // how often the pre-snap read is right now (momentum, a road crowd)
   clock: Decision | null;                   // the clock decision that goes with it (tempo on offense, timeout on defense)
@@ -179,8 +180,27 @@ function ClockRow({ clock, clockSel, hints, s, onClock, onMajor, auto }: { clock
   );
 }
 
+/** The rookie playbook: plain plays that cover every situation (the rest are a tap away). */
+const STARTER = ['power', 'outside_zone', 'quick_out', 'slants', 'dig', 'deep_post'];
+const STARTER_DEF = ['balanced', 'man', 'blitz', 'prevent'];
+function starter(dec: Decision, s: State): Opt[] {
+  if (dec.step === 'play') {
+    const ids = [...STARTER];
+    if (s.dist <= 1) ids.unshift('sneak');
+    if (s.t <= 12 && 100 - s.yl > 35) ids.push('hail');
+    return ids.map((id) => dec.options.find((o) => o.choice.play === id)).filter((o): o is Opt => !!o);
+  }
+  const goal = dec.options.some((o) => o.choice.look === 'goal');
+  const ids = goal ? ['goal', 'balanced', 'man', 'blitz'] : STARTER_DEF;
+  return ids.map((id) => dec.options.find((o) => o.choice.look === id)).filter((o): o is Opt => !!o);
+}
+/** Open the full playbook from anywhere (App keeps the setting). */
+const fullPlaybook = () => window.dispatchEvent(new Event('4c:fullplaybook'));
+
 export function CallPanel(p: Props) {
-  const { dec, clock, clockSel, s, teams, selected, edits, hints, prev, onSelect, onSnap, onEdit, scout = [], read } = p;
+  const { dec, clock, clockSel, s, teams, selected, edits, hints, prev, onSelect, onSnap, onEdit, read } = p;
+  const simple = !!p.simple && (dec.step === 'play' || dec.step === 'look');
+  const scout = simple ? [] : p.scout ?? [];
   const isPlay = dec.step === 'play';
   const isLook = dec.step === 'look';
   const [tab, setTab] = useState<Tab>('short');
@@ -198,7 +218,7 @@ export function CallPanel(p: Props) {
     if (el) keepClear(el.closest<HTMLElement>('.prow-wrap') ?? el);
   }, [selected?.key]);
 
-  const list = isPlay ? dec.options.filter((o) => tabOf(o) === tab) : isLook ? dec.options.filter((o) => defTabOf(o) === dtab) : dec.options;
+  const list = simple ? starter(dec, s) : isPlay ? dec.options.filter((o) => tabOf(o) === tab) : isLook ? dec.options.filter((o) => defTabOf(o) === dtab) : dec.options;
   // keys: 1-9 the list, then the special-teams buttons; R S D O T switch tabs; Enter snaps the selected call
   const keyed = isPlay ? [...list, ...specials] : list;
   useEffect(() => {
@@ -206,6 +226,8 @@ export function CallPanel(p: Props) {
       if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+      if ((e.target as HTMLElement)?.closest?.('[role="dialog"]')) return;   // a modal is open: its keys are its own
+      if (document.querySelector('.tour')) return;   // the first-game tour is up: no calls under it
       const n = Number(e.key);
       if (n >= 1 && n <= keyed.length) {
         e.preventDefault();
@@ -214,6 +236,8 @@ export function CallPanel(p: Props) {
       } else if ((isPlay || isLook) && e.key === 'Enter' && selected && canSnap) {
         e.preventDefault();
         onSnap(selected);
+      } else if (simple) {
+        // no tabs in the rookie playbook
       } else if (isPlay) {
         const t = TABS.find((x) => x.key === e.key.toLowerCase());
         if (t) setTab(t.id);
@@ -258,9 +282,10 @@ export function CallPanel(p: Props) {
         <header className="cp-head">
           <div className="cp-flags"><span className="def-flag">Defense · your call</span><WeatherChip s={s} /></div>
           <Title text={dec.title} />
-          <div className="read tend"><b>Scouting:</b> {tendency(s)}</div>
+          {!simple && <div className="read tend"><b>Scouting:</b> {tendency(s)}</div>}
         </header>
         {clockRow}
+        {simple ? <p className="tab5-blurb cp-simple">Your starting defenses. <button className="link" onClick={fullPlaybook}>All 19 defenses</button></p> : <>
         <div className="tabs5 deftabs" role="tablist" aria-label="Kinds of defense">
           {DEF_TABS.map((t) => {
             const n = dec.options.filter((o) => defTabOf(o) === t.id).length;
@@ -273,7 +298,8 @@ export function CallPanel(p: Props) {
           })}
         </div>
         <p className="tab5-blurb">{DT.blurb}</p>
-        <div className="cp-list def-list cards" role="listbox" aria-label={`${DT.label} defenses`}>{list.map(row)}</div>
+        </>}
+        <div className="cp-list def-list cards" role="listbox" aria-label={simple ? 'Defenses' : `${DT.label} defenses`}>{list.map(row)}</div>
         {look && <Trade look={look} cls="strip" />}
         <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
           <div className="cp-sel">
@@ -309,7 +335,7 @@ export function CallPanel(p: Props) {
             return (
               <button key={o.key} className={`dbtn${MAJOR.has(o.key) ? ' major' : ''} ${hintClass(wp, best)}`} disabled={needClock} onClick={() => onSnap(o)}>
                 <span className="dbtn-txt">
-                  <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}</span>
+                  <span className="dbtn-name"><kbd>{i + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline">★ Playbook</em>}</span>
                   {o.sub && <span className="dbtn-sub">{o.sub}</span>}
                 </span>
                 {wp != null && <span className="opt-wp">{(wp * 100).toFixed(1)}%</span>}
@@ -344,6 +370,7 @@ export function CallPanel(p: Props) {
           <MiniPlay play={o.choice.play} side={sel ? edits.side : undefined} routes={sel ? edits.routes : undefined} target={sel ? edits.target : undefined} mods={sel ? edits.mods : undefined} />
           {f && <span className="pc-form">{FORMATION_NAME[f] ?? f}</span>}
           <span className="pc-tag">{wp != null ? <span className="opt-wp">{(wp * 100).toFixed(1)}%</span> : o.risk ? <span className={`riskchip r${o.risk}`}>{RISK[o.risk]}</span> : null}</span>
+          {o.premium && <span className="pc-pb" title="From the Coach's Playbook">★ Playbook</span>}
         </span>
         <span className="pc-name"><kbd>{i + 1}</kbd>{o.label}</span>
         <span className="pc-sub">{o.sub}</span>
@@ -381,7 +408,7 @@ export function CallPanel(p: Props) {
           return (
             <button key={o.key} className={`sbtn${sel ? ' sel' : ''} ${hintClass(wp, best)}`} onClick={() => onSelect(o)} aria-pressed={sel}>
               <MiniPlay play={o.key} />
-              <span><span className="sbtn-name"><kbd>{list.length + j + 1}</kbd>{o.label}</span><span className="sbtn-sub">{o.sub}</span></span>
+              <span><span className="sbtn-name"><kbd>{list.length + j + 1}</kbd>{o.label}{o.premium && <em className="pc-pb inline">★</em>}</span><span className="sbtn-sub">{o.sub}</span></span>
               {wp != null && <span className="opt-wp">{(wp * 100).toFixed(1)}%</span>}
             </button>
           );
@@ -407,7 +434,7 @@ export function CallPanel(p: Props) {
       <header className="cp-head">
         <div className="cp-flags"><span className="off-flag">Your call</span><WeatherChip s={s} /></div>
         <Title text={dec.title} />
-        {s.shownLook && (
+        {s.shownLook && !simple && (
           <div className="read" title={`Your pre-snap read is right about ${Math.round((read?.p ?? 0.7) * 100)}% of the time${read?.crowd ? ' (a road crowd on third down makes it harder)' : ''}`}>
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="2" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>
             <span><b>Defense:</b> {LOOK_READ[s.shownLook]}</span>
@@ -420,6 +447,7 @@ export function CallPanel(p: Props) {
       </header>
       {clockRow}
       {fourth && specialRow}
+      {simple ? <p className="tab5-blurb cp-simple">Your starting playbook: runs, short passes and a deep shot. <button className="link" onClick={fullPlaybook}>Show the full playbook (27 plays)</button></p> : <>
       <div className="tabs5" role="tablist" aria-label="Kinds of plays">
         {TABS.map((t) => {
           const n = dec.options.filter((o) => tabOf(o) === t.id).length;
@@ -432,10 +460,11 @@ export function CallPanel(p: Props) {
         })}
       </div>
       <p className="tab5-blurb">{T.blurb}</p>
-      <div className="cp-list cards" role="listbox" aria-label={`${T.label} calls`}>{list.map(row)}</div>
+      </>}
+      <div className="cp-list cards" role="listbox" aria-label={simple ? 'Plays' : `${T.label} calls`}>{list.map(row)}</div>
       {!fourth && specialRow}
       <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
-        {adjust}
+        {!simple && adjust}
         <div className="cp-sel">
           {selected ? (
             <>

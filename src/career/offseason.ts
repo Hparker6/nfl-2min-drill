@@ -5,6 +5,8 @@
 import { clip, gauss, hash, rng } from '../engine/rng';
 import { SLOT_GROUP, SLOTS } from '../engine/roster';
 import { seasonAwards } from './awards';
+import { noteSeason, RECORD_STATS } from './legacy';
+import { editionShown } from '../game/edition';
 import { ARCH, ordinal, weeklyGoals, youPlayer, type Career, type SeasonSummary } from './career';
 import { genPlayer, nameMaker, overall, teamById, teamInfo } from './league';
 import { newSeason, placesFrom, REG_WEEKS } from './season';
@@ -26,7 +28,15 @@ export function endSeason(c: Career) {
     year: s.year, team: me.team!, line: s.stats[c.you.pid] ?? {}, w: st?.w ?? 0, l: st?.l ?? 0, t: st?.t ?? 0, playoff,
     awards: s.awards.filter((a) => a.you).map((a) => a.name), ovr: me.rating,
   };
+  const poLine = s.poStats?.[c.you.pid];
+  if (poLine && Object.keys(poLine).length) sum.po = poLine;
   c.history.push(sum);
+  const broke = noteSeason(c, s, { team: sum.team, w: sum.w, l: sum.l, t: sum.t, playoff });
+  if (editionShown()) for (const k of broke) {
+    const r = c.legacy!.records[k]!;
+    const label = RECORD_STATS.find((x) => x[0] === k)![1].toLowerCase();
+    c.news.unshift({ week: 23, year: s.year, text: `League record: ${r.name}, ${r.v.toLocaleString('en-US')} ${label} in a season.`, tone: r.you ? 'good' : 'neutral' });
+  }
   // a year off the contract: at 0 he's a free agent this offseason
   if (c.you.contract) c.you.contract.years = Math.max(0, c.you.contract.years - 1);
   for (const a of s.awards.filter((x) => x.you)) c.news.unshift({ week: 23, year: s.year, text: `${c.you.name} wins ${a.name}.`, tone: 'good' });
@@ -180,8 +190,10 @@ export function offers(c: Career): { team: string; years: number; salary: number
     .sort((a, b) => a.need - b.need || (r() - 0.5))
     .slice(0, 4);
   const out = teams.map((x) => ({ team: x.t.id, years: 2 + Math.floor(r() * 4), salary: Math.round(value * (0.9 + r() * 0.25) * 10) / 10 }));
-  // your own team always wants you back
-  if (!c.you.wantsTrade) out.unshift({ team: me.team!, years: 3 + Math.floor(r() * 3), salary: Math.round(value * 1.05 * 10) / 10 });
+  // your own team always wants you back; when you asked for a trade and nobody better bites, it is still there
+  // (a career can never be stuck with no team to sign with)
+  const own = { team: me.team!, years: 3 + Math.floor(r() * 3), salary: Math.round(value * 1.05 * 10) / 10 };
+  if (!c.you.wantsTrade || !out.length) out.unshift(own);
   return out;
 }
 
@@ -205,7 +217,7 @@ export function signWith(c: Career, team: string, years: number, salary: number,
   }
   to.roster.QB = me.id;
   me.team = to.id;
-  c.news.unshift({ week: 0, year: c.season.year + 1, text: trade ? `Traded: ${c.you.name} to ${to.city}${theirs ? ` for ${theirs.name}` : ''}.` : `${c.you.name} signs with ${to.city}: ${years} years, $${salary}m a year.`, tone: 'good' });
+  c.news.unshift({ week: 0, year: c.season.year + (c.phase === 'offseason' ? 1 : 0), text: trade ? `Traded: ${c.you.name} to ${to.city}${theirs ? ` for ${theirs.name}` : ''}.` : `${c.you.name} signs with ${to.city}: ${years} years, $${salary}m a year.`, tone: 'good' });
 }
 
 /** Teams that would trade for you now: a worse quarterback, and you're worth his spot. */

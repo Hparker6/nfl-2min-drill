@@ -5,6 +5,8 @@ import { fmtClock } from '../game/describe';
 import { track } from '../game/analytics';
 import type { Store } from '../game/storage';
 import { GameScreen } from './GameScreen';
+import { editionShown } from '../game/edition';
+import { LADDER, MAX_STARS, totalStars } from '../game/ladder';
 
 interface Props {
   store: Store;
@@ -91,6 +93,12 @@ export function Practice({ store, update }: Props) {
           <button className="btn big" onClick={random}>Random spot</button>
         </div>
       </section>
+      {editionShown() && (
+        <section className="summary ld-entry">
+          <div><b>Gridiron Challenge</b><span className="muted">{LADDER.length} original late-game spots, harder as you climb, three stars each. {totalStars(store.ladder)} / {MAX_STARS} ★</span></div>
+          <button className="btn" onClick={() => { location.hash = 'ladder'; }}>Open the ladder ▸</button>
+        </section>
+      )}
     </div>
   );
 }

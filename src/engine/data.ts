@@ -110,6 +110,12 @@ export interface Call {
   // rpo: the run it hands off to, and the throw it pulls to when the box is loaded or a blitz comes
   run?: string;
   trick?: boolean;
+  /** the Coach's Playbook (the Coach's Edition): offered only when the game's state says so (State.pb); the AI never calls these */
+  premium?: boolean;
+  /** hook and ladder: after the catch, a lateral to the trailing man */
+  ladder?: boolean;
+  /** offered on fourth down only, with the field goal and the punt (fake punt) */
+  fourthOnly?: boolean;
   risk: 1 | 2 | 3;        // shown as a risk meter on the card
 }
 
@@ -144,6 +150,12 @@ export const CALLS: Call[] = [
   { id: 'reverse', fam: 'trick', name: 'End-around', sub: 'A receiver loops back the other way with the ball', kind: 'run', ypc: 3.6, sd: 9, big: 0.14, stuff: 0.3, oob: 0.36, lane: 'out', trick: true, carrier: 'WR2', risk: 3 },
   { id: 'wr_pass', fam: 'trick', name: 'Receiver pass', sub: 'Toss it to a receiver, who throws deep', kind: 'pass', drop: 'trick', tgt: 'TE', trick: true, adj: -0.04, routes: { WR1: 'go', WR2: 'screen', WR3: 'post', TE: 'seam', RB: 'flat' }, risk: 3 },
   { id: 'direct', fam: 'trick', name: 'Direct snap', sub: 'Snap it straight to the running back', kind: 'run', ypc: 4.3, sd: 4.6, big: 0.08, stuff: 0.17, oob: 0.08, lane: 'in', trick: true, risk: 2 },
+
+  // ---- the Coach's Playbook (Coach's Edition): honest odds, graded like every other call
+  { id: 'hook_ladder', fam: 'trick', name: 'Hook and ladder', sub: 'A hitch, then a lateral to the trailing back: a few yards become a lot (or a loose ball)', kind: 'pass', drop: 'quick', tgt: 'WR2', trick: true, ladder: true, premium: true, adj: -0.05, routes: { WR1: 'go', WR2: 'hitch', WR3: 'cross', TE: 'seam', RB: 'flat' }, risk: 3 },
+  { id: 'statue', fam: 'trick', name: 'Statue of Liberty', sub: 'Fake the throw; the back takes it from behind and runs wide', kind: 'run', ypc: 3.9, sd: 8.5, big: 0.13, stuff: 0.24, oob: 0.28, lane: 'out', trick: true, premium: true, risk: 3 },
+  { id: 'hb_pass', fam: 'trick', name: 'Halfback pass', sub: 'Toss it to the running back, who pulls up and throws deep', kind: 'pass', drop: 'trick', tgt: 'WR1', trick: true, premium: true, adj: -0.07, routes: { WR1: 'post', WR2: 'go', WR3: 'seam', TE: 'hitch', RB: 'flat' }, risk: 3 },
+  { id: 'fake_punt', fam: 'trick', name: 'Fake punt', sub: 'Line up to punt; the up-back takes the snap and runs', kind: 'run', ypc: 3.4, sd: 4.6, big: 0.06, stuff: 0.2, oob: 0.08, lane: 'in', trick: true, premium: true, fourthOnly: true, risk: 3 },
 ];
 
 export const CALL: Record<string, Call> = Object.fromEntries(CALLS.map((c) => [c.id, c]));
