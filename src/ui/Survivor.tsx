@@ -7,6 +7,7 @@ import { rateSpots } from '../game/rating';
 import type { Store, SpotResult } from '../game/storage';
 import { track } from '../game/analytics';
 import { GameScreen } from './GameScreen';
+import { EditionPromo } from './EditionLock';
 
 interface Props {
   store: Store;
@@ -107,6 +108,7 @@ export function Survivor({ store, update, toast }: Props) {
             <button className="btn primary big" onClick={share}>Share run</button>
             <button className="btn big" onClick={() => { track('play_again', { from: 'survivor', to: 'survivor' }); newRun(); }}>Start a new run</button>
           </div>
+          <EditionPromo where="survivor" detail={String(survived)} />
         </section>
       </div>
     );

@@ -7,6 +7,7 @@ import type { Store } from '../game/storage';
 import { GameScreen } from './GameScreen';
 import { editionShown } from '../game/edition';
 import { LADDER, MAX_STARS, totalStars } from '../game/ladder';
+import { Icon } from './Icon';
 
 interface Props {
   store: Store;
@@ -95,7 +96,7 @@ export function Practice({ store, update }: Props) {
       </section>
       {editionShown() && (
         <section className="summary ld-entry">
-          <div><b>Gridiron Challenge</b><span className="muted">{LADDER.length} original late-game spots, harder as you climb, three stars each. {totalStars(store.ladder)} / {MAX_STARS} ★</span></div>
+          <div><b>Gridiron Challenge</b><span className="muted">{LADDER.length} original late-game spots, harder as you climb, three stars each. {totalStars(store.ladder)} / {MAX_STARS} <Icon name="star" /></span></div>
           <button className="btn" onClick={() => { location.hash = 'ladder'; }}>Open the ladder ▸</button>
         </section>
       )}

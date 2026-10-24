@@ -10,6 +10,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AD_UNIT } from '../game/site';
 import { ownsEdition } from '../game/edition';
+import { RemoveAds } from './EditionLock';
 
 declare global { interface Window { adsbygoogle?: unknown[] } }
 
@@ -50,7 +51,7 @@ function AdUnit({ client, slot, where }: { client: string; slot: string; where: 
   }, [client]);
   return (
     <aside className={`ad-slot ad-${where}`} aria-label="Advertisement">
-      <span className="ad-k">Advertisement</span>
+      <span className="ad-k">Advertisement <RemoveAds /></span>
       <ins className="adsbygoogle" style={{ display: 'block' }} data-ad-client={client} data-ad-slot={slot} data-ad-format="auto" data-full-width-responsive="true" />
     </aside>
   );

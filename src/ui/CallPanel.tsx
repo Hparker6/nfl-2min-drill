@@ -10,6 +10,7 @@ import type { Look, LookFam, PassMods, Rcv, RouteId, State, TeamInfo } from '../
 import { MiniPlay } from './MiniPlay';
 import type { ScoutNote } from '../game/scout';
 import { Icon } from './Icon';
+import { PlaybookTeaser } from './EditionLock';
 
 /** What the play-caller changed about the selected call: the side, the receiver, the routes, the quarterback's action. */
 export interface Edits {
@@ -463,6 +464,7 @@ export function CallPanel(p: Props) {
       <p className="tab5-blurb">{T.blurb}</p>
       </>}
       <div className="cp-list cards" role="listbox" aria-label={simple ? 'Plays' : `${T.label} calls`}>{list.map(row)}</div>
+      {isPlay && !simple && tab === 'trick' && !list.some((o) => o.premium) && <PlaybookTeaser />}
       {!fourth && specialRow}
       <footer className={`cp-foot${canSnap ? ' ready' : ''}`}>
         {!simple && adjust}

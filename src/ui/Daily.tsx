@@ -204,7 +204,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
         <span className="k">Day {dayNumber(date)} · your score</span>
         <div className="score-big">{rt.performance}</div>
         <div className="score-line">
-          {board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()} today` : pct != null ? `Better than ${pct}% of simulated play-callers` : `Decisions ${rt.decisions} · Result ${rt.result}`}
+          {board?.rank ? `#${board.rank.toLocaleString()} of ${board.count.toLocaleString()} today` : pct != null ? <>Better than {pct}% of simulated <span className="nowrap">play-callers</span></> : `Decisions ${rt.decisions} · Result ${rt.result}`}
         </div>
         <div className="score-sub">
           <span><em>{result.win ? 'Win' : 'Loss'}</em> {result.score[0]}–{result.score[1]}{result.ot ? ' OT' : ''}</span>
@@ -294,7 +294,7 @@ function DayScore({ date, result, store, update, toast, go, kind, dare }: { date
         </div>
         <span className="muted small">Next daily in <Countdown /></span>
       </div>
-      <EditionPromo where="after" />
+      <EditionPromo where={result.win ? 'after' : 'loss'} />
     </section>
   );
 }

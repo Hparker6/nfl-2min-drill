@@ -397,7 +397,7 @@ kbd { display: inline-grid; place-items: center; min-width: 18px; height: 18px; 
 .modal-body h3 { font-size: 18px; text-transform: uppercase; margin-top: 6px; }
 .modal-body ul { padding-left: 18px; margin: 0; display: grid; gap: 6px; }
 .modal-body ul.grades { list-style: none; padding: 0; }
-.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat-grid div { background: var(--panel-2); border-radius: var(--r-sm); padding: 8px; display: grid; text-align: center; }
 .stat-grid b { font: 700 28px var(--display); }
 .stat-grid span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
@@ -1443,4 +1443,54 @@ input, textarea, [contenteditable] { caret-color: var(--accent); }
 /* Wide screens: the scoreboard and the header line up with the field and the panel below them, one column edge. */
 @media (min-width: 1280px) {
   .game { width: fit-content; max-width: 100%; margin-inline: auto; }
+}
+
+/* ---- Coach's Edition: gold ---- */
+:root { --gold-1: #8a6410; --gold-2: #f5c518; --gold-3: #fff1a8; --gold-ink: #241a00; --gold-glow: rgba(245, 197, 24, .42); }
+/* the top bar button: a gold bar with a light that sweeps across it every few seconds, and a soft glow */
+.top-edition { position: relative; overflow: hidden; isolation: isolate; color: var(--gold-ink); background: linear-gradient(115deg, #d9a20a 0%, var(--gold-2) 38%, var(--gold-3) 50%, var(--gold-2) 62%, #d9a20a 100%); background-size: 220% 100%; box-shadow: 0 4px 16px -6px var(--gold-glow), inset 0 1px 0 rgba(255, 255, 255, .45); animation: ed-sheen 7s ease-in-out infinite; }
+.top-edition::after { content: ''; position: absolute; inset: -40% auto -40% -30%; width: 22%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .75), transparent); transform: skewX(-18deg); animation: ed-glint 7s ease-in-out infinite; z-index: -1; }
+.top-edition:hover { background: linear-gradient(115deg, #e5ad10, #ffd84a 50%, #e5ad10); box-shadow: 0 6px 22px -6px var(--gold-glow), inset 0 1px 0 rgba(255, 255, 255, .5); }
+.top-edition.owned { background: var(--panel-2); color: var(--gold-2); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-2) 45%, transparent); animation: none; }
+.top-edition.owned::after { display: none; }
+@keyframes ed-sheen { 0%, 100% { background-position: 100% 0; } 50% { background-position: 0 0; } }
+@keyframes ed-glint { 0%, 70% { left: -30%; opacity: 0; } 74% { opacity: 1; } 88%, 100% { left: 120%; opacity: 0; } }
+
+/* every gold surface: a shimmering gold hairline, a warm tint, a glow that sits under it */
+.ed-gold { position: relative; border: 1px solid transparent; background:
+  linear-gradient(160deg, color-mix(in srgb, var(--gold-2) 12%, var(--panel)) 0%, var(--panel) 65%) padding-box,
+  linear-gradient(115deg, var(--gold-1), var(--gold-2) 35%, var(--gold-3) 50%, var(--gold-2) 65%, var(--gold-1)) border-box;
+  background-size: 100% 100%, 260% 100%; animation: ed-border 6s linear infinite; box-shadow: 0 10px 30px -14px var(--gold-glow); }
+@keyframes ed-border { from { background-position: 0 0, 0 0; } to { background-position: 0 0, 260% 0; } }
+.ed-promo { border-radius: var(--r-md); }
+.ed-promo-star, .ed-promo-price { color: var(--gold-2); }
+.ed-promo-star { filter: drop-shadow(0 0 6px var(--gold-glow)); }
+.ed-promo-hook { margin: 2px 0 0; font: 800 20px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; color: var(--ink) !important; }
+.btn.ed-cta { justify-self: start; border: 0; color: var(--gold-ink); background: linear-gradient(115deg, #d9a20a, var(--gold-2) 45%, var(--gold-3) 55%, #d9a20a); font-weight: 700; box-shadow: 0 4px 14px -6px var(--gold-glow); }
+.btn.ed-cta:hover:not(:disabled) { background: linear-gradient(115deg, #e5ad10, #ffd84a 50%, #e5ad10); }
+.ed-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font: 700 11px var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--gold-ink); background: linear-gradient(115deg, #d9a20a, var(--gold-2) 50%, #d9a20a); vertical-align: middle; }
+.ed-lock h3 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ed-promo-loss, .ed-promo-survivor { margin: 6px auto 0; max-width: 560px; width: 100%; box-sizing: border-box; }
+
+/* the locked row at the end of the Trick tab */
+.pb-teaser { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; margin-top: 8px; padding: 10px 12px; border-radius: var(--r-sm); color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.pb-teaser-lock { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; color: var(--gold-ink); background: linear-gradient(135deg, #d9a20a, var(--gold-3)); }
+.pb-teaser-txt { display: grid; gap: 2px; min-width: 0; }
+.pb-teaser-txt b { font: 800 15px var(--display); text-transform: uppercase; letter-spacing: .03em; }
+.pb-teaser-txt span { font-size: 12.5px; color: var(--ink-2); }
+.pb-teaser-go { font: 700 13px var(--display); letter-spacing: .04em; color: var(--gold-2); white-space: nowrap; }
+.pb-teaser:hover .pb-teaser-go { color: var(--gold-3); }
+
+/* "Remove ads" beside the ad label */
+.ad-slot .ad-k .ad-remove { margin-left: 8px; font: 700 10px var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--gold-2); padding: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .top-edition, .top-edition::after, .ed-gold { animation: none; }
+  .top-edition::after { display: none; }
+}
+
+.nowrap { white-space: nowrap; }
+/* phones: the start button stays in reach while the brief scrolls under the field */
+@media (max-width: 999px) {
+  .brief .btn.primary.big { position: sticky; bottom: 10px; z-index: 6; box-shadow: 0 12px 28px -10px rgba(0, 0, 0, .7); }
 }
