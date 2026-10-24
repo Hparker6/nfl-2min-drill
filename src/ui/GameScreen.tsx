@@ -19,7 +19,7 @@ import { FieldView, type Banner, type FieldHandle } from './FieldView';
 import { MiniPlay } from './MiniPlay';
 import { Scoreboard } from './Scoreboard';
 import { SpotReview } from './Review';
-import { tellsOf, type Preview } from './field';
+import { tellsOf, type Preview, tokenColors } from './field';
 import { AdSlot, gameOnScreen } from './AdSlot';
 import { audio } from '../game/audio';
 import { cueFor, finalCue, HAPTIC, type ImpactKind } from '../game/fx';
@@ -651,6 +651,7 @@ export function GameScreen(p: Props) {
     return () => clearTimeout(id);
   }, [touring, phase, dec]);
 
+  const legendCols = tokenColors(T[view.off], T[view.off === 0 ? 1 : 0]);
   return (
     <div className={`game${clutchNow ? ' clutch' : ''}`} ref={gameRef}>
       {touring === 'on' && <Tour steps={FIRST_GAME_TOUR} onDone={(f) => { setTouring('done'); track('tour_done', { finished: f }); p.tour?.onDone(f); }} />}
@@ -666,8 +667,8 @@ export function GameScreen(p: Props) {
             {tellNow && !rookie && <div className="fchip-tell" title={`What the defense shows before the snap. Your read is right about ${Math.round(readNow.p * 100)}% of the time.`}>Tell · {tellNow}</div>}
             {phase === 'deciding' && readNow.crowd && !rookie && <div className="fchip-crowd">Road crowd: harder read</div>}
             <div className="legend" aria-hidden>
-              <span><i className="lg-o" />Offense: {T[view.off].name}</span>
-              <span><i className="lg-d" />Defense: {T[view.off === 0 ? 1 : 0].name}</span>
+              <span><i className="lg-o" style={{ background: legendCols.o.fill }} />Offense: {T[view.off].name}</span>
+              <span><i className="lg-d" style={{ background: legendCols.d.fill }} />Defense: {T[view.off === 0 ? 1 : 0].name}</span>
               <span className="lg-x">Hover a player for ratings</span>
             </div>
           </FieldView>

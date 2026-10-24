@@ -1,6 +1,7 @@
 /**
  * The field: an SVG drawn in yards (x across, 0-53.3; y down the field). Your end zone is at the bottom, theirs at
- * the top. Offense is drawn as blue circles and defense as light diamonds for every team. Players are positioned in the offense's frame ([x from the offense's left sideline, yards past the line])
+ * the top. Players are jersey tokens in their team's colors (round on offense, a rounded square on defense) with
+ * the rating as the outline. Players are positioned in the offense's frame ([x from the offense's left sideline, yards past the line])
  * and mapped onto the field, so the same formation code works whichever way the offense is going.
  *
  * The camera is a window onto the field whose height follows the element's aspect ratio (resize()), so the field
@@ -22,7 +23,7 @@ import { hash, rng } from '../engine/rng';
 import { choreograph, routePoints, type BallKey, type Key, type Timeline } from '../engine/timeline';
 import { kickoffTimeline, patTimeline } from '../engine/kicks';
 import type { Ev, Look, Rcv, RouteId, State, Team, TeamInfo, PassMods, Weather } from '../engine/types';
-import { BEHIND, BEHIND_VIEW, drawEnd, drawEndZone, drawMidfield, drawNumberArrow } from './stadium';
+import { BEHIND, BEHIND_VIEW, drawEnd, drawEndZone, drawMidfield, drawNumberArrow, inkOn } from './stadium';
 import { KickCam, type KickoffShot } from './kickcam';
 
 const NS = 'http://www.w3.org/2000/svg';
@@ -62,9 +63,26 @@ export function ratingColor(r: number): string {
   const f = Math.max(0, Math.min(1, (r - 62) / 28));
   return `hsl(${Math.round(f * 125)} 68% ${Math.round(46 - Math.abs(f - 0.5) * 8)}%)`;
 }
+/** A team's token colors on the field: its own color, and the number in whatever reads on it. */
+export interface TokenColor { fill: string; ink: string }
+const rgbOf = (h: string) => { const n = parseInt(h.replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const colorDist = (a: string, b: string) => { const x = rgbOf(a), y = rgbOf(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]); };
+/**
+ * Offense and defense in their teams' colors. When the two are too alike to tell apart at a glance (two red teams),
+ * the defense wears its second color, or failing that a light or dark neutral against the offense.
+ */
+export function tokenColors(off: TeamInfo, def: TeamInfo): { o: TokenColor; d: TokenColor } {
+  const of = off.color;
+  let df = def.color;
+  if (colorDist(of, df) < 120) {
+    const alt = def.color2;
+    df = alt && colorDist(of, alt) >= 120 && colorDist(alt, '#2c7246') >= 70 ? alt : rgbOf(of).reduce((a, b) => a + b, 0) / 3 > 128 ? '#1b2024' : '#eceae3';
+  }
+  return { o: { fill: of, ink: inkOn(of) }, d: { fill: df, ink: inkOn(df) } };
+}
 const COARSE = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
 const LINE_KEYS = new Set(['LT', 'LG', 'C', 'RG', 'RT', 'EDGE1', 'DL1', 'DL2', 'EDGE2']);
-interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement; mk: SVGElement }
+interface Dot { g: SVGGElement; body: SVGElement; ring: SVGElement; lab: SVGTextElement; name: SVGTextElement; mk: SVGElement; side: 'o' | 'd' }
 
 export class FieldRenderer {
   private svg: SVGSVGElement;
@@ -114,7 +132,8 @@ export class FieldRenderer {
     this.shadow = this.el('ellipse', { rx: 0.5, ry: 0.3, class: 'f-ball-sh' }) as SVGEllipseElement;
     this.ball = this.el('ellipse', { rx: 0.42, ry: 0.7, class: 'f-ball' }) as SVGEllipseElement;
     this.ballLace = this.el('line', { class: 'f-lace' }) as SVGLineElement;
-    svg.append(defs, this.gField, this.gMarks, this.gRoutes, this.gFx, this.gPlayers, this.shadow, this.ball, this.ballLace);
+    this.trail = this.el('path', { class: 'f-trail' }) as SVGPathElement;
+    svg.append(defs, this.gField, this.gMarks, this.gRoutes, this.gFx, this.gPlayers, this.shadow, this.trail, this.ball, this.ballLace);
     this.applyCam();
   }
 
@@ -127,7 +146,7 @@ export class FieldRenderer {
 
   /** Linemen stand a yard apart, so they grow less than everyone else. */
   private scaleMarker(d: Dot, key: string) {
-    const k = LINE_KEYS.has(key.slice(2)) ? Math.min(this.mkScale, 1.3) : this.mkScale;
+    const k = LINE_KEYS.has(key.slice(2)) ? Math.round(Math.min(this.mkScale, 1.3) * 0.86 * 100) / 100 : this.mkScale;
     if (k === 1) d.mk.removeAttribute('transform'); else d.mk.setAttribute('transform', `scale(${k})`);
   }
 
@@ -264,15 +283,18 @@ export class FieldRenderer {
     for (const side of ['o', 'd'] as const) {
       for (const pos of side === 'o' ? OFF_POS : DEF_POS) {
         const g = this.el('g', { class: `f-dot f-${side}` }, this.gPlayers) as SVGGElement;
-        // offense: circles; defense: diamonds. The outline is the player's rating, red to green.
+        // jersey tokens: round on offense, a rounded square on defense (the shape still tells the sides apart without
+        // color). The fill is the team's color, the outline the player's rating; a dark edge keeps neighbors apart.
         // the marker itself sits in its own group so small screens can draw it larger (.f-mk in the stylesheet)
         const mk = this.el('g', { class: 'f-mk' }, g);
+        if (side === 'o') this.el('circle', { r: 1.06, class: 'f-edge' }, mk);
+        else this.el('rect', { x: -1.02, y: -1.02, width: 2.04, height: 2.04, rx: 0.52, class: 'f-edge' }, mk);
         const ring = side === 'o'
-          ? this.el('circle', { r: 1.12, class: 'f-ring' }, mk)
-          : this.el('rect', { x: -1.02, y: -1.02, width: 2.04, height: 2.04, rx: 0.3, transform: 'rotate(45)', class: 'f-ring' }, mk);
+          ? this.el('circle', { r: 1.24, class: 'f-ring' }, mk)
+          : this.el('rect', { x: -1.2, y: -1.2, width: 2.4, height: 2.4, rx: 0.62, class: 'f-ring' }, mk);
         const body = side === 'o'
-          ? this.el('circle', { r: 0.86, class: 'f-body' }, mk)
-          : this.el('rect', { x: -0.74, y: -0.74, width: 1.48, height: 1.48, rx: 0.2, transform: 'rotate(45)', class: 'f-body' }, mk);
+          ? this.el('circle', { r: 0.88, class: 'f-body' }, mk)
+          : this.el('rect', { x: -0.84, y: -0.84, width: 1.68, height: 1.68, rx: 0.44, class: 'f-body' }, mk);
         const lab = this.el('text', { y: 0.3, class: 'f-lab' }, mk) as SVGTextElement;
         lab.textContent = POS_LABEL[pos];
         // linemen stand a yard apart: their names would overlap, so they go by number only
@@ -309,7 +331,7 @@ export class FieldRenderer {
           g.setAttribute('data-rcv', pos);
         }
         this.el('title', {}, g).textContent = pos;
-        this.dots.set(`${side}:${pos}`, { g, body, ring, lab, name, mk });
+        this.dots.set(`${side}:${pos}`, { g, body, ring, lab, name, mk, side });
         this.scaleMarker(this.dots.get(`${side}:${pos}`)!, `${side}:${pos}`);
       }
     }
@@ -357,6 +379,7 @@ export class FieldRenderer {
     this.gFx.innerHTML = '';
     const targets = new Map<string, Pt>();
     const off = s.off, def: Team = off === 0 ? 1 : 0;
+    const cols = tokenColors(T[off], T[def]);
     const passCall = !!pv.routes && !!pv.play && CALL[pv.play]?.kind === 'pass' && pv.play !== 'hail' && off === 0;
     const fm = formation(DESIGN[pv.play ?? '']?.formation ?? 'gun');
     for (const pos of OFF_POS) {
@@ -365,7 +388,7 @@ export class FieldRenderer {
       p = [p[0], Math.max(p[1], -s.yl - 8)];
       const d = this.dots.get(`o:${pos}`)!;
       const pl = T[off].players[pos];
-      this.paint(d, 'o', pl, pos);
+      this.paint(d, 'o', pl, pos, cols.o);
       d.g.classList.toggle('tgt', pv.target === pos || (!!pv.play && passCall && !pv.target && CALL[pv.play]?.tgt === pos));
       const tappable = passCall && (RECEIVERS as string[]).includes(pos);
       d.g.classList.toggle('tappable', tappable);
@@ -382,7 +405,7 @@ export class FieldRenderer {
       const p = ds[pos];
       const d = this.dots.get(`d:${pos}`)!;
       const pl = T[def].players[pos];
-      this.paint(d, 'd', pl, pos);
+      this.paint(d, 'd', pl, pos, cols.d);
       d.g.classList.remove('tgt', 'tappable', 'carrier');
       d.g.classList.toggle('blitz', blitzing.includes(pos));
       d.g.classList.toggle('tell', tell.who.includes(pos));
@@ -414,6 +437,7 @@ export class FieldRenderer {
     // move players: a jog from where they stand, or a quick fade when the ball changed hands
     const swapped = this.lastOff !== null && this.lastOff !== off;
     this.lastOff = off;
+    this.declutter(targets);
     if (instant || !this.pos.size) targets.forEach((p, k) => this.place(k, p));
     else if (swapped) {
       this.gPlayers.classList.add('fade');
@@ -464,14 +488,58 @@ export class FieldRenderer {
     }
   }
 
-  /** Offense and defense look the same for every team: blue circles and light diamonds, for an instant read. */
-  private paint(d: Dot, side: 'o' | 'd', pl: { name: string; number?: number; rating?: number } | undefined, pos: string) {
+  /** A jersey token: the team's color, the number in an ink that reads on it, the rating as the outline. */
+  private paint(d: Dot, side: 'o' | 'd', pl: { name: string; number?: number; rating?: number } | undefined, pos: string, col?: TokenColor) {
     const rated = this.byRating && pl?.rating != null;
     d.body.setAttribute('class', `f-body ${side === 'o' ? 'f-body-o' : 'f-body-d'}${rated ? ' rated' : ''}`);
     d.lab.setAttribute('class', `f-lab ${side === 'o' ? 'f-lab-o' : 'f-lab-d'}${rated ? ' rated' : ''}`);
-    if (rated) d.body.setAttribute('style', `fill:${ratingColor(pl!.rating!)}`); else d.body.removeAttribute('style');
+    const fill = col?.fill ?? (side === 'o' ? '#1f6fd6' : '#eceae3');
+    d.body.setAttribute('style', `fill:${fill};stroke:${rated ? ratingColor(pl!.rating!) : 'rgba(255,255,255,.9)'}`);
+    d.lab.setAttribute('style', `fill:${col?.ink ?? (side === 'o' ? '#ffffff' : '#14181a')}`);
     d.lab.textContent = pl?.number != null ? String(pl.number) : POS_LABEL[pos];
     d.name.textContent = pl ? shortName(pl.name) : '';
+  }
+
+  private trail!: SVGPathElement;
+  private trailPts: Pt[] = [];
+  private trailClear: ReturnType<typeof setTimeout> | null = null;
+  /** A pass or a kick in the air leaves a short streak behind the ball; it fades once the ball comes down. */
+  private trailAt(p: Pt, h: number) {
+    if (h > 0.8) {
+      if (this.trailClear) { clearTimeout(this.trailClear); this.trailClear = null; }
+      this.trailPts.push(p);
+      if (this.trailPts.length > 16) this.trailPts.shift();
+      this.trail.setAttribute('d', this.trailPts.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(2)},${q[1].toFixed(2)}`).join(' '));
+      this.trail.classList.add('on');
+    } else if (this.trailPts.length && !this.trailClear) {
+      this.trail.classList.remove('on');
+      this.trailClear = setTimeout(() => { this.trailPts = []; this.trail.setAttribute('d', ''); this.trailClear = null; }, 350);
+    }
+  }
+
+  /** Names that would overlap (a back beside the quarterback, two receivers stacked) go above their token instead. */
+  private declutter(targets: Map<string, Pt>) {
+    const named: { d: Dot; p: Pt; w: number }[] = [];
+    targets.forEach((p, k) => {
+      const d = this.dots.get(k);
+      if (!d) return;
+      d.name.setAttribute('y', '2.05');
+      const txt = d.name.textContent ?? '';
+      if (!txt || d.name.classList.contains('f-name-line')) return;
+      named.push({ d, p, w: txt.length * 0.4 * this.mkScale });
+    });
+    named.sort((a, b) => a.p[1] - b.p[1]);
+    const up = new Set<Dot>();
+    for (let i = 0; i < named.length; i++) {
+      for (let j = i + 1; j < named.length; j++) {
+        const a = named[i], b = named[j];
+        if (up.has(a.d) || up.has(b.d)) continue;
+        if (Math.abs(a.p[0] - b.p[0]) < (a.w + b.w) / 2 + 0.3 && Math.abs(a.p[1] - b.p[1]) < 1.6 * this.mkScale) {
+          a.d.name.setAttribute('y', '-1.6');
+          up.add(a.d);
+        }
+      }
+    }
   }
 
   private setBall(p: Pt, h: number, scale: number) {
@@ -480,6 +548,7 @@ export class FieldRenderer {
     this.shadow.setAttribute('cy', p[1].toFixed(2));
     this.shadow.style.opacity = h > 0.3 ? String(Math.max(0.15, 0.5 - h * 0.03)) : '0';
     const y = p[1] - h * 0.45;
+    this.trailAt([p[0], y], h);
     this.ball.setAttribute('cx', p[0].toFixed(2));
     this.ball.setAttribute('cy', y.toFixed(2));
     this.ball.setAttribute('rx', (0.42 * scale).toFixed(2));
@@ -614,8 +683,9 @@ export class FieldRenderer {
     const seed = hash(ev.t, ev.kind, ev.kicker, ev.yl, ev.touchback ? 1 : 0, ev.td ? 1 : 0);
     const { tl, res, yl0 } = kickoffTimeline(ev, T[ev.kicker].rat, T[ev.kicker === 0 ? 1 : 0].rat, seed);
     this.lastOff = ev.kicker;
-    for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.kicker].players[k], k);
-    for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.kicker === 0 ? 1 : 0].players[k], k);
+    const kc = tokenColors(T[ev.kicker], T[ev.kicker === 0 ? 1 : 0]);
+    for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.kicker].players[k], k, kc.o);
+    for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.kicker === 0 ? 1 : 0].players[k], k, kc.d);
     const fake = { type: 'snap', off: ev.kicker, yl0, down0: 1, dist0: 10, t0: ev.t, t: ev.t, res, first: false } as Extract<Ev, { type: 'snap' }>;
     const map = this.frame(ev.kicker, yl0);
     const catchEv = tl.events.find((e) => e.kind === 'catch');
@@ -654,8 +724,9 @@ export class FieldRenderer {
     }
     const { tl, res, yl0 } = patTimeline(ev, T[ev.off].rat, T[ev.off === 0 ? 1 : 0].rat, seed);
     this.lastOff = ev.off;
-    for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.off].players[k], k);
-    for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.off === 0 ? 1 : 0].players[k], k);
+    const sc = tokenColors(T[ev.off], T[ev.off === 0 ? 1 : 0]);
+    for (const k of OFF_POS) this.paint(this.dots.get('o:' + k)!, 'o', T[ev.off].players[k], k, sc.o);
+    for (const k of DEF_POS) this.paint(this.dots.get('d:' + k)!, 'd', T[ev.off === 0 ? 1 : 0].players[k], k, sc.d);
     const fake = { type: 'snap', off: ev.off, yl0, down0: 1, dist0: 100 - yl0, t0: ev.t, t: ev.t, res, first: false } as Extract<Ev, { type: 'snap' }>;
     return this.runTimeline(tl, fake, this.frame(ev.off, yl0), 'kick', speed, onOutcome);
   }
